@@ -28,9 +28,8 @@ GST_DEBUG_CATEGORY_STATIC (robustclock_debug);
 #define GST_CAT_DEFAULT (robustclock_debug)
 
 
-/* Maximum acceptable drift of the system clock with respect to the
-   wrapped clock. */
-#define MAX_DRIFT GST_MSECOND
+/* Maximum acceptable time for the wrapped clock to be stalled. */
+#define MAX_STALLED (GST_SECOND * 0.1)
 
 
 static void
@@ -123,18 +122,14 @@ gst_robust_clock_init (GstRobustClock * clock)
 GstClock *
 gst_robust_clock_new (GstClock *wrapped)
 {
-  int i;
-
   GstRobustClock *rclock =
       GST_ROBUST_CLOCK (g_object_new (GST_TYPE_ROBUST_CLOCK, NULL));
 
   rclock->wrapped = wrapped;
   rclock->wrapped_class = GST_CLOCK_GET_CLASS (wrapped);
 
-  for (i = 0; i < GST_ROBUSTCLOCK_AVERAGED; i++) {
-    rclock->diffs[i] = 0;
-  }
-  rclock->array_pos = 0;
+  rclock->last_system = GST_CLOCK_TIME_NONE;
+  rclock->last_wrapped = GST_CLOCK_TIME_NONE;
 
   rclock->adjust = 0;
 
@@ -184,31 +179,28 @@ gst_robust_clock_get_internal_time (GstClock *clock)
   GstRobustClock *rclock = GST_ROBUST_CLOCK (clock);
   GTimeVal timeval;
   GstClockTime wrapped_time, system_time;
-  GstClockTimeDiff cur_diff, drift;
-
-  //g_print (".");
-
-  /* Theory of operation: we check how much both clocks adavanced
-     since last time. If the system clock advanced clearly faster than
-     the wrapped clock, set the adjust value so that the actual time
-     lapse is taken into account. */
+  GstClockTimeDiff interval;
 
   g_get_current_time (&timeval);
-  system_time = GST_TIMEVAL_TO_TIME (timeval) + rclock->adjust;
-
+  system_time = GST_TIMEVAL_TO_TIME (timeval);
   wrapped_time = rclock->wrapped_class->get_internal_time (rclock->wrapped);
 
-  cur_diff = GST_CLOCK_DIFF (system_time, wrapped_time);
-  drift = cur_diff - rclock->diffs[rclock->array_pos];
+  if (rclock->last_wrapped != GST_CLOCK_TIME_NONE &&
+      wrapped_time == rclock->last_wrapped) {
+    /* Wrapped clock is stalled. Progress as much as the system clock
+       did since the last time we were consulted. */
+    interval = GST_CLOCK_DIFF(system_time, rclock->last_system);
 
-  if (drift > MAX_DRIFT) {
-    //g_print ("Ooooops: % 0.6f!\n", (double) drift / GST_MSECOND);
+    if (interval > MAX_STALLED) {
+      rclock->adjust += interval;
+      rclock->last_system = system_time;
+    }
+  } else {
+    rclock->last_system = system_time;
+    rclock->last_wrapped = wrapped_time;
   }
 
-  rclock->diffs[rclock->array_pos] = cur_diff;
-  rclock->array_pos = (rclock->array_pos + 1) % GST_ROBUSTCLOCK_AVERAGED;
-
-  return system_time;
+  return wrapped_time + rclock->adjust;
 }
 
 static GstClockEntryStatus

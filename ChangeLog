@@ -1,3 +1,14 @@
+2004-11-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/dvdplayer.py (DVDPlayer.__init__): Use the robust clock by
+	default.
+
+	* gst-plugins/robustclock/robustclock.h: 
+	* gst-plugins/robustclock/robustclock.c (gst_robust_clock_new) 
+	(gst_robust_clock_get_internal_time):
+	Implemented a more or less reasonable algorithm for the robust
+	clock. Some preroll mechanism is still needed.
+
 2004-11-28  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c

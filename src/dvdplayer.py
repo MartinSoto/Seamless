@@ -117,10 +117,9 @@ class DVDPlayer(Thread):
         self.dvdSrc.link_pads('subtitle', self.videoSink, 'subtitle')
         self.dvdSrc.link_pads('audio', self.audioSink, 'audio')
 
-        # (Not yet!) Wrap the clock in a robust clock.
-        #self.clock = wrapclock.wrap(self.audioSinkElem.get_clock())
-        #self.clock = gst.system_clock_obtain()
-        #self.use_clock(self.clock)
+        # Wrap the clock in a robust clock.
+        self.clock = wrapclock.wrap(self.audioSinkElem.get_clock())
+        self.use_clock(self.clock)
 
         # Wrap the source element in the virtual machine.
         self.machine = VirtualMachine(self.info,

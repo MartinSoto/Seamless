@@ -36,10 +36,6 @@ G_BEGIN_DECLS
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_ROBUST_CLOCK))
 
 
-/* Drift values averaged to calculate the current drift. */
-#define GST_ROBUSTCLOCK_AVERAGED 20
-
-
 typedef struct _GstRobustClock GstRobustClock;
 typedef struct _GstRobustClockClass GstRobustClockClass;
 
@@ -50,12 +46,13 @@ struct _GstRobustClock {
   GstClock *wrapped;		/* The wrapped clock. */
   GstClockClass *wrapped_class;	/* The class of the wrapped clock. */
 
-  GstClockTimeDiff diffs[GST_ROBUSTCLOCK_AVERAGED];
-                                /* The latest time differences between
-                                   system and wrapped time. */
-  gint array_pos;		/* Current position in the 'diffs'. */
+  GstClockTime last_system;	/* Last time seen from the system
+                                   clock. */
+  GstClockTime last_wrapped;	/* Last time seen from the wrapped
+                                   clock. */
 
-  GstClockTimeDiff adjust;	/* Value added to the returned time. */
+  GstClockTimeDiff adjust;	/* Adjust value to add to the wrapped
+                                   clock. */
 };
 
 struct _GstRobustClockClass {

@@ -1,12 +1,14 @@
 -*- Text -*-
 
+- Hide cursor in the video window.
+
+- Find out why sounds interrupts shortly when moving in menus and
+  using alsasink.
+
+- Trap the stop (^Z) signal and stop the clock while the program is
+  suspended.
+
 - Check for DVD I/O errors when starting and retry if necessary.
-
-- Apparently no discont is being sent at the beginning.
-
-- Find a way to automatically detect if fairpth is present and use it.
-
-- BUG: Trying to terminate the program while in a still frame, blocks.
 
 - BUG: The separate xvimagesink window flashes shortly before the
   program starts.
@@ -22,8 +24,6 @@
 - Implement the cell time as still time thing. Monsters Inc seems to
   use that in the warnings before the film.
 
-- Put copyright/license notices in files.
-
 - Add __richcmp__ to dvdread wrappers as necessary.
 
 - Put pipeline handling in a separate class, wrapping the source
@@ -34,8 +34,6 @@
 - Implement proper VOBU jumping, using the jump fields in nav packets.
 
 - Handle button nav packets properly with respect to time.
-
-- Put source code in sf.net.
 
 - Create a Pyrex wrapper for lirc.
 
@@ -51,11 +49,9 @@
 Particular DVDs
 ---------------
 
-- Monsters Inc: Language selection still at the beginning doesn't show
-  highlight.
+- The Others: Main menu doesn't show the highlight. You can't get out
+  of the film.
 
-- Frankestein: Doesn't go past menu.
-
-- Jacky Brown: Funny menu highlight.
-
-- The Others: Main menu doesn't show the highlight.
+- A Bug's Life: Initial language selection frame doesn't display the
+  first time. Scene selection doesn't work. Seems to be a machine
+  problem.
