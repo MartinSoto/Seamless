@@ -149,20 +149,5 @@ class Scheduler(object):
         self.current = getattr(self.current.instance,
                                methodName)(*posArgs, **kwArgs)
 
-    def getAttr(self, attrName):
-        # Go down the stack searching for an instance having an
-        # attribute with the specified name.
-        if isinstance(self.current, RestartableIterator) and \
-               hasattr(self.current.instance, attrName):
-            return getattr(self.current.instance, attrName)
-
-        for itr in reversed(self.stack):
-            if isinstance(itr, RestartableIterator) and \
-                   hasattr(itr, attrName):
-                return getattr(self.current.instance, attrName)
-
-    __getattr__ = getAttr
-
-
 __all__ = ('IterSchedError', 'NoOp', 'Call', 'Chain', 'Restart',
            'restartPoint', 'Scheduler')

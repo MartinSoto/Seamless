@@ -1,11 +1,16 @@
 2005-03-26  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/itersched.py (Scheduler.restart): Get rid of the
+	getattr functionality. It was a bad idea after all.
 	* src/machine/machine.py (PerformMachine): This class now holds
 	the whole execution state. Register handling and playback location
 	now part of PerformMachine objects.	
 	(CellPlayer.__init__): Receive a perform machine instead of the
 	complete machine object.
 	(VirtualMachine): State information moved to PerformMachine.
+	(ProgramChainPlayer, DiscPlayer, TitleSetPlayer, LangUnitPlayer):
+	Renamed from *Navigator.
+	(entryPoint): New wrapper for machine entry points.
 
 2005-03-25  Martin Soto  <martinsoto@users.sourceforge.net>
 

@@ -54,19 +54,6 @@ class MachineException(Exception):
 disasm = disassemble.CommandDisassembler()
 
 
-def synchronized(method):
-    """Wrapper for syncronized methods."""
-
-    def wrapper(self, *args, **keywords):
-        self.lock.acquire()
-        try:
-            method(self, *args, **keywords)
-        finally:
-            self.lock.release()
-
-    return wrapper
-
-
 class EosEvent(object):
     """A token representing an EOS event in the event queue."""
     pass
@@ -428,11 +415,11 @@ class PerformMachine(object):
         return self.systemRegisters[regNr]
 
 
-class DiscNavigator(object):
-    __slots__ = ('machine')
+class DiscPlayer(object):
+    __slots__ = ('perform')
 
-    def __init__(self, machine):
-        self.machine = machine
+    def __init__(self, perform):
+        self.perform = perform
 
     def nop(self):
         """No operation."""
@@ -527,11 +514,11 @@ class DiscNavigator(object):
         pass
 
 
-class TitleSetNavigator(object):
-    __slots__ = ('machine')
+class TitleSetPlayer(object):
+    __slots__ = ('perform')
 
-    def __init__(self, machine):
-        self.machine = machine
+    def __init__(self, perform):
+        self.perform = perform
 
     def linkProgramChain(self, programChainNr):
         """Jump to the program chain identified by 'programChainNr' in
@@ -575,11 +562,11 @@ class TitleSetNavigator(object):
         pass
 
 
-class LangUnitNavigator(object):
-    __slots__ = ('machine')
+class LangUnitPlayer(object):
+    __slots__ = ('perform')
 
-    def __init__(self, machine):
-        self.machine = machine
+    def __init__(self, perform):
+        self.perform = perform
 
     def linkProgramChain(self, programChainNr):
         """Jump to the program chain identified by 'programChainNr' in
@@ -590,68 +577,38 @@ class LangUnitNavigator(object):
         pass
 
 
-class ProgramChainNavigator(object):
-    __slots__ = ('machine')
+class ProgramChainPlayer(object):
+    __slots__ = ('perform')
 
-    def __init__(self, machine):
-        self.machine = machine
+    def __init__(self, perform):
+        self.perform = perform
 
+    @restartPoint
+    def playProgramChain(self, programChain):
+        """Play the specified program chain."""
+        pass
+
+    @restartPoint
+    def linkCell(self, cellNr):
+        """Jump to the specified cell in the current program chain."""
+        pass
+
+    @restartPoint
     def linkTopCell(self):
         """Jump to beginning of the current cell."""
         pass
 
+    @restartPoint
     def linkNextCell(self):
         """Jump to the beginning of the next cell."""
         pass
 
+    @restartPoint
     def linkPrevCell(self):
         """Jump to the beginning of the previous cell."""
         pass
 
-    def linkTopProgram(self):
-        """Jump to the beginning of the current program.
-
-        Programs are a logical subdivision of program chains. A
-        program is characterized by its start cell number."""
-        pass
-
-    def linkNextProgram(self):
-        """Jump to the beginning of the next program.
-
-        Programs are a logical subdivision of program chains. A
-        program is characterized by its start cell number."""
-        pass
-
-    def linkPrevProgram(self):
-        """Jump to the beginning of the previous program.
-
-        Programs are a logical subdivision of program chains. A
-        program is characterized by its start cell number."""
-        pass
-
-    def linkTopProgramChain(self):
-        """Jump to the beginning of the current program chain."""
-        pass
-
-    def linkNextProgramChain(self):
-        """Jump to the beginning of the next program chain."""
-        pass
-
-    def linkPrevProgramChain(self):
-        """Jump to the beginning of the previous program chain."""
-        pass
-
-    def linkGoUpProgramChain(self):
-        """Jump to the 'up' program chain.
-
-        The 'up' program chain is explicitly referenced from a given
-        program chain."""
-        pass
-
-    def linkTailProgramChain(self):
-        """Jump to the end command block of the current program chain."""
-        pass
-
+    @restartPoint
     def linkProgram(self, programNr):
         """Jump to the specified program in the current program
         chain.
@@ -660,18 +617,66 @@ class ProgramChainNavigator(object):
         program is characterized by its start cell number."""
         pass
 
-    def linkCell(self, cellNr):
-        """Jump to the specified cell in the current program chain."""
+    @restartPoint
+    def linkTopProgram(self):
+        """Jump to the beginning of the current program.
+
+        Programs are a logical subdivision of program chains. A
+        program is characterized by its start cell number."""
+        pass
+
+    @restartPoint
+    def linkNextProgram(self):
+        """Jump to the beginning of the next program.
+
+        Programs are a logical subdivision of program chains. A
+        program is characterized by its start cell number."""
+        pass
+
+    @restartPoint
+    def linkPrevProgram(self):
+        """Jump to the beginning of the previous program.
+
+        Programs are a logical subdivision of program chains. A
+        program is characterized by its start cell number."""
+        pass
+
+    @restartPoint
+    def linkTopProgramChain(self):
+        """Jump to the beginning of the current program chain."""
+        pass
+
+    @restartPoint
+    def linkNextProgramChain(self):
+        """Jump to the beginning of the next program chain."""
+        pass
+
+    @restartPoint
+    def linkPrevProgramChain(self):
+        """Jump to the beginning of the previous program chain."""
+        pass
+
+    @restartPoint
+    def linkGoUpProgramChain(self):
+        """Jump to the 'up' program chain.
+
+        The 'up' program chain is explicitly referenced from a given
+        program chain."""
+        pass
+
+    @restartPoint
+    def linkTailProgramChain(self):
+        """Jump to the end command block of the current program chain."""
         pass
 
 
-class CommandBlockNavigator(object):
-    __slots__ = ('machine',
+class CommandBlockPlayer(object):
+    __slots__ = ('perform',
                  'decoder')
 
-    def __init__(self, machine):
-        self.machine = machine
-        self.decoder = decode.CommandDecoder(PerformMachine(machine))
+    def __init__(self, perform):
+        self.perform = perform
+        self.decoder = decode.CommandDecoder(PerformMachine(perform))
 
     def goto(self, commandNr):
         """Go to command 'commandNr' in the current command block."""
@@ -711,6 +716,9 @@ class CellPlayer(object):
         """Play the specified cell."""
         self.cell = cell
 
+        # Update the machine state.
+        self.perform.location.cell = cell
+
         # Find the playback domain for the cell.
         if isinstance(cell.programChain.container, dvdread.LangUnit):
             self.domain = dvdread.DOMAIN_MENU
@@ -741,15 +749,18 @@ class CellPlayer(object):
 
         # The values in the next nav packet should determine if more
         # material is played in the cell. See the 'setNav' method in
-        # this class.
+        # this class. If this point is reached we are at the end of
+        # the cell.
+        self.perform.location.cell = None
 
+    @restartPoint
     def setNav(self, nav):
-        """Set the new navigation packet."""
+        """Set the current navigation packet."""
         self.nav = nav
 
         # Play the next VOBU.
         if nav.nextVOBU != 0x3fffffff:
-            yield Restart.playVobu(self.sectorNr + nav.nextVOBU)
+            yield Chain(self.playVobu(self.sectorNr + nav.nextVOBU))
 
 
     #
@@ -787,6 +798,104 @@ class CellPlayer(object):
     def setKaraokeMode(self, mode):
         """Set the karaoke mode."""
         pass
+
+
+def synchronized(method):
+    """Wrapper for syncronized methods."""
+
+    def wrapper(self, *args, **keywords):
+        self.lock.acquire()
+        try:
+            method(self, *args, **keywords)
+        finally:
+            self.lock.release()
+
+    return wrapper
+
+
+def entryPoint(method):
+    def wrapper(self, *args, **keywords):
+        self.sched.call(method(self, *args, **keywords))
+
+    return synchronized(wrapper)
+
+
+class VirtualMachine(object):
+    """A DVD playback virtual machine implementation."""
+
+    __slots__ = ('info',
+                 'src',
+                 'lock',
+                 'perform',
+                 'sched')
+
+    def __init__(self, info, src):
+        self.info = info
+        self.src = src
+
+        # The synchronized method lock.
+        self.lock = threading.RLock()
+
+        # Connect our signals to the source object.
+        src.connect('vobu-read', self.vobuRead)
+        src.connect('vobu-header', self.wrapHeader)
+
+        # The perform machine.
+        self.perform = PerformMachine()
+
+        # Initialize the scheduler.
+        self.sched = Scheduler(CellPlayer(self.perform).playCell(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1).getCell(1)))
+
+
+    #
+    # Signal Handling
+    #
+
+    @synchronized
+    def vobuRead(self, src):
+        """Invoked by the source element after reading a complete
+        VOBU."""
+
+        try:
+            # Get the next item.
+            item = self.sched.next()
+        except StopIteration:
+            # Time to stop the pipeline.
+            self.src.set_eos()
+            self.src.emit('push-event', gst.Event(gst.EVENT_EOS));
+            return
+        except:
+            # We had an exception in the playback code.
+            traceback.print_exc()
+            sys.exit(1)
+
+        if isinstance(item, gst.Event):
+            # We have an event, put it in the pipeline.
+            self.src.emit('push-event', item);
+        else:
+            # Otherwise, we have a new playback position in the disc.
+            (domain, titleNr, sectorNr) = item
+            src.set_property('domain', domain)
+            src.set_property('title', titleNr)
+            src.set_property('vobu-start', sectorNr)
+
+    def wrapHeader(self, src, buf):
+        """The signal handler for the source's vobu-header signal. It
+        is only responsible for wrapping the raw header in a NavPacket
+        object, and handling control to the vobuHeader entry point."""
+        nav = dvdread.NavPacket(buf.get_data())
+        self.vobuHeader(nav)
+
+    @entryPoint
+    def vobuHeader(self, nav):
+        """Handle a new VOBU header."""
+        yield Restart.setNav(nav)
+
+    def flushSource(self):
+        """Stop the source element. This operation works even in the
+        middle of a VOBU playback and it's necessary for fast
+        interactive response."""
+        self.src.set_property('block-count', 0)
 
 
     #
@@ -886,74 +995,3 @@ class CellPlayer(object):
     def force(self):
         pass
 
-
-class VirtualMachine(object):
-    """A DVD playback virtual machine implementation."""
-
-    __slots__ = ('info',
-                 'src',
-                 'lock',
-                 'perform',
-                 'sched')
-
-    def __init__(self, info, src):
-        self.info = info
-        self.src = src
-
-        # The synchronized method lock.
-        self.lock = threading.RLock()
-
-        # Connect our signals to the source object.
-        src.connect('vobu-read', self.vobuRead)
-        src.connect('vobu-header', self.vobuHeader)
-
-        # The perform machine.
-        self.perform = PerformMachine()
-
-        # Initialize the scheduler.
-        self.sched = Scheduler(CellPlayer(self.perform).playCell(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1).getCell(1)))
-
-    #
-    # Signal Handling
-    #
-
-    @synchronized
-    def vobuRead(self, src):
-        """Invoked by the source element after reading a complete
-        VOBU."""
-
-        try:
-            # Get the next item.
-            item = self.sched.next()
-        except StopIteration:
-            # Time to stop the pipeline.
-            self.src.set_eos()
-            self.src.emit('push-event', gst.Event(gst.EVENT_EOS));
-            return
-        except:
-            # We had an exception in the playback code.
-            traceback.print_exc()
-            sys.exit(1)
-
-        if isinstance(item, gst.Event):
-            # We have an event, put it in the pipeline.
-            self.src.emit('push-event', item);
-        else:
-            # Otherwise, we have a new playback position in the disc.
-            (domain, titleNr, sectorNr) = item
-            src.set_property('domain', domain)
-            src.set_property('title', titleNr)
-            src.set_property('vobu-start', sectorNr)
-
-    @synchronized
-    def vobuHeader(self, src, buf):
-        """Invoked by the source element when it sees a VOBU
-        header."""
-        nav = dvdread.NavPacket(buf.get_data())
-        self.sched.call(self.sched.setNav(nav))
-
-    def flushSource(self):
-        """Stop the source element. This operation works even in the
-        middle of a VOBU playback and its necessary for fast
-        interactive response."""
-        self.src.set_property('block-count', 0)
