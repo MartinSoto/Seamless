@@ -59,18 +59,18 @@ class DVDPlayer(Thread):
         if options.videoDecode == 'soft':
             videoDecoder = 'mpeg2dec name=mpeg2dec !'
         else:
-            audioDecoder = ''
+            videoDecoder = ''
 
         self.dvdSrc = parse_launch("""
         (
           dvdblocksrc name=dvdblocksrc location=%s !
             seamless-dvddemux name=dvddemux .current_video !
             %s
-            queue name=video
+            seamless-queue name=video
           dvddemux.current_subpicture !
-            queue name=subtitle
+            seamless-queue name=subtitle
           dvddemux.current_audio !
-            queue name=audio max-size-buffers=50
+            seamless-queue name=audio max-size-buffers=50
         )
         """ % (options.location, videoDecoder))
         ghostify(self.dvdSrc, 'video', 'src', 'video')

@@ -1,3 +1,14 @@
+2005-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/dvdplayer.py (DVDPlayer.__init__): Use seamless-queue instead
+	of the standard queue.
+
+	* gst-plugins/queue/gstqueue.c: 
+	* gst-plugins/queue/gstqueue.h: 
+	* gst-plugins/Makefile.am: 
+	* configure.ac: GstQueue forked from GStreamer to apply the
+	controversial renegotiation patch.
+
 2004-12-04  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/videowidget.py (VideoWidget.__init__) 

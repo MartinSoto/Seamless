@@ -134,6 +134,7 @@ AC_OUTPUT([
   gst-plugins/iec958/Makefile
   gst-plugins/mpeg2sub/Makefile
   gst-plugins/mpegstream/Makefile
+  gst-plugins/queue/Makefile
   gst-plugins/robustclock/Makefile
   m4/Makefile
   src/Makefile

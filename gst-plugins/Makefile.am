@@ -5,4 +5,4 @@ ALSASPDIF_DIR=
 endif
 
 SUBDIRS=$(ALSASPDIF_DIR) capspipe dvdblock iec958 mpegstream mpeg2sub \
-	robustclock
+	queue robustclock
