@@ -31,6 +31,11 @@ dnl Define plugindir
 plugindir="\$(pkglibdir)/gst-plugins"
 AC_SUBST(plugindir)
 
+dnl Required versions of dependencies
+AC_SUBST(GSTREAMER_REQ, 0.8.0)
+AC_SUBST(GLIB_REQ, 2.0.0)
+AC_SUBST(PYGTK_REQ, 2.4.0)
+
 dnl Check for glib2
 PKG_CHECK_MODULES(GLIB, glib-2.0 gobject-2.0 gthread-2.0 gmodule-2.0, ,
   AC_MSG_ERROR(You don't have glib-2.0 installed))
@@ -38,12 +43,6 @@ AC_SUBST(GLIB_LIBS)
 AC_SUBST(GLIB_CFLAGS)
 
 dnl check for gstreamer
-GST_VERSION_MAJOR=0
-GST_VERSION_MINOR=8
-GST_VERSION_RELEASE=0
-GSTREAMER_REQ=$GST_VERSION_MAJOR.$GST_VERSION_MINOR.$GST_VERSION_RELEASE
-
-dnl check for 0.8 first
 GST_MAJORMINOR=0.8
 PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GSTREAMER_REQ,
   HAVE_GSTREAMER=yes, HAVE_GSTREAMER=no)
@@ -74,12 +73,12 @@ AC_SUBST(GST_VERSION_MAJOR)
 AC_SUBST(GST_VERSION_MINOR)
 AC_SUBST(GST_MAJORMINOR)
 
-dnl Check for python
+dnl Check for Python
 AM_PATH_PYTHON
-AC_MSG_CHECKING(for python >= 2.2)
+AC_MSG_CHECKING(for python >= 2.3)
 prog="
 import sys, string
-minver = (2,2,0,'final',0)
+minver = (2,3,0,'final',0)
 if sys.version_info < minver:
   sys.exit(1)
 sys.exit(0)"
@@ -92,10 +91,10 @@ else
 fi
 AM_CHECK_PYTHON_HEADERS(,[AC_MSG_ERROR(could not find Python headers)])
 
-dnl Check for ALSA
-AM_PATH_ALSA(0.9.1)
-AC_SUBST(ALSA_CFLAGS)
-AC_SUBST(ALSA_LIBS)
+dnl check for PyGTK
+PKG_CHECK_MODULES(PYGTK, pygtk-2.0 >= $PYGTK_REQ, ,
+  AC_MSG_ERROR(Could not find PyGTK C development files))
+AC_SUBST(PYGTK_CFLAGS)
 
 dnl Check for dvdread
 AC_CHECK_LIB(dvdread, ifoOpen,
@@ -105,12 +104,20 @@ AC_CHECK_HEADER(dvdread/dvd_reader.h,
   [AC_SUBST(DVDREAD_CFLAGS,'')],
   [AC_MSG_ERROR(could not find libdvdread headers)])
 
+
+dnl
+dnl Optional Dependencies
+dnl
+
+dnl Check for ALSA
+AM_PATH_ALSA(0.9.1, HAVE_ALSA="yes", HAVE_ALSA="no")
+AC_SUBST(HAVE_ALSA)
+AC_SUBST(ALSA_CFLAGS)
+AC_SUBST(ALSA_LIBS)
+AM_CONDITIONAL(HAVE_ALSA, test "x$HAVE_ALSA" = "xyes")
+
 dnl Check for Pyrex
 AC_PATH_PROG(PYREXC, pyrexc, NOT_FOUND)
-if test $PYREXC = NOT_FOUND
-then
-  AC_MSG_ERROR(could not find Pyrex compiler)
-fi
 AC_SUBST(PYREXC)
 
 dnl Be clean and use pure Gtk+-2.0
@@ -127,6 +134,7 @@ AC_OUTPUT([
   gst-plugins/iec958/Makefile
   gst-plugins/mpeg2sub/Makefile
   gst-plugins/mpegstream/Makefile
+  m4/Makefile
   src/Makefile
   src/dvdread/Makefile
   src/machine/Makefile

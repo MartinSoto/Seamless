@@ -1,3 +1,21 @@
+2004-11-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* autogen.sh:
+	* alsa.m4:
+	* local-python.m4:
+	* pkg.m4:
+	* Makefile.am:
+	Add m4 directory.
+
+	* gst-plugins/Makefile.am: 
+	* configure.ac:
+	Make compiling alsaspdif depending on the availability of alsa
+	libraries.
+
+	* configure.ac:
+	Don't error if Pyrex is not around.
+	General clean up.
+
 2004-11-26  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/seamless.py (main): Add new commandline options.

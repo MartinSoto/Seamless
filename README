@@ -1,1 +1,15 @@
-A seamless readme
+Dependencies
+
+- Python 2.3
+
+- GStreamer, gst-plugins, gst-python
+
+- PyGTK
+
+- libdvdread
+
+Additional
+
+Pyrex
+
+PyGTK development files

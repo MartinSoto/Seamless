@@ -21,7 +21,7 @@ set -x
 
 # if any of these steps fails, the others will not execute, which is good
 # we want to treat errors as soon as possible
-$ACLOCAL && 
+$ACLOCAL -I m4 && 
 libtoolize --force && \
 $AUTOHEADER
 $AUTOMAKE -a && \
