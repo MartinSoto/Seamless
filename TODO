@@ -10,12 +10,9 @@
 
 - Check for DVD I/O errors when starting and retry if necessary.
 
-- BUG: The separate xvimagesink window flashes shortly before the
-  program starts.
-
 - Some menu subpictures get displayed too early (Matrix PAL). Why?
 
-- Implement free changing of streams.
+- Implement free changing of sutitles
 
 - Support angles.
 

@@ -16,28 +16,37 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
+import threading
+
+import gobject
 import gtk
 
 import gst
 import gst.interfaces
 
 class VideoWidget(gtk.DrawingArea):
+    __gsignals__ = {
+        'ready' : (gobject.SIGNAL_RUN_LAST,
+                   gobject.TYPE_NONE,
+                   ())
+        }
+
     def __init__(self):
-        gtk.DrawingArea.__init__(self)
+        self.__gobject_init__()
+
+        # A lock to protect accesses to the display window.
+        self.xlock = threading.RLock()
 
         self.connect('realize', self.realizeCb)
         self.connect('size-allocate', self.sizeAllocateCb)
         self.connect('destroy', self.destroyCb)
         
         # Background is always black.
-        for state in (gtk.STATE_NORMAL,
-                      gtk.STATE_ACTIVE,
-                      gtk.STATE_PRELIGHT,
-                      gtk.STATE_SELECTED,
-                      gtk.STATE_INSENSITIVE):
-            self.modify_bg(state, gtk.gdk.color_parse('black'))
+        self.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse('black'))
 
         self.videoWin = None
+        self.videoWinExposed = False
+
         self.imageSink = None
 
         self.desiredAspect = 1
@@ -81,20 +90,9 @@ class VideoWidget(gtk.DrawingArea):
             y = (allocation.height - height) / 2
 
         if self.videoWin:
+            self.xlock.acquire()
             self.videoWin.move_resize(int(x), int(y), int(width), int(height))
-        else:
-            # Create the video window.
-            self.videoWin = gtk.gdk.Window(
-                self.window,
-                int(width), int(height),
-                gtk.gdk.WINDOW_CHILD,
-                gtk.gdk.EXPOSURE_MASK,
-                gtk.gdk.INPUT_OUTPUT,
-                "",
-                int(x), int(y))
-            self.videoWin.add_filter(self.videoEventFilter)
-
-            self.videoWin.show()
+            self.xlock.release()
 
 
     #
@@ -113,10 +111,21 @@ class VideoWidget(gtk.DrawingArea):
     def realizeCb(self, widget):
         self.setEventMask(gtk.gdk.EXPOSURE_MASK | self.eventMask)
 
+        # Create the video window.
+        self.videoWin = gtk.gdk.Window(
+            self.window,
+            1, 1,
+            gtk.gdk.WINDOW_CHILD,
+            gtk.gdk.EXPOSURE_MASK,
+            gtk.gdk.INPUT_OUTPUT,
+            "",
+            0, 0)
+        self.videoWin.add_filter(self.videoEventFilter)
+
+        self.videoWin.show()
+
     def sizeAllocateCb(self, widget, allocation):
-        if self.videoWin:
-            self.videoWin.resize(allocation.width, allocation.height)
-            self.resizeVideo()
+        self.resizeVideo()
 
     def destroyCb(self, da):
         self.imageSink.set_xwindow_id(0L)
@@ -125,5 +134,22 @@ class VideoWidget(gtk.DrawingArea):
         # FIXME: Check for expose event here. Cannot be done now
         # because pygtk seems to have a bug and only reports "NOTHING"
         # events.
-        self.imageSink.set_xwindow_id(self.videoWin.xid)
+
+        self.xlock.acquire()
+
+        if not self.videoWinExposed:
+            # We are ready to display video. The 'ready' signal could
+            # actually set up the image sink.
+            self.emit('ready')
+
+            if self.videoWin:
+                self.imageSink.set_xwindow_id(self.videoWin.xid)
+                self.videoWinExposed = True
+
+        self.imageSink.expose()
+
+        self.xlock.release()
+
         return gtk.gdk.FILTER_CONTINUE
+
+gobject.type_register(VideoWidget)

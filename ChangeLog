@@ -1,3 +1,24 @@
+2004-12-04  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainui.py:
+	Double quuotes substituted by single quotes.
+	(MainUserInterface.__init__, MainUserInterface.videoReady): Trap
+	the 'ready' signal in the video widget and start the player using
+	it.
+
+	* src/videowidget.py:
+	Class is now a real gobject.
+	(VideoWidget.__init__, VideoWidget.resizeVideo,
+	VideoWidget.videoEventFilter): 
+	Added a lock to protect accesses to the video window. This will
+	hopefully correct the fatal X errors people have been
+	experiencing.
+	(VideoWidget.videoEventFilter):
+	Added a 'ready' signal, to inform when the widget is ready for
+	display.
+	Added a call to the expose method of the gst.xoverlay
+	interface. This fixes a lot of display problems.
+
 2004-12-03  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/dvdplayer.py (DVDPlayer.__init__): Pass the DVD device

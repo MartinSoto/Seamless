@@ -41,7 +41,7 @@ import lirc
 import xscreensaver
 
 
-class MainUserInterface:
+class MainUserInterface(object):
     def __init__(self, player, options):
         self.player = player
         self.options = options
@@ -52,15 +52,15 @@ class MainUserInterface:
         self.window.set_border_width(0)
         self.window.set_property('can-focus', True)
 
-        self.window.connect("realize", self.mainRealize)
-        self.window.connect("key-press-event", self.mainKeyPress)
-        self.window.connect("delete_event", self.mainDeleteEvent)
-        self.window.connect("destroy", self.mainDestroy)
+        self.window.connect('key-press-event', self.mainKeyPress)
+        self.window.connect('delete_event', self.mainDeleteEvent)
+        self.window.connect('destroy', self.mainDestroy)
 
         self.video = videowidget.VideoWidget()
         self.window.add(self.video)
         
         self.video.setEventMask(gtk.gdk.BUTTON_PRESS_MASK)
+        self.video.connect('ready', self.videoReady)
         self.video.connect('button-press-event', self.videoButtonPress)
 
         # Give the window a decent minimum size.
@@ -119,35 +119,30 @@ class MainUserInterface:
     # Callbacks
     #
 
-    def mainRealize(self, widget):
-        # Setup and start the player.
-        self.video.setImageSink(self.player.getVideoSink())
-        self.player.start()
-
     def mainKeyPress(self, widget, event):
         keyName = gtk.gdk.keyval_name(event.keyval)
 
-        if keyName == "Up":
+        if keyName == 'Up':
             self.player.up()
-        elif keyName == "Down":
+        elif keyName == 'Down':
             self.player.down()
-        elif event.state == 0 and keyName == "Left":
+        elif event.state == 0 and keyName == 'Left':
             self.player.left()
-        elif event.state == 0 and keyName == "Right":
+        elif event.state == 0 and keyName == 'Right':
             self.player.right()
-        elif keyName == "Return":
+        elif keyName == 'Return':
             self.player.confirm()
-        elif keyName == "Page_Up":
+        elif keyName == 'Page_Up':
             self.player.prevProgram()
-        elif keyName == "Page_Down":
+        elif keyName == 'Page_Down':
             self.player.nextProgram()
-        elif event.state == gtk.gdk.SHIFT_MASK and keyName == "Left":
+        elif event.state == gtk.gdk.SHIFT_MASK and keyName == 'Left':
             self.player.backward10()
-        elif event.state == gtk.gdk.SHIFT_MASK and keyName == "Right":
+        elif event.state == gtk.gdk.SHIFT_MASK and keyName == 'Right':
             self.player.forward10()
-        elif keyName == "Escape":
+        elif keyName == 'Escape':
             self.player.menu()
-        elif keyName == "F2":
+        elif keyName == 'F2':
             self.player.nextAudioStream()
 
         return False
@@ -157,6 +152,11 @@ class MainUserInterface:
 
     def mainDestroy(self, widget):
         self.shutDown()
+
+    def videoReady(self, widget):
+        # Setup and start the player.
+        self.video.setImageSink(self.player.getVideoSink())
+        self.player.start()
 
     def videoButtonPress(self, widget, event):
         self.toggleFullScreen()
