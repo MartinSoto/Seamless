@@ -1,0 +1,12 @@
+import os
+import sys
+
+# The suffix for plugin files.
+pluginSuffix = '.so'
+
+# The base source directory.
+libdir = '__libdir__'
+base = os.path.join(libdir, '__PACKAGE__')
+
+# The directory containing the GStreamer plugins.
+gstPlugins = os.path.join(base, 'gst-plugins')

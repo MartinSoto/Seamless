@@ -1,2 +1,0 @@
-class MachineError(Exception):
-    pass

@@ -1,1 +1,1 @@
-SUBDIRS=plugin dvdread
+SUBDIRS=gst-plugins src

@@ -1,6 +1,16 @@
 -*- Text -*-
 
-- Implement aspect ratio handling.
+- BUG: Trying to terminate the program while in a still frame, blocks.
+
+- BUG: The separate xvimagesink window flashes shortly before the
+  program starts.
+
+- BUG: Add queueing for subtitles. Animatrix shows subtitles getting erased
+  too soon.
+
+- Some menu subpictures get displayed too early (Matrix PAL). Why?
+
+- BUG: Subtitle palette sometimes get messed up when jumping chapters.
 
 - Implement free changing of streams.
 

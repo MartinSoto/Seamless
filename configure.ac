@@ -1,7 +1,10 @@
 AC_INIT(Seamless DVD Player, 0.0.1)
-AC_CONFIG_SRCDIR(src/seamless)
+AC_CONFIG_SRCDIR(src/seamless.py)
 AM_INIT_AUTOMAKE(seamless, ${PACKAGE_VERSION})
 PACKAGE_TARNAME=$PACKAGE
+
+AC_DEFINE(ORIGIN, "http://seamless.sourceforge.net",
+          The origin URL for this package)
 
 AM_CONFIG_HEADER(config.h)
 
@@ -19,6 +22,14 @@ dnl modify pkg-config path
 AC_ARG_WITH(pkg-config-path, 
    AC_HELP_STRING([--with-pkg-config-path],[colon-separated list of pkg-config(1) dirs]),
    [export PKG_CONFIG_PATH=${withval}])
+
+dnl specific additional LDFLAGS for plugins
+GST_PLUGIN_LDFLAGS="-module -avoid-version $EXPORT_LDFLAGS"
+AC_SUBST(GST_PLUGIN_LDFLAGS, "$GST_PLUGIN_LDFLAGS")
+
+dnl Define plugindir
+plugindir="\$(pkglibdir)/gst-plugins"
+AC_SUBST(plugindir)
 
 dnl Check for glib2
 PKG_CHECK_MODULES(GLIB, glib-2.0 gobject-2.0 gthread-2.0 gmodule-2.0, ,
@@ -102,14 +113,23 @@ then
 fi
 AC_SUBST(PYREXC)
 
-dnl be clean and use pure Gtk+-2.0
+dnl Be clean and use pure Gtk+-2.0
 EXTRA_CFLAGS="-Wall -Werror -DGTK_DISABLE_DEPRECATED=1 -DG_DISABLE_DEPRECATED=1 -DGDK_DISABLE_DEPRECATED=1 -DGDK_PIXBUF_DISABLE_DEPRECATED=1 -DGNOME_DISABLE_DEPRECATED=1 -DGST_DISABLE_DEPRECATED=1"
 AC_SUBST(EXTRA_CFLAGS)
 
 AC_OUTPUT([
   Makefile
-  plugin/Makefile
-  dvdread/Makefile
+  config/Makefile
+  gst-plugins/Makefile
+  gst-plugins/alsaspdif/Makefile
+  gst-plugins/capspipe/Makefile
+  gst-plugins/dvdblock/Makefile
+  gst-plugins/iec958/Makefile
+  gst-plugins/mpeg2sub/Makefile
+  gst-plugins/mpegstream/Makefile
+  src/Makefile
+  src/dvdread/Makefile
+  src/machine/Makefile
 ])
 
 echo
