@@ -1,0 +1,33 @@
+-*- Text -*-
+
+- Put copyright/license notices in files.
+
+- Send the still frame event from VirtualMachine and not from Location
+
+- Implement auto activate for buttons.
+
+- Implement free changing of streams.
+
+- Implement mutual exclusion between user interaction and automatic
+  navigation.
+
+- Add __richcmp__ to dvdread wrappers as necessary.
+
+- Angles.
+
+- Put pipeline handling in a separate class, wrapping the source
+  element.
+
+- Implement backwards playing.
+
+- Implement proper VOBU jumping, using the jump fields in nav packets.
+
+- Implement aspect ratio handling.
+
+- Implement support for other sound types.
+
+- Handle button nav packets properly with respect to time.
+
+- Organize source code for distribution and put it in sf.net.
+
+- Create a Pyrex wrapper for lirc.
