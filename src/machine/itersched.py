@@ -20,6 +20,11 @@ class IterSchedError(Exception):
     pass
 
 
+def checkItr(itr):
+    assert hasattr(itr, 'next') and hasattr(itr, '__iter__'), \
+           "Object '%s' is not an iterator" % repr(itr)
+
+
 class YieldOp(object):
     __slots__ = ()
 
@@ -40,6 +45,7 @@ class Call(YieldOp):
     __slots__ = ('called')
 
     def __init__(self, called):
+        checkItr(called)
         self.called = called
 
     def modifySched(self, sched):
@@ -50,6 +56,7 @@ class Chain(YieldOp):
     __slots__ = ('chained')
 
     def __init__(self, chained):
+        checkItr(chained)
         self.chained = chained
 
     def modifySched(self, sched):

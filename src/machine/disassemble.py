@@ -18,6 +18,7 @@
 
 import string
 
+from itersched import *
 import decode
 
 
@@ -82,6 +83,7 @@ class CommandDisassembler(decode.CommandDecoder):
     def makeMachineOperation(format):
         def printOp(self, *args):
             self.text.append(format % tuple(map(str, args)))
+            yield NoOp
 
         return printOp
 
@@ -103,6 +105,7 @@ class CommandDisassembler(decode.CommandDecoder):
 
     def closeSetParentalLevel(self, cmd):
         self.text.closeIndent()
+        yield NoOp
 
     # Links.
     linkTopCell = makeMachineOperation('linkTopCell()')
@@ -177,6 +180,7 @@ class CommandDisassembler(decode.CommandDecoder):
                 self.parent.text.append('counter %s = %s' % (self.name, value))
             else:
                 self.parent.text.append('%s = %s' % (self.name, value))
+            yield NoOp
 
         def getValue(self):
             return self.name
@@ -250,6 +254,8 @@ class CommandDisassembler(decode.CommandDecoder):
 
         self.text.closeIndent()
 
+        yield NoOp 
+
 
     #
     # Arithmetic and Bit Operations
@@ -277,6 +283,7 @@ class CommandDisassembler(decode.CommandDecoder):
         opStr = self.arithOpsStrs[cmd[0] & 0xf]
         self.text.append(opStr % \
                          (str(self.getGeneralPurpose(regNr)), str(operand)))
+        yield NoOp
 
 
     #
@@ -284,6 +291,8 @@ class CommandDisassembler(decode.CommandDecoder):
     #
 
     def decodeCommand(self, cmd, pos=0, indent=0):
+        self.resetText()
+
         self.text.openIndent(indent)
 
         self.text.append("%03d:" % pos)
@@ -292,8 +301,11 @@ class CommandDisassembler(decode.CommandDecoder):
 
         self.text.openIndent(5)
 
-        self.performCommand(cmd)
+        for i in  Scheduler(self.performCommand(cmd)):
+            pass
 
         self.text.closeIndent(5)
 
         self.text.closeIndent(indent)
+
+        return self.getText()

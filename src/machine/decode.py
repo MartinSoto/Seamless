@@ -19,6 +19,8 @@
 import operator
 import random
 
+from itersched import *
+
 
 class Register(object):
     """A base class for all register types.
@@ -126,7 +128,7 @@ class CommandDecoder(object):
         return cond(self, op1, op2)
 
     def closeCondition(self, cmd):
-        pass
+        yield NoOp
 
 
     #
@@ -144,42 +146,44 @@ class CommandDecoder(object):
             return
         elif linkType == 0x1:
             if cmd[7] == 0x01:
-                self.machine.linkTopCell()
+                yield Call(self.machine.linkTopCell())
             elif cmd[7] == 0x02:
-                self.machine.linkNextCell()
+                yield Call(self.machine.linkNextCell())
             elif cmd[7] == 0x03:
-                self.machine.linkPrevCell()
+                yield Call(self.machine.linkPrevCell())
             elif cmd[7] == 0x05:
-                self.machine.linkTopProgram()
+                yield Call(self.machine.linkTopProgram())
             elif cmd[7] == 0x06:
-                self.machine.linkNextProgram()
+                yield Call(self.machine.linkNextProgram())
             elif cmd[7] == 0x07:
-                self.machine.linkPrevProgram()
+                yield Call(self.machine.linkPrevProgram())
             elif cmd[7] == 0x09:
-                self.machine.linkTopProgramChain()
+                yield Call(self.machine.linkTopProgramChain())
             elif cmd[7] == 0x0a:
-                self.machine.linkNextProgramChain()
+                yield Call(self.machine.linkNextProgramChain())
             elif cmd[7] == 0x0b:
-                self.machine.linkPrevProgramChain()
+                yield Call(self.machine.linkPrevProgramChain())
             elif cmd[7] == 0x0c:
-                self.machine.linkGoUpProgramChain()
+                yield Call(self.machine.linkGoUpProgramChain())
             elif cmd[7] == 0x0d:
-                self.machine.linkTailProgramChain()
+                yield Call(self.machine.linkTailProgramChain())
             elif cmd[7] == 0x10:
-                self.machine.resume()
+                yield Call(self.machine.resume())
 
-            self.performButton(cmd)
+            yield Call(self.performButton(cmd))
         elif linkType == 0x4:
-            self.machine.linkProgramChain(cmd[6] * 0x100 + cmd[7])
+            yield Call(self.machine.linkProgramChain(cmd[6] * \
+                                                     0x100 + cmd[7]))
         elif linkType == 0x5:
-            self.machine.linkChapter((cmd[6] & 0x3) * 0x100 + cmd[7])
-            self.performButton(cmd)
+            yield Call(self.machine.linkChapter((cmd[6] & 0x3) * \
+                                                0x100 + cmd[7]))
+            yield Call(self.performButton(cmd))
         elif linkType == 0x6:
-            self.machine.linkProgram(cmd[7])
-            self.performButton(cmd)
+            yield Call(self.machine.linkProgram(cmd[7]))
+            yield Call(self.performButton(cmd))
         elif linkType == 0x7:
-            self.machine.linkCell(cmd[7])
-            self.performButton(cmd)
+            yield Call(self.machine.linkCell(cmd[7]))
+            yield Call(self.performButton(cmd))
         else:
             assert False, 'Unknown link operation'
 
@@ -187,7 +191,7 @@ class CommandDecoder(object):
         # Handle the select button operation.
         button = cmd[6] >> 2
         if button != 0:
-            self.machine.selectButton(button)
+            yield Call(self.machine.selectButton(button))
 
 
     #
@@ -222,8 +226,8 @@ class CommandDecoder(object):
             # Perform a register swap.
             assert isinstance(source, Register)
             tmp = dest.getValue()
-            dest.setValue(source.getValue())
-            source.setValue(tmp)
+            yield Call(dest.setValue(source.getValue()))
+            yield Call(source.setValue(tmp))
         else:
             opFunc = self.arithOps[op]
 
@@ -232,7 +236,7 @@ class CommandDecoder(object):
             else:
                 value = source
 
-            dest.setValue(opFunc(dest.getValue(), value))
+            yield Call(dest.setValue(opFunc(dest.getValue(), value)))
 
 
     #
@@ -245,25 +249,25 @@ class CommandDecoder(object):
 
         op = cmd[1] & 0xf
         if op == 0:
-            self.machine.nop()
+            yield Call(self.machine.nop())
         elif op == 1:
-            self.machine.goto(cmd[7])
+            yield Call(self.machine.goto(cmd[7]))
         elif op == 2:
-            self.machine.brk()
+            yield Call(self.machine.brk())
         elif op == 3:
             if self.machine.openSetParentalLevel(cmd):
-                self.machine.goto(cmd[7])
-                self.machine.closeSetParentalLevel(cmd)
+                yield Call(self.machine.goto(cmd[7]))
+                yield Call(self.machine.closeSetParentalLevel(cmd))
 
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def perform2(self, cmd):
         if not self.openCondition(cmd):
             return
 
-        self.performLink(cmd)
+        yield Call(self.performLink(cmd))
 
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def perform3(self, cmd):
         if not self.openCondition(cmd):
@@ -271,43 +275,45 @@ class CommandDecoder(object):
 
         op = cmd[1] & 0xf
         if op == 1:
-            self.machine.exit()
+            yield Call(self.machine.exit())
         elif op == 2:
-            self.machine.jumpToTitle(cmd[5])
+            yield Call(self.machine.jumpToTitle(cmd[5]))
         elif op == 3:
-            self.machine.jumpToTitleInSet(cmd[5])
+            yield Call(self.machine.jumpToTitleInSet(cmd[5]))
         elif op == 5:
-            self.machine.jumpToChapterInSet(cmd[5], cmd[2] * 0x100 + cmd[3])
+            yield Call(self.machine.jumpToChapterInSet(cmd[5], cmd[2] * \
+                                                       0x100 + cmd[3]))
         elif op == 6:
             subop = cmd[5] >> 4
             if subop == 0x0:
-                self.machine.jumpToFirstPlay()
+                yield Call(self.machine.jumpToFirstPlay())
             elif subop == 0x4:
-                self.machine.jumpToTitleMenu()
+                yield Call(self.machine.jumpToTitleMenu())
             elif subop == 0x8:
-                self.machine.jumpToMenu(cmd[4], cmd[3], cmd[5] & 0xf)
+                yield Call(self.machine.jumpToMenu(cmd[4], cmd[3],
+                                                   cmd[5] & 0xf))
             elif subop == 0xc:
-                self.machine.jumpToManagerProgramChain(cmd[2] * 0x100
-                                                       + cmd[3])
+                yield Call(self.machine. \
+                           jumpToManagerProgramChain(cmd[2] * 0x100 + cmd[3]))
             else:
-                assert False, 'Jump suboberation unknown'
+                assert False, 'Jump suboperation unknown'
         elif op == 8:
             subop = cmd[5] >> 4
             if subop == 0x0:
-                self.machine.callFirstPlay(cmd[4])
+                yield Call(self.machine.callFirstPlay(cmd[4]))
             elif subop == 0x4:
-                self.machine.callTitleMenu(cmd[4])
+                yield Call(self.machine.callTitleMenu(cmd[4]))
             elif subop == 0x8:
-                self.machine.callMenu(cmd[5] & 0xf, cmd[4])
+                yield Call(self.machine.callMenu(cmd[5] & 0xf, cmd[4]))
             elif subop == 0xc:
-                self.machine.callManagerProgramChain(cmd[2] * 0x100
-                                                     + cmd[3], cmd[4])
+                yield Call(self.machine.callManagerProgramChain(cmd[2] * 0x100
+                                                     + cmd[3], cmd[4]))
             else:
-                assert False, 'Jump suboberation unknown'
+                assert False, 'Jump suboperation unknown'
         else:
             assert False, 'Unknown jump/call operation'
         
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def perform45(self, cmd):
         assert cmd[1] & 0xf0 == 0 or cmd[1] & 0xf == 0
@@ -326,30 +332,35 @@ class CommandDecoder(object):
         op = cmd[0] & 0xf
         if op == 1:
             if cmd[3] & 0x80:
-                self.machine.setAudio(getParm(cmd[3] & 0x7f))
+                yield Call(self.machine.setAudio(getParm(cmd[3] & 0x7f)))
             if cmd[4] & 0x80:
-                self.machine.setSubpicture(getParm(cmd[4] & 0x7f))
+                yield Call(self.machine.setSubpicture(getParm(cmd[4] & 0x7f)))
             if cmd[5] & 0x80:
-                self.machine.setAngle(getParm(cmd[5] & 0x7f))
+                yield Call(self.machine.setAngle(getParm(cmd[5] & 0x7f)))
         elif op == 2:
-            self.machine.setTimedJump(cmd[4] * 0x100 + cmd[5], getParm(cmd[3]))
+            yield Call(self.machine.setTimedJump(cmd[4] * 0x100 + cmd[5],
+                                                 getParm(cmd[3])))
         elif op == 3:
             regNr = cmd[5] & 0xf
             value = getParm(cmd[2] * 0x100 + cmd[3])
             if cmd[5] & 0x80:
-                self.machine.getGeneralPurpose(regNr).setValue(value, True)
+                yield Call(self.machine.getGeneralPurpose(regNr). \
+                           setValue(value, True))
             else:
-                self.machine.getGeneralPurpose(regNr).setValue(value)
+                yield Call(self.machine.getGeneralPurpose(regNr). \
+                           setValue(value))
         elif op == 4:
-            self.machine.setKaraokeMode(getParm(cmd[4] * 0x100 + cmd[5]))
+            yield Call(self.machine.setKaraokeMode(getParm(cmd[4] * \
+                                                           0x100 + cmd[5])))
         elif op == 6:
-            self.machine.setSystemParam8(getParm(cmd[4] * 0x100 + cmd[5]))
+            yield Call(self.machine.setSystemParam8(getParm(cmd[4] * \
+                                                            0x100 + cmd[5])))
         else:
             assert False, 'Unknown SRPM set operation'
 
-        self.performLink(cmd)
+        yield Call(self.performLink(cmd))
 
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def perform6(self, cmd):
         assert cmd[1] & 0xf0 == 0 or cmd[1] & 0xf == 0
@@ -357,11 +368,11 @@ class CommandDecoder(object):
         if not self.openCondition(cmd):
             return
 
-        self.performArithOperation(cmd, cmd[3],
-                                   self.getRegister(cmd[5]))
-        self.performLink(cmd)
+        yield Call(self.performArithOperation(cmd, cmd[3],
+                                              self.getRegister(cmd[5])))
+        yield Call(self.performLink(cmd))
 
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def perform7(self, cmd):
         assert cmd[1] & 0xf0 == 0 or cmd[1] & 0xf == 0
@@ -369,68 +380,69 @@ class CommandDecoder(object):
         if not self.openCondition(cmd):
             return
 
-        self.performArithOperation(cmd, cmd[3], cmd[4] * 0x100 + cmd[5])
-        self.performLink(cmd)
+        yield Call(self.performArithOperation(cmd, cmd[3],
+                                              cmd[4] * 0x100 + cmd[5]))
+        yield Call(self.performLink(cmd))
 
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def perform8(self, cmd):
-        self.performArithOperation(cmd, cmd[1] & 0xf,
-                                   self.getRegister(cmd[3]))
+        yield Call(self.performArithOperation(cmd, cmd[1] & 0xf,
+                                              self.getRegister(cmd[3])))
         
         if not self.openCondition(cmd):
             return
 
-        self.performLink(cmd)
+        yield Call(self.performLink(cmd))
 
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def perform9(self, cmd):
-        self.performArithOperation(cmd, cmd[1] & 0xf,
-                                   cmd[2] * 0x100 + cmd[3])
+        yield Call(self.performArithOperation(cmd, cmd[1] & 0xf,
+                                              cmd[2] * 0x100 + cmd[3]))
         
         if not self.openCondition(cmd):
             return
 
-        self.performLink(cmd)
+        yield Call(self.performLink(cmd))
 
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def performA(self, cmd):
         if not self.openCondition(cmd):
             return
 
-        self.performArithOperation(cmd, cmd[1] & 0xf,
-                                   self.getRegister(cmd[2]))
-        self.performLink(cmd)
+        yield Call(self.performArithOperation(cmd, cmd[1] & 0xf,
+                                              self.getRegister(cmd[2])))
+        yield Call(self.performLink(cmd))
 
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def performB(self, cmd):
         if not self.openCondition(cmd):
             return
 
-        self.performArithOperation(cmd, cmd[1] & 0xf,
-                                   cmd[2] * 0x100 + cmd[3])
-        self.performLink(cmd)
+        yield Call(self.performArithOperation(cmd, cmd[1] & 0xf,
+                                              cmd[2] * 0x100 + cmd[3]))
+        yield Call(self.performLink(cmd))
 
-        self.closeCondition(cmd)
+        yield Call(self.closeCondition(cmd))
 
     def performC(self, cmd):
         if self.openCondition(cmd):
-            self.performArithOperation(cmd, cmd[1] & 0xf,
-                                       self.getRegister(cmd[2]))
-            self.closeCondition(cmd)
+            yield Call(self.performArithOperation(cmd, cmd[1] & 0xf,
+                                                  self.getRegister(cmd[2])))
+            yield Call(self.closeCondition(cmd))
 
-        self.performLink(cmd)
+        yield Call(self.performLink(cmd))
 
     def performD(self, cmd):
         if self.openCondition(cmd):
-            self.performArithOperation(cmd, cmd[1] & 0xf,
-                                       cmd[2] * 0x100 + cmd[3])
-            self.closeCondition(cmd)
+            yield Call(self.performArithOperation(cmd, cmd[1] & 0xf,
+                                                  cmd[2] * 0x100 + cmd[3]))
+            yield Call(self.closeCondition(cmd))
 
-        self.performLink(cmd)
+        yield Call(self.performLink(cmd))
 
 
     performFuncs = (
@@ -457,4 +469,4 @@ class CommandDecoder(object):
     #
 
     def performCommand(self, cmd):
-        self.performFuncs[cmd[0] >> 4](self, cmd)
+        yield Call(self.performFuncs[cmd[0] >> 4](self, cmd))

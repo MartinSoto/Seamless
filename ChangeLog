@@ -1,3 +1,11 @@
+2005-03-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/disassemble.py: 
+	* src/machine/decode.py: Converted to operate with itersched.
+	* src/machine/itersched.py (checkItr): New function.
+	(Call.__init__, Chain.__init__): Add calls to checkItr to check
+	for proper parameters.
+
 2005-03-06  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/itersched.py (YieldOp): Renamed from
