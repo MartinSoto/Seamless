@@ -96,50 +96,13 @@ class SystemRegister(Register):
               'Attempt to directly assign a system register'
 
 
-class PlaybackLocation(object):
-    """A self-contained representation of a location in a DVD.
-
-    A PlaybackLocation contains all information necessary to locate a
-    position in the DVD and to play back starting from that
-    position."""
-    
-    __slots__ = ('title',
-                 'chapter',
-                 'programChain',
-                 'cell',
-                 'sectorNr',
-                 'lastSectorNr',
-                 'commandType',
-                 'commands',
-                 'commandNr',
-                 'nav',
-                 'button',
-                 'cellCurrentTime')
-
-    def __init__(self):
-        self.title = None
-        self.chapter = None
-
-        self.programChain = None
-        self.nav = None
-        self.commandType = None
-
-        self.sectorNr = None
-        self.lastSectorNr = None
-
-        # Button one is highlighted by default (???)
-        self.button = 1
-
-        self.cellCurrentTime = 0
-
-
 def makeMachineOperation(method):
     def restartOp(self, *args, **keywords):
         yield getattr(Restart, method)(*args, **keywords)
 
     return restartOp
 
-# FIXME: Erase this all opearations get implemented properly.
+# FIXME: Erase this when all operations get implemented properly.
 def makeDummyOperation(method):
     def printOp(self, *args, **keywords):
         lArgs = [repr(i) for i in args]
@@ -152,7 +115,9 @@ def makeDummyOperation(method):
 
 
 class PerformMachine(object):
-    __slots__ = ('audio',
+    __slots__ = ('location',
+
+                 'audio',
                  'subpicture',
                  'angle',
                  'audioPhys',
@@ -169,13 +134,12 @@ class PerformMachine(object):
                  'aspectRatio',
                  'videoMode',
 
-                 'location',
-                 'resumeLocation',
-
                  'generalRegisters',
                  'systemRegisters')
 
-    def __init__(self):
+    def __init__(self, location=None):
+        self.location = location
+
         # Current logical audio and subpicture streams and current
         # angle. The values follow the conventions of system registers
         # 1, 2, and 3, respectively.
@@ -210,14 +174,13 @@ class PerformMachine(object):
         # Current video mode.
         self.videoMode = dvdread.VIDEO_MODE_NORMAL
 
-        # Location and resume location.
-        self.location = PlaybackLocation()
-        self.resumeLocation = None
-
         # Initialize all machine registers.
         self.generalRegisters = None
         self.systemRegisters = None
         self.initializeRegisters()
+
+    def setLocation(self, location):
+        self.location = location
 
 
     #
@@ -310,31 +273,35 @@ class PerformMachine(object):
 
     def getSystem4(self):
         """Return the value of system register 4 (title_in_volume)."""
-        if self.location.title != None:
-            return self.location.title.globalTitleNr
+        title = self.location.getTitle()
+        if title != None:
+            return title.globalTitleNr
         else:
-            return 1
+            return 0
 
     def getSystem5(self):
         """Return the value of system register 5 (title_in_vts)."""
-        if self.location.title != None:
-            return self.location.title.titleNr
+        title = self.location.currentTitle()
+        if title != None:
+            return title.titleNr
         else:
-            return 1
+            return 0
 
     def getSystem6(self):
         """Return the value of system register 6 (program_chain)."""
-        if self.location.programChain != None:
-            return self.location.programChain.programChainNr
+        programChain = self.location.currentProgramChain()
+        if programChain != None:
+            return programChain.programChainNr
         else:
             return 0
 
     def getSystem7(self):
         """Return the value of system register 7 (chapter)."""
-        if self.location.chapter != None:
-            return self.location.chapter.chapterNr
+        cell = self.location.currentCell()
+        if cell != None:
+            return cell.programNr
         else:
-            return 1
+            return 0
 
     def getSystem8(self):
         """Return the value of system register 8 (highlighted_button)."""
@@ -595,6 +562,13 @@ class ProgramChainPlayer(object):
         self.programChain = None
         self.cell = None
 
+    def currentProgramChain(self):
+        """Return the program chain currently being played.
+
+        'None' is returned if no program chain is currently being
+        played."""
+        return self.programChain
+
     @restartPoint
     def playProgramChain(self, programChain):
         """Play the specified program chain."""
@@ -783,6 +757,12 @@ class CellPlayer(object):
                  'sectorNr',	# Last sector played.
                  'nav')		# Last nav packet seen.
 
+    def currentCell(self):
+        """Return the cell currently being played.
+
+        'None' is returned if no cell is currently being played."""
+        return self.cell
+
     def __init__(self, perform):
         self.perform = perform
         self.cell = None
@@ -795,9 +775,6 @@ class CellPlayer(object):
     def playCell(self, cell):
         """Play the specified cell."""
         self.cell = cell
-
-        # Update the machine state.
-        self.perform.location.cell = cell
 
         # Find the playback domain for the cell.
         if isinstance(cell.programChain.container, dvdread.LangUnit):
@@ -831,7 +808,6 @@ class CellPlayer(object):
         # material is played in the cell. See the 'setNav' method in
         # this class. If this point is reached we are at the end of
         # the cell.
-        self.perform.location.cell = None
 
     @restartPoint
     def setNav(self, nav):
@@ -880,6 +856,31 @@ class CellPlayer(object):
         pass
 
 
+class PlaybackLocation(object):
+    """A class encapsulating operations necessary to determine the
+    location in the dvd structure that is currently being played back."""
+    
+    __slots__ = ('sched',)
+
+    def __init__(self, sched):
+        self.sched = sched
+
+    def getValue(self, methodName):
+        for inst in self.sched.restartable():
+            if hasattr(inst, methodName):
+                return getattr(inst, methodName)()
+        return None
+
+    def currentTitle(self):
+        return self.getValue('currentTitle')
+
+    def currentProgramChain(self):
+        return self.getValue('currentProgramChain')
+
+    def currentCell(self):
+        return self.getValue('currentCell')
+
+
 def synchronized(method):
     """Wrapper for syncronized methods."""
 
@@ -907,7 +908,8 @@ class VirtualMachine(object):
                  'src',
                  'lock',
                  'perform',
-                 'sched')
+                 'sched',
+                 'location')
 
     def __init__(self, info, src):
         self.info = info
@@ -925,6 +927,10 @@ class VirtualMachine(object):
 
         # Initialize the scheduler.
         self.sched = itersched.Scheduler(ProgramChainPlayer(self.perform).playProgramChain(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1)))
+
+        # The location is based on the current state of the scheduler.
+        self.location = PlaybackLocation(self.sched)
+        self.perform.setLocation(self.location)
 
 
     #

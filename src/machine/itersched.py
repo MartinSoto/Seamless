@@ -163,5 +163,15 @@ class Scheduler(object):
         self.current = getattr(self.current.instance,
                                methodName)(*posArgs, **kwArgs)
 
+    def restartable(self):
+        """Iterate over the restartable instances in the scheduler.
+
+        Returns an iterator that goes through the restartable object
+        instances currently stacked in the scheduler. Last stacked
+        instances are returned first."""
+        for itr in reversed(self.stack):
+            if isinstance(itr, RestartableIterator):
+                yield itr.instance
+
 __all__ = ('IterSchedError', 'NoIterError', 'NoOp', 'Call', 'Chain',
            'Restart', 'restartPoint', 'Scheduler')

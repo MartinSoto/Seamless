@@ -1,5 +1,18 @@
 2005-03-27  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (PlaybackLocation): Rewrite the whole
+	class based on going down the scheduler stack looking for methods
+	that provide the necessary info.
+	(CellPlayer.playCell, CellPlayer.playVobu): No more fiddling with
+	the machine state.
+	(VirtualMachine.__slots__, VirtualMachine.__init__): New
+	'location' attribute.
+	(CellPlayer.currentCell, ProgramChainPlayer.currentProgramChain):
+	New methods to properly handle playback location info.
+	(PerformMachine.setLocation): New method.
+
+	* src/machine/itersched.py (Scheduler.restartable): New method.
+
 	* src/machine/machine.py (makeDummyOperation, PerformMachine):
 	Operations are now dummy, i.e. they only print the
 	invokation. Dummy operations will be gradually replaced by actual
