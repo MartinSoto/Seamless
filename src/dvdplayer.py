@@ -181,12 +181,15 @@ class DVDPlayer(Thread):
 
     def stop(self):
         self.machine.stop()
+
+        # Wait for the pipeline to actually stop. If waiting time is
+        # too long, just give up and hope for the best.
+        maxIter = 40
+        while maxIter > 0 and self.get_state() == gst.STATE_PLAYING:
+            time.sleep(0.1)
+            maxIter -= 1
+
         self.set_state(STATE_NULL)
-
-        # Wait for the pipeline to actually stop.
-        while self.get_state() != gst.STATE_NULL:
-            time.sleep(0,1)
-
 
     def backward10(self):
         self.machine.timeJumpRelative(-10)

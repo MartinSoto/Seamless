@@ -390,7 +390,7 @@ gst_mpeg2subt_handle_video (GstMpeg2Subt * mpeg2subt, GstData * _data)
         gst_pad_push (mpeg2subt->srcpad, _data);
         break;
       default:
-        gst_pad_push (mpeg2subt->srcpad, _data);
+        gst_pad_event_default (mpeg2subt->videopad, GST_EVENT(_data));
         break;
     }
   } else

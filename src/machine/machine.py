@@ -56,6 +56,11 @@ COMMAND_POST = 3
 disasm = disassemble.CommandDisassembler()
 
 
+class EosEvent(object):
+    """A token representing an EOS event in the event queue."""
+    pass
+
+
 class PlaybackLocation(object):
     """A self-contained representation of a location in a DVD.
 
@@ -546,7 +551,6 @@ class VirtualMachine(CommandPerformer):
     #
 
     def vobuRead(self, src):
-        
         self.lock.acquire()
         
         try:
@@ -566,7 +570,13 @@ class VirtualMachine(CommandPerformer):
 
         # Send all queued events.
         while len(self.pendingEvents) > 0:
-            self.src.get_pad('src').push(self.pendingEvents.pop(0))
+            event = self.pendingEvents.pop(0)
+            if isinstance(event, EosEvent):
+                # Time to stop the pipeline.
+                self.src.set_eos()
+                self.src.get_pad('src').push(Event(EVENT_EOS))
+            else:
+                self.src.get_pad('src').push(event)
 
         #print >> sys.stderr, 'Current VOBU:', self.location.lastSectorNr,
         #print >> sys.stderr, '\r',
@@ -1141,6 +1151,9 @@ class VirtualMachine(CommandPerformer):
     def stop(self):
         self.flushEvent()
         self.flushSource()
+
+        # Put an EOS token in the queue.
+        self.queueEvent(EosEvent())
 
     stop = synchronized(stop)
 

@@ -1,3 +1,17 @@
+2004-11-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_video): Pass unhandled events to
+	gst_pad_event_default instead of just pushing them forward. Fixed
+	a bug that prevented the element from pausing on EOS.
+
+	* src/dvdplayer.py (DVDPlayer.stop): Really wait for the pipeline
+	to stop.
+
+	* src/machine/machine.py (VirtualMachine.vobuRead, EosEvent) 
+	(VirtualMachine.stop): Properly set the pipeline to EOS when
+	stopping.
+
 2004-11-21  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 
