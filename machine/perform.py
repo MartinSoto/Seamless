@@ -336,8 +336,7 @@ class CommandPerformer(object):
             elif subop == 0x4:
                 self.jumpToTitleMenu()
             elif subop == 0x8:
-                # Ignore the title, menus belong to the titleset anyway.
-                self.jumpToMenu(cmd[4], cmd[5] & 0xf)
+                self.jumpToMenu(cmd[4], cmd[3], cmd[5] & 0xf)
             elif subop == 0xc:
                 self.jumpToManagerProgramChain(cmd[2] * 0x100 + cmd[3])
             else:

@@ -104,7 +104,8 @@ class CommandDisassembler(CommandPerformer):
 
     jumpToFirstPlay = makeMachineOperation('jumpToFirstPlay()')
     jumpToTitleMenu = makeMachineOperation('jumpToTitleMenu()')
-    jumpToMenu = makeMachineOperation('jumpToMenu(titleSet=%s, menu=%s)')
+    jumpToMenu = makeMachineOperation('jumpToMenu(titleSetNr=%s, ' \
+                                      'titleNr=%s, menu=%s)')
     jumpToManagerProgramChain = \
         makeMachineOperation('jumpToManagerProgramChain(%s)')
 

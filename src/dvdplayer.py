@@ -76,3 +76,18 @@ class DVDPlayer(Thread):
 
     def forward10(self):
         self.machine.timeJumpRelative(10)
+
+
+    def nextAudioStream(self):
+        streamNumbers = map(lambda x: x[0],
+                            self.machine.getAudioStreams())
+        if len(streamNumbers) == 0:
+            return
+
+        try:
+            pos = streamNumbers.index(self.machine.audioStream)
+        except:
+            return
+
+        self.machine.audioStream = streamNumbers[(pos + 1) % \
+                                                 len(streamNumbers)]

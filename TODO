@@ -27,3 +27,8 @@
 - Put source code in sf.net.
 
 - Create a Pyrex wrapper for lirc.
+
+- Honor prohibited operations when it makes sense, or ignore them
+  smartly.
+
+- Implement auto NTSC/PAL mode.

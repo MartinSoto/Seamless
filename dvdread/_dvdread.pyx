@@ -713,6 +713,9 @@ cdef class VideoTitleSet:
         self.titleSetNr = titleSetNr
 
         self.handle = ifoOpen(dvd.reader, titleSetNr)
+        if self.handle == NULL:
+            raise DVDReadError, \
+                  "Could not open video title set %d" % titleSetNr
 
     def __dealloc__(self):
         ifoClose(self.handle)

@@ -1,7 +1,20 @@
-2004-07-12  Martin Soto  <martinsoto@users.sourceforge.net>
+2004-07-14  Martin Soto  <martinsoto@users.sourceforge.net>
 
-	* machine/machine.py (PlaybackLocation): Add cellCurrentTime
+	* machine/machine.py (VirtualMachine.setAudioStream): Added
+	support for switching audio streams.
+
+	* dvdread/_dvdread.pyx (DVDReadError.__new__): Raise an exception
+	if ifoOpen fails.
+
+2004-07-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* machine/machine.py (VirtualMachine.jumpToMenu): Add a new
+	parameter for the title number, and handle the case were title set
+	number is 0 (video manager).
+	(PlaybackLocation): Add cellCurrentTime
 	attribute and use it to handle current time.
+	(VirtualMachine.setButtonNav): Make checks tighter on forced
+	select/activate.
 
 2004-07-11  Martin Soto  <martinsoto@users.sourceforge.net>
 

@@ -82,8 +82,8 @@ class PlaybackLocation(object):
         # No still frame in progress.
         self.stillEnd = None
 
-        # Interactive is true while in the middle of performing a
-        # interactive operation.
+        # Interactive is true when performing an interactive
+        # operation.
         self.interactive = False
 
         self.cellCurrentTime = 0
@@ -905,6 +905,9 @@ class VirtualMachine(CommandPerformer):
         self.location.jumpToUnit(self.location.programChain.getCell(cellNr))
 
     def selectButton(self, buttonNr):
+        if not 0 <= buttonNr <= 36:
+            raise MachineException, "Button number out of range"
+
         self.location.button = buttonNr
         self.updatePipeline()
 
@@ -929,18 +932,20 @@ class VirtualMachine(CommandPerformer):
         langUnit = self.getLangUnit(self.info.videoManager)
         self.location.jumpToUnit(langUnit.getMenuProgramChain(MENU_TYPE_TITLE))
 
-    def jumpToMenu(self, titleSetNr, menuType):
-        titleSet = self.info.videoManager.getVideoTitleSet(titleSetNr)
-        if self.location.title == None or \
-           self.location.title.videoTitleSet.titleSetNr != titleSetNr:
-            # Jump first to the video title set to make sure that the
-            # location points to the right title.
-            title = titleSet.getVideoTitle(1)
-            if title != None:
-                self.location.jumpToUnit(title)
+    def jumpToMenu(self, titleSetNr, titleNr, menuType):
+        # Get the title set. Title set 0 is the video manager.
+        if titleSetNr == 0:
+            titleSet = self.info.videoManager
+        else:
+            titleSet = self.info.videoManager.getVideoTitleSet(titleSetNr)
+
+        # Jump first to the video title to make sure that the location
+        # points to the right title.
+        title = titleSet.getVideoTitle(titleNr)
+        self.location.jumpToUnit(title)
         
         # Now jump to the actual program chain corresponding to the menu..
-        langUnit = self.getLangUnit(titleSet)
+        langUnit = self.getLangUnit(title.videoTitleSet)
         self.location.jumpToUnit(langUnit.getMenuProgramChain(menuType))
 
     def jumpToManagerProgramChain(self, programChainNr):
@@ -971,7 +976,8 @@ class VirtualMachine(CommandPerformer):
     def callMenu(self, menuType, rtn=0):
         self.saveLocation(rtn)
         titleSetNr = self.location.title.videoTitleSet.titleSetNr
-        self.jumpToMenu(titleSetNr, menuType)
+        titleNr = self.location.title.titleNr
+        self.jumpToMenu(titleSetNr, titleNr, menuType)
 
     def callManagerProgramChain(self, programChainNr, rtn=0):
         self.saveLocation(rtn)
@@ -1084,12 +1090,43 @@ class VirtualMachine(CommandPerformer):
 
 
     #
+    # Stream Control
+    #
+
+    def getAudioStream(self):
+        return self.audio + 1
+
+    def setAudioStream(self, logical):
+        if not 1 <= logical <= 8:
+            raise MachineException, "Invalid logical stream number"
+
+        self.audio = logical - 1
+        self.updatePipeline()
+
+    audioStream = property(getAudioStream, setAudioStream)
+
+    def getAudioStreams(self):
+        if self.location.programChain == None:
+            return []
+
+        streams = []
+        for logical in range(1, 9):
+            if self.location.programChain.getAudioPhysStream(logical) \
+               != None:
+                streams.append((logical,
+                                self.location.title.videoTitleSet. \
+                                getAudioAttributes(logical)))
+
+        return streams
+
+
+    #
     # Button Navigation
     #
 
     def setButtonNav(self, buttonNav):
         # Check for forced select.
-        if buttonNav.forcedSelect != 0 and \
+        if 1 <= buttonNav.forcedSelect <= 36 and \
            (self.buttonNav == None or \
             self.buttonNav.forcedSelect != buttonNav.forcedSelect):
             self.selectButton(buttonNav.forcedSelect)
@@ -1097,7 +1134,7 @@ class VirtualMachine(CommandPerformer):
         self.buttonNav = buttonNav
 
         # Check for forced activate.
-        if buttonNav.forcedActivate != 0:
+        if 1 <= buttonNav.forcedActivate <= 36:
             self.selectButton(buttonNav.forcedActivate)
             self.confirm()
 
