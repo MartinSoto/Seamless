@@ -57,13 +57,38 @@ def main():
     optParser = OptionParser()
     optParser.set_usage('Usage: %prog [options]')
     optParser.set_description("Seamless: A DVD player based on GStreamer")
-    optParser.add_option("--path", dest="path",
-                         metavar="PATH",
-                         help="DVD device path is PATH",
-                         default="/dev/dvd")
     optParser.add_option("--fullscreen", dest="fullScreen",
                          action="store_true",
                          help="start in full screen mode")
+    optParser.add_option("--path", dest="location",
+                         metavar="PATH",
+                         help="DVD device path is PATH",
+                         default="/dev/dvd")
+    optParser.add_option("--lirc", dest="lirc",
+                         action="store_true",
+                         help="enable lirc remote control support")
+    optParser.add_option("--audio-sink", dest="audioSink",
+                         metavar="SINK",
+                         help="audio sink is SINK",
+                         default="alsasink")
+    optParser.add_option("--audio-decode", dest="audioDecode",
+                         metavar="TYPE",
+                         help="set type to 'hard' if the specified audio "
+                         "sink decodes audio internally in hardware or "
+                         "to 'soft' if it requires a software decoder",
+                         default="soft",
+                         choices = ('soft', 'hard'))
+    optParser.add_option("--video-sink", dest="videoSink",
+                         metavar="SINK",
+                         help="video sink is SINK",
+                         default="xvimagesink brightness=40 hue=1000")
+    optParser.add_option("--video-decode", dest="videoDecode",
+                         metavar="TYPE",
+                         help="set type to 'hard' if the specified video "
+                         "sink decodes video internally in hardware or "
+                         "to 'soft' if it requires a software decoder",
+                         default="soft",
+                         choices = ('soft', 'hard'))
     (options, args) = optParser.parse_args()
 
     if args != []:
@@ -74,9 +99,8 @@ def main():
     #gst.scheduler_factory_set_default_name('fairgthread')
 
     # Create the main objects.
-    player = dvdplayer.DVDPlayer(location=options.path)
-    appInstance = mainui.MainUserInterface(player,
-                                           fullScreen=options.fullScreen)
+    player = dvdplayer.DVDPlayer(options)
+    appInstance = mainui.MainUserInterface(player, options)
 
     gtk.main()
 

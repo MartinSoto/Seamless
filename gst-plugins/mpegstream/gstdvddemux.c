@@ -298,6 +298,8 @@ gst_dvd_demux_init (GstDVDDemux * dvd_demux)
 
   /* Make sure a discont event will be sent with the initial
      timestamp. */
+  GST_DEBUG_OBJECT (dvd_demux, "Setting discont time to %" GST_TIME_FORMAT,
+      GST_TIME_ARGS (dvd_demux->last_end_ptm));
   dvd_demux->discont_time = dvd_demux->last_end_ptm;
   dvd_demux->just_flushed = FALSE;
 
@@ -437,6 +439,8 @@ gst_dvd_demux_handle_dvd_event (GstDVDDemux * dvd_demux, GstEvent * event)
          the next sequence time. We don't do it here to reduce the
          time gap between the discontinuity and the subsequent data
          blocks. */
+      GST_DEBUG_OBJECT (dvd_demux, "Setting discont time to %" GST_TIME_FORMAT,
+          GST_TIME_ARGS (start_ptm + mpeg_demux->adjust));
       dvd_demux->discont_time = start_ptm + mpeg_demux->adjust;
       dvd_demux->just_flushed = FALSE;
     }
@@ -834,6 +838,7 @@ gst_dvd_demux_send_subbuffer (GstMPEGDemux * mpeg_demux,
   if (dvd_demux->discont_time != GST_CLOCK_TIME_NONE) {
     PARSE_CLASS (mpeg_demux)->send_discont (mpeg_parse,
         dvd_demux->discont_time);
+    GST_DEBUG_OBJECT (dvd_demux, "Setting discont time to NONE");
     dvd_demux->discont_time = GST_CLOCK_TIME_NONE;
   }
 

@@ -1,3 +1,18 @@
+2004-11-26  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/seamless.py (main): Add new commandline options.
+
+	* src/mainui.py (MainUserInterface.__init__): Take the options
+	object directly. Make lirc optional. Set the fullscreen mode at
+	the right location.
+
+	* src/dvdplayer.py (_DVDPlayer.__init__): Build the pipeline
+	somewhat more dynamically, based on command line options.
+
+	* gst-plugins/mpegstream/gstdvddemux.c (gst_dvd_demux_init) 
+	(gst_dvd_demux_handle_dvd_event, gst_dvd_demux_send_subbuffer):
+	Some discont event debugging.
+
 2004-11-24  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (VirtualMachine.vobuRead) 

@@ -42,16 +42,15 @@ import xscreensaver
 
 
 class MainUserInterface:
-    def __init__(self, player, fullScreen=False):
+    def __init__(self, player, options):
         self.player = player
-        self.fullScreen = fullScreen
+        self.options = options
 
         # Create the main window.
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_title('DVD Player')
         self.window.set_border_width(0)
         self.window.set_property('can-focus', True)
-        self.performFullScreen()
 
         self.window.connect("realize", self.mainRealize)
         self.window.connect("key-press-event", self.mainKeyPress)
@@ -73,11 +72,17 @@ class MainUserInterface:
         self.window.set_default_size(int(rootWidth * 0.75),
                                      int(rootHeight * 0.75))
 
+        # Set the proper full screen mode.
+        self.fullScreen = self.options.fullScreen
+        self.performFullScreen()
+
+        # Show the actual windows.
         self.video.show()
         self.window.show()
 
         # Initialize all 'plugins'.
-        self.lirc = lirc.LIRC(self)
+        if self.options.lirc:
+            self.lirc = lirc.LIRC(self)
         self.xscreensaver = xscreensaver.XScreensaver(self)
 
     def getPlayer(self):
@@ -85,7 +90,8 @@ class MainUserInterface:
 
     def shutDown(self):
         # Stop control plugins.
-        self.lirc.close()
+        if self.options.lirc:
+            self.lirc.close()
         self.xscreensaver.close()
 
         self.player.stop()

@@ -46,111 +46,82 @@ class DVDPlayer(Thread):
     """
     """
 
-    def __init__(self, name="player", location="/dev/dvd"):
+    def __init__(self, options, name="player"):
         Thread.__init__(self, name)
 
         # Create an info object for the DVD.
-        self.info = DVDInfo(location)
+        self.info = DVDInfo(options.location)
 
         # Build the pipeline.
 
-        #timeout = "timeout=10000000"
-        timeout = ""
+        # The backend thread.
+        if options.videoDecode == 'soft':
+            videoDecoder = 'mpeg2dec name=mpeg2dec !'
+        else:
+            audioDecoder = ''
+
         self.dvdSrc = parse_launch("""
         (
           dvdblocksrc name=dvdblocksrc !
             seamless-dvddemux name=dvddemux .current_video !
-            mpeg2dec name=mpeg2dec !
-            queue name=video %s
+            %s
+            queue name=video
           dvddemux.current_subpicture !
-            queue name=subtitle %s
+            queue name=subtitle
           dvddemux.current_audio !
             queue name=audio max-size-buffers=50
         )
-        """ % (timeout, timeout))
+        """ % videoDecoder)
         ghostify(self.dvdSrc, 'video', 'src', 'video')
         ghostify(self.dvdSrc, 'subtitle', 'src', 'subtitle')
         ghostify(self.dvdSrc, 'audio', 'src', 'audio')
         self.add(self.dvdSrc)
 
-        #self.videoSink = sinkFromSpec("""
-        #  { queue name=queue max-size-buffers=150 !
-        #    fakesink }""")
-        #self.videoSink = sinkFromSpec("""
-        #  { queue name=queue max-size-buffers=150 !
-        #    dxr3videosink }
-        #    """)
-        #self.videoSink = sinkFromSpec("""
-        #{
-        #  queue name=queue max-size-buffers=150 ! filesink location=video.out
-        #}
-        #""")
-        #self.add(self.videoSink)
-        #self.videoSink = sinkFromSpec("""
-        #  { queue name=queue max-size-buffers=150 !
-        #    fdsink fd=1 }
-        #    """)
+        # The video playback thread.
         self.videoSink = parse_launch("""
         {
           seamless-mpeg2subt name=mpeg2subt !
             identity name=videoident !
-            xvimagesink name=videosink brightness=40 hue=1000
+            %s name=videosink
         }
-        """)
-        # For 16:9:  pixel-aspect-ratio=4/3
-#         self.videoSink = parse_launch("""
-#         {
-#           mpeg2subt name=mpeg2subt !
-#             identity name=videoident !
-#             ffcolorspace !
-#             videoscale !
-#             ximagesink name=videosink
-#         }
-#         """)
+        """ % options.videoSink)
         ghostify(self.videoSink, 'mpeg2subt', 'video')
         ghostify(self.videoSink, 'mpeg2subt', 'subtitle')
         self.videoSinkElem = self.videoSink.get_by_name('videosink')
         self.videoIdent = self.videoSink.get_by_name('videoident')
         self.add(self.videoSink)
 
-        #self.audioSink = sinkFromSpec("""
-        #  { queue name=queue !
-        #    fakesink }
-        #    """)
-        #self.audioSink = sinkFromSpec("""
-        #  { queue name=queue ! a52dec ! osssink }
-        #    """)
-        #self.audioSink = sinkFromSpec("""
-        #  { queue name=queue ! filesink location=audio.out }
-        #  """)
+        # The audio playback thread.
+        if options.audioDecode == 'soft':
+            sinkName = 'a52dec'
+            audioDecoder = 'a52dec name=%s !' % sinkName
+        else:
+            sinkName = 'audioident'
+            audioDecoder = ''
+
         self.audioSink = parse_launch("""
         {
-          ac3iec958 name=ac3iec958 !
+          %s
             identity name=audioident !
-            alsaspdifsink name=audiosink
+            %s name=audiosink
         }
-        """)
-        ghostify(self.audioSink, 'ac3iec958', 'sink', 'audio')
-#         self.audioSink = parse_launch("""
-#         {
-#           a52dec name=a52dec !
-#             identity name=audioident !
-#             alsasink name=audiosink
-#         }
-#         """)
-#         ghostify(self.audioSink, 'a52dec', 'sink', 'audio')
+        """ % (audioDecoder, options.audioSink))
+        ghostify(self.audioSink, sinkName, 'sink', 'audio')
         self.audioSinkElem = self.audioSink.get_by_name('audiosink')
         self.audioIdent = self.audioSink.get_by_name('audioident')
         self.add(self.audioSink)
 
+        # All together now.
         self.dvdSrc.link_pads('video', self.videoSink, 'video')
         self.dvdSrc.link_pads('subtitle', self.videoSink, 'subtitle')
         self.dvdSrc.link_pads('audio', self.audioSink, 'audio')
 
         # Distribute the clock manually.
-        clock = self.audioSinkElem.get_clock()
-        self.videoSink.use_clock(clock)
-        self.audioSink.use_clock(clock)
+        # Hack: use the system clock to avoid blocking.
+        self.clock = self.audioSinkElem.get_clock()
+        #self.clock = gst.system_clock_obtain()
+        self.videoSink.use_clock(self.clock)
+        self.audioSink.use_clock(self.clock)
 
         # Wrap the source element in the virtual machine.
         self.machine = VirtualMachine(self.info,
