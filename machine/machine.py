@@ -373,7 +373,7 @@ class VirtualMachine(CommandPerformer):
         # Current logical audio and subpicture streams and current
         # angle. The values follow the conventions of system registers
         # 1, 2, and 3, respectively.
-        self.audio = 0xf	# None
+        self.audio = 0		# This seems to be needed by some DVDs.
         self.subpicture = 0x3e	# None
         self.angle = 1
 
@@ -658,14 +658,14 @@ class VirtualMachine(CommandPerformer):
     def getSystem4(self):
         """Return the value of system register 4 (title_in_volume)."""
         if self.location.title != None:
-            return self.location.title.titleNr
+            return self.location.title.globalTitleNr
         else:
             return 1
 
     def getSystem5(self):
         """Return the value of system register 5 (title_in_vts)."""
         if self.location.title != None:
-            return self.location.title.globalTitleNr
+            return self.location.title.titleNr
         else:
             return 1
 
@@ -858,7 +858,7 @@ class VirtualMachine(CommandPerformer):
         self.updatePipeline()
 
     def setSystemParam8(self, value):
-        self.selectButton(value << 10)
+        self.selectButton(value >> 10)
 
     def jumpToTitle(self, titleNr):
         self.location.jumpToUnit(self.info.videoManager.getVideoTitle(titleNr))
@@ -879,8 +879,16 @@ class VirtualMachine(CommandPerformer):
         self.location.jumpToUnit(langUnit.getMenuProgramChain(MENU_TYPE_TITLE))
 
     def jumpToMenu(self, titleSetNr, menuType):
-        langUnit = self.getLangUnit(self.info.videoManager. \
-                                    getVideoTitleSet(titleSetNr))
+        titleSet = self.info.videoManager.getVideoTitleSet(titleSetNr)
+        if self.location.title.videoTitleSet.titleSetNr != titleSetNr:
+            # Jump first to the video title set to make sure that the
+            # location points to the right title.
+            title = titleSet.getVideoTitle(1)
+            if title != None:
+                self.location.jumpToUnit(title)
+        
+        # Now jump to the actual program chain corresponding to the menu..
+        langUnit = self.getLangUnit(titleSet)
         self.location.jumpToUnit(langUnit.getMenuProgramChain(menuType))
 
     def jumpToManagerProgramChain(self, programChainNr):

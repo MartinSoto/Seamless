@@ -1,3 +1,17 @@
+2004-07-11  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* machine/disassemble.py (CommandDisassembler): Change the
+	direction of the shift operation in setSystemParam8.
+
+	* machine/machine.py (VirtualMachine.__init__): Initialize audio
+	to 0. Some DVDs seem to need it.
+	(VirtualMachine.getSystem4): Fix incorrect implementation.
+	(VirtualMachine.getSystem5): idem.
+	(VirtualMachine.jumpToMenu): Make sure that the location points to
+	a title in the specified title set.
+	(VirtualMachine.setSystemParam8): Invert the direction of the
+	shift.
+
 2004-07-04  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* machine/machine.py (disasm): audio, subpicture and angle

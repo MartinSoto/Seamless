@@ -94,7 +94,7 @@ class CommandDisassembler(CommandPerformer):
 
     # Select (highlight) a button
     selectButton = makeMachineOperation('selectButton(%s)')
-    setSystemParam8 = makeMachineOperation('selectButton(%s << 10)')
+    setSystemParam8 = makeMachineOperation('selectButton(%s >> 10)')
 
     # Jumps
     jumpToTitle = makeMachineOperation('jumpToTitle(%s)')
