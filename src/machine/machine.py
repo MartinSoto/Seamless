@@ -16,7 +16,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-"""Main implementation of DVD virtual machine."""
+"""Main implementation of the DVD virtual machine."""
 
 import threading
 import traceback
@@ -115,7 +115,8 @@ def makeDummyOperation(method):
 
 
 class PerformMachine(object):
-    __slots__ = ('location',
+    __slots__ = ('info',
+                 'location',
 
                  'audio',
                  'subpicture',
@@ -137,7 +138,8 @@ class PerformMachine(object):
                  'generalRegisters',
                  'systemRegisters')
 
-    def __init__(self, location=None):
+    def __init__(self, info, location=None):
+        self.info = info
         self.location = location
 
         # Current logical audio and subpicture streams and current
@@ -232,14 +234,56 @@ class PerformMachine(object):
         makeDummyOperation('jumpToManagerProgramChain')
 
     # Timed jump
-    setTimedJump = makeDummyOperation('setTimedJump')
+    def setTimedJump(self, programChainNr, seconds):
+        """Sets the special purpose registers (SPRMs) 10 and 9 with
+        'programChainNr' and 'seconds', respectively.
+
+        SPRM 9 will be set with a time value in seconds and the
+        machine decreases its value automatically every second. When
+        the value reaches 0, an automatic jump to the video manager
+        program chain stored in register 10 will happen."""
+        # FIXME: Implement this.
+        print 'setTimeJump attempted, implement me!' 
+        yield NoOp
 
     # Call and resume
-    callFirstPlay = makeDummyOperation('callFirstPlay')
-    callTitleMenu = makeDummyOperation('callTitleMenu')
-    callMenu = makeDummyOperation('callMenu')
-    callManagerProgramChain = \
-        makeDummyOperation('callManagerProgramChain')
+    def callFirstPlay(self, rtn=0):
+        """Save the current location and jump to the first play
+        program chain.
+
+        The first play program chain is a special program chain in the
+        disk that is intended to be the first element played in that
+        disk when playback starts. If 'rtn' is not zero, it specifies
+        the cell number to return to when the saved state is resumed."""
+        yield NoOp
+
+    def callTitleMenu(self, rtn=0):
+        """Save the current location and jump to the title menu.
+
+        The title menu is a menu allowing to select one of the
+        available titles in a disk. Not all disks offer a title
+        menu. If 'rtn' is not zero, it specifies the cell number to
+        return to when the saved state is resumed."""
+        yield NoOp
+
+    def callManagerProgramChain(self, programChainNr, rtn=0):
+        """Save the current location and jump to the specified program
+        chain in the video manager.
+
+        Program chains directly associated to the video manager are
+        only for menus."""
+        yield NoOp
+
+    def callMenu(self, menuType, rtn=0):
+        """Save the current location and jump to the menu of the
+        specified type in the current title.
+
+        The menu type is one of dvdread.MENU_TYPE_TITLE,
+        dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
+        dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
+        dvdread.MENU_TYPE_CHAPTER."""
+        yield NoOp
+
     resume = makeDummyOperation('resume')
 
     # Selectable streams
@@ -309,16 +353,19 @@ class PerformMachine(object):
 
     def getSystem9(self):
         """Return the value of system register 9 (navigation_timer)."""
+        # FIXME: implement this.
         print >> sys.stderr, "Navigation timer checked, implement me!"
         return 0
 
     def getSystem10(self):
         """Return the value of system register 10 (program_chain_for_timer)."""
+        # FIXME: implement this.
         print >> sys.stderr, "Navigation timer checked, implement me!"
         return 0
 
     def getSystem11(self):
         """Return the value of system register 11 (karaoke_mode)."""
+        # FIXME: implement this.
         print >> sys.stderr, "Karaoke mode checked, implement me!"
         return 0
 
@@ -400,37 +447,74 @@ class PerformMachine(object):
         return self.systemRegisters[regNr]
 
 
+    #
+    # Language Units
+    #
+
+    def getLangUnit(self, container):
+        """Find the appropriate language unit for a container.
+
+        Given a container (video manager or title set) this method
+        returns an appropriate language unit. If there's a language
+        unit for the preferred menu language set in this object, it is
+        returned. Otherwise, the first one available is returned."""
+        unit = container.getLangUnit(self.prefMenuLang)
+        if unit == None:
+            unit = container.getLangUnit(1)
+
+        return unit
+
+
 class DiscPlayer(object):
-    __slots__ = ('perform')
+    __slots__ = ('perform',
+                 'videoManager')
 
     def __init__(self, perform):
         self.perform = perform
 
-    def exit(self):
-        """End execution of the machine."""
-        pass
+        self.videoManager = self.perform.info.videoManager
 
-    def jumpToTitle(self, titleNr):
-        """Jump to the first chapter of the specified title.
-
-        The title number is provided with respect to the video
-        manager, i.e. is global to the whole disk."""
-        pass
-
+    @restartPoint
     def jumpToFirstPlay(self):
         """Jump to the first play program chain.
 
         The first play program chain is a special program chain in the
         disk that is intended to be the first element played in that
         disk when playback starts."""
-        pass
+        yield Call(ProgramChainPlayer(self.perform). \
+                   playProgramChain(self.videoManager.firstPlay))
 
+    @restartPoint
+    def jumpToTitle(self, titleNr):
+        """Jump to the first chapter of the specified title.
+
+        The title number is provided with respect to the video
+        manager, i.e. is global to the whole disk."""
+        title = self.videoManager.getVideoTitle(titleNr)
+        yield Call(TitlePlayer(self.perform).playTitle(title))
+
+    @restartPoint
     def jumpToTitleMenu(self):
         """Jump to the title menu.
 
         The title menu is a menu allowing to select one of the
         available titles in a disk. Not all disks offer a title menu."""
+        langUnit = self.perform.getLangUnit(self.videoManager)
+        yield Call(LangUnitPlayer(self.perform). \
+                   playMenuInUnit(langUnit, dvdread.MENU_TYPE_TITLE))
 
+    @restartPoint
+    def jumpToManagerProgramChain(self, programChainNr):
+        """Jump to the specified program chain in the video
+        manager.
+
+        Program chains directly associated to the video manager are
+        only for the menus."""
+        langUnit = self.perform.getLangUnit(self.videoManager)
+        yield Call(LangUnitPlayer(self.perform). \
+                   playProgramChainInUnit(langUnit, programChainNr))
+
+    @restartPoint
     def jumpToMenu(self, titleSetNr, titleNr, menuType):
         """Jump to menu 'menuType' in title 'titleNr' of video title
         set 'titleSetNr'.
@@ -443,113 +527,136 @@ class DiscPlayer(object):
         dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
         dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
         dvdread.MENU_TYPE_CHAPTER."""
-        pass
+        # Get the title set and title. Title set 0 is the video manager.
+        if titleSetNr == 0:
+            titleSet = self.videoManager
+        else:
+            titleSet = self.videoManager.getVideoTitleSet(titleSetNr)
 
-    def jumpToManagerProgramChain(self, programChainNr):
-        """Jump to the specified program chain in the video
-        manager.
+        title = titleSet.getVideoTitle(titleNr)
 
-        Program chains directly associated to the video manager are
-        only for menus."""
-        pass
+        yield Call(TitlePlayer(self.perform). \
+                   playMenuInTitle(title, menuType))
 
-    def setTimedJump(self, programChainNr, seconds):
-        """Sets the special purpose registers (SPRMs) 10 and 9 with
-        'programChainNr' and 'seconds', respectively.
-
-        SPRM 9 will be set with a time value in seconds and the
-        machine decreases its value automatically every second. When
-        the value reaches 0, an automatic jump to the video manager
-        program chain stored in register 10 will happen."""
-        pass
-
-    def callFirstPlay(self, rtn=0):
-        """Save the current location and jump to the first play
-        program chain.
-
-        The first play program chain is a special program chain in the
-        disk that is intended to be the first element played in that
-        disk when playback starts. If 'rtn' is not zero, it specifies
-        the cell number to return to when the saved state is resumed."""
-        pass
-
-    def callTitleMenu(self, rtn=0):
-        """Save the current location and jump to the title menu.
-
-        The title menu is a menu allowing to select one of the
-        available titles in a disk. Not all disks offer a title
-        menu. If 'rtn' is not zero, it specifies the cell number to
-        return to when the saved state is resumed."""
-        pass
-
-    def callManagerProgramChain(self, programChainNr, rtn=0):
-        """Save the current location and jump to the specified program
-        chain in the video manager.
-
-        Program chains directly associated to the video manager are
-        only for menus."""
-        pass
-
+    @restartPoint
     def resume(self):
         """Resume playback at the previously saved location."""
         pass
 
+    @restartPoint
+    def exit(self):
+        """End execution of the machine."""
+        # Doing nothing should do the trick.
+        yield NoOp
 
-class TitleSetPlayer(object):
-    __slots__ = ('perform')
+
+class TitlePlayer(object):
+    __slots__ = ('perform',
+                 'title')
 
     def __init__(self, perform):
         self.perform = perform
 
-    def linkProgramChain(self, programChainNr):
-        """Jump to the program chain identified by 'programChainNr' in
-        the current title."""
-        pass
+        self.title = None
 
+    def currentTitle(self):
+        """Return the title currently being played.
+
+        'None' is returned if no title is currently being played."""
+        return self.title
+
+    @restartPoint
+    def playTitle(self, title, chapterNr=1):
+        """Play the specified chapter of the given video title."""
+        self.title = title
+
+        yield Chain(self.linkChapter(chapterNr))
+
+    @restartPoint
+    def playMenuInTitle(self, title, menuType):
+        """Make the given video title current, and jump inmediatly to
+        the corresponding menu of the specified menu type.
+
+        This operation is necessary to implement a particular DVD
+        virtual machine command that selects a menu in teh context of
+        a particular video title."""
+        self.title = title
+
+        langUnit = self.perform.getLangUnit(self.title.videoTitleSet)
+        yield Call(LangUnitPlayer(self.perform). \
+                   playMenuInUnit(langUnit, menuType))
+
+    @restartPoint
     def linkChapter(self, chapterNr):
-        """Jump to the specified chapter in the current video title
-        set.
+        """Jump to the specified chapter in the current video title.
 
         Chapters are a logical subdivision of video title sets. Each
         chapter is characterized by the program chain and program
         where it starts."""
-        pass
+        chapter = self.title.getChapter(chapterNr)
+        yield Call(ProgramChainPlayer(self.perform). \
+                   playProgramChain(chapter.cell.programChain,
+                                    chapter.cell.cellNr))
 
+    @restartPoint
     def jumpToTitleInSet(self, titleNr):
         """Jump to the first chapter of the specified title.
 
-        The title number is provided with respect to the current video
-        title set."""
-        pass
+        The title number is given with respect to the current video
+        title set (i.e., the title set the current title belongs to.)"""
+        yield Chain(self.jumpToChapterInSet(titleNr, 1))
 
+    @restartPoint
     def jumpToChapterInSet(self, titleNr, chapterNr):
         """Jump to the specified chapter in the specified title.
 
         The title number is provided with respect to the current video
-        title set."""
-        pass
+        title set (i.e., the title set the current title belongs to.)"""
+        title = self.title.videoTitleSet.getVideoTitle(titleNr)
+        yield Chain(self.playTitle(title, chapterNr))
 
-    def callMenu(self, menuType, rtn=0):
-        """Save the current location and jump to the menu of the
-        specified type in the current title.
-
-        The menu type is one of dvdread.MENU_TYPE_TITLE,
-        dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
-        dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
-        dvdread.MENU_TYPE_CHAPTER."""
-        pass
+    @restartPoint
+    def linkProgramChain(self, programChainNr):
+        """Jump to the program chain identified by 'programChainNr' in
+        the current title."""
+        programChain = self.title.getProgramChain(programChainNr)
+        yield Call(ProgramChainPlayer(self.perform). \
+                   playProgramChain(programChain))
 
 
 class LangUnitPlayer(object):
-    __slots__ = ('perform')
+    __slots__ = ('perform',
+                 'unit')
 
     def __init__(self, perform):
         self.perform = perform
 
+        self.unit = None
+
+    @restartPoint
+    def playMenuInUnit(self, unit, menuType):
+        """Play the menu of the specified menu type in the given
+        language unit."""
+        self.unit = unit
+
+        yield Call(ProgramChainPlayer(self.perform). \
+                   playProgramChain(self.unit.getMenuProgramChain(menuType)))
+
+    @restartPoint
+    def playProgramChainInUnit(self, unit, programChainNr):
+        """Play the specified program chain in the given language
+        unit."""
+        self.unit = unit
+
+        yield Chain(self.linkProgramChain(programChainNr))
+
+    @restartPoint
     def linkProgramChain(self, programChainNr):
         """Jump to the program chain identified by 'programChainNr' in
         the current language unit."""
-        pass
+        programChain = self.unit.getProgramChain(programChainNr)
+        yield Call(ProgramChainPlayer(self.perform). \
+                   playProgramChain(programChain))
 
 
 class ProgramChainPlayer(object):
@@ -570,17 +677,20 @@ class ProgramChainPlayer(object):
         return self.programChain
 
     @restartPoint
-    def playProgramChain(self, programChain):
-        """Play the specified program chain."""
+    def playProgramChain(self, programChain, cellNr=1):
+        """Play the specified program chain.
+
+        'cellNr' specifies the start cell."""
         self.programChain = programChain
         self.cell = None
 
-        # Play the 'pre' commands.
-        yield Call(CommandBlockPlayer(self.perform). \
-                   playBlock(self.programChain.preCommands))
+        if cellNr == 1:
+            # Play the 'pre' commands.
+            yield Call(CommandBlockPlayer(self.perform). \
+                       playBlock(self.programChain.preCommands))
 
-        # Go to the first cell.
-        yield Chain(self.linkCell(1))
+        # Go to the specified cell.
+        yield Chain(self.linkCell(cellNr))
 
     @restartPoint
     def linkCell(self, cellNr):
@@ -741,6 +851,7 @@ class CommandBlockPlayer(object):
         """Try to set parental level.
 
         If successful, jump to the specified command."""
+        # FIXME: implement this.
         print "Attempt to set parental level, implement me!"
 
         # For the moment, just jump inconditionally.
@@ -923,7 +1034,7 @@ class VirtualMachine(object):
         src.connect('vobu-header', self.wrapHeader)
 
         # The perform machine.
-        self.perform = PerformMachine()
+        self.perform = PerformMachine(info)
 
         # Initialize the scheduler.
         self.sched = itersched.Scheduler(ProgramChainPlayer(self.perform).playProgramChain(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1)))

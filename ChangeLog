@@ -2,7 +2,13 @@
 
 	* src/machine/machine.py (CellPlayer.setNav): nextVOBU ->
 	nextVobu.
-
+	(PerformMachine.__slots__): New attribute 'info'.
+	(TitlePlayer): Renamed from TitleSetPlayer. Methods implemented.
+	(TitlePlayer.currentTitle): New method.
+	(ProgramChainPlayer.playProgramChain): Added cellNr parameter to
+	allow for selecting the initial cell.
+	(LangUnitPlayer.__slots__): New attribute 'unit'.
+	(LangUnitPlayer): Methods implemented.
 	* src/dvdread/_dvdread.pyx(ProgramChain.getClutEntry,
 	Cell.lastVobuStartSector, NavPacket.nextVobu, NavPacket.prevVobu,
 	NavPacket.getForwardVobu, NavPacket.getBackwardVobu,
