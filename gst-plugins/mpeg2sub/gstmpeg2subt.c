@@ -445,7 +445,7 @@ gst_mpeg2subt_parse_header (GstMpeg2Subt * mpeg2subt)
         mpeg2subt->start_display_time =
             GST_BUFFER_TIMESTAMP (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt)) +
             ((GST_SECOND * event_time) / 90);
-        GST_DEBUG ("Subtitle starts at %" G_GUINT64_FORMAT,
+        GST_DEBUG_OBJECT (mpeg2subt, "Subtitle starts at %" G_GUINT64_FORMAT,
             mpeg2subt->end_display_time);
         buf++;
         break;
@@ -453,7 +453,7 @@ gst_mpeg2subt_parse_header (GstMpeg2Subt * mpeg2subt)
         mpeg2subt->end_display_time =
             GST_BUFFER_TIMESTAMP (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt)) +
             ((GST_SECOND * event_time) / 90);
-        GST_DEBUG ("Subtitle ends at %" G_GUINT64_FORMAT,
+        GST_DEBUG_OBJECT (mpeg2subt, "Subtitle ends at %" G_GUINT64_FORMAT,
             mpeg2subt->end_display_time);
         buf++;
         break;
@@ -491,7 +491,7 @@ gst_mpeg2subt_parse_header (GstMpeg2Subt * mpeg2subt)
             CLAMP ((((buf[5] & 0x0f) << 8) | buf[6]), 0,
             (mpeg2subt->in_height - 1));
 
-        GST_DEBUG ("left %d, top %d, right %d, bottom %d", mpeg2subt->left,
+        GST_DEBUG_OBJECT (mpeg2subt, "left %d, top %d, right %d, bottom %d", mpeg2subt->left,
             mpeg2subt->top, mpeg2subt->right, mpeg2subt->bottom);
         buf += 7;
         break;
@@ -499,7 +499,7 @@ gst_mpeg2subt_parse_header (GstMpeg2Subt * mpeg2subt)
         PARSE_BYTES_NEEDED (5);
         mpeg2subt->offset[0] = (((unsigned int) buf[1]) << 8) | buf[2];
         mpeg2subt->offset[1] = (((unsigned int) buf[3]) << 8) | buf[4];
-        GST_DEBUG ("Offset1 %d, Offset2 %d", mpeg2subt->offset[0],
+        GST_DEBUG_OBJECT (mpeg2subt, "Offset1 %d, Offset2 %d", mpeg2subt->offset[0],
             mpeg2subt->offset[1]);
         buf += 5;
         break;
@@ -806,6 +806,16 @@ gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt)
       ((mpeg2subt->forced_display && (mpeg2subt->current_button != 0)))) {
     GST_DEBUG_OBJECT (mpeg2subt, "Updating still frame");
 
+    if (g_queue_get_length (mpeg2subt->subt_queue) > 1) {
+      /* New subtitle packets arriving while the still frame was
+         displayed, stay with the last one. */
+      while (g_queue_get_length (mpeg2subt->subt_queue) > 1) {
+        gst_buffer_unref (GST_BUFFER (g_queue_pop_head (mpeg2subt->subt_queue)));
+      }
+      gst_mpeg2subt_parse_header (mpeg2subt);
+    }
+
+    /* Force the video sink to show this frame instantly. */
     out_buf = gst_buffer_copy (mpeg2subt->last_frame);
     gst_mpeg2subt_merge_title (mpeg2subt, out_buf);
 
@@ -853,7 +863,7 @@ gst_mpeg2subt_handle_subtitle (GstMpeg2Subt * mpeg2subt, GstData * _data)
       packet_size = GST_READ_UINT16_BE (data);
 
       if (packet_size == size) {
-        GST_LOG ("Subtitle packet size %d, current size %ld",
+        GST_LOG_OBJECT (mpeg2subt, "Subtitle packet size %d, current size %ld",
             packet_size, size);
 
         g_queue_push_tail (mpeg2subt->subt_queue, mpeg2subt->partialbuf);
@@ -871,7 +881,7 @@ gst_mpeg2subt_handle_subtitle (GstMpeg2Subt * mpeg2subt, GstData * _data)
         gst_mpeg2subt_flush_subtitle (mpeg2subt);
         break;
       case GST_EVENT_ANY:
-        GST_LOG ("DVD event on subtitle pad with timestamp %llu",
+        GST_LOG_OBJECT (mpeg2subt, "DVD event on subtitle pad with timestamp %llu",
             GST_EVENT_TIMESTAMP (GST_EVENT (_data)));
         gst_mpeg2subt_handle_dvd_event (mpeg2subt, GST_EVENT (_data), TRUE);
         break;
@@ -890,7 +900,7 @@ gst_mpeg2subt_handle_subtitle (GstMpeg2Subt * mpeg2subt, GstData * _data)
         }
         break;
       default:
-        GST_LOG ("Got event of type %d on subtitle pad",
+        GST_LOG_OBJECT (mpeg2subt, "Got event of type %d on subtitle pad",
             GST_EVENT_TYPE (GST_EVENT (_data)));
         break;
     }
@@ -969,7 +979,7 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
       mpeg2subt->menu_index[i] = ((guint32) (palette) >> (16 + (i * 4))) & 0x0f;
     }
 
-    GST_DEBUG ("New button activated clip=(%d,%d) to (%d,%d) palette 0x%x", sx,
+    GST_DEBUG_OBJECT (mpeg2subt, "New button activated clip=(%d,%d) to (%d,%d) palette 0x%x", sx,
         sy, ex, ey, palette);
     gst_mpeg2subt_setup_palette (mpeg2subt, mpeg2subt->menu_index,
         mpeg2subt->menu_alpha);
@@ -981,7 +991,7 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     int i;
     gint value;
 
-    GST_LOG ("New colour table recieved");
+    GST_LOG_OBJECT (mpeg2subt, "New colour table recieved");
     for (i = 0; i < 16; i++) {
       sprintf (name, "clut%02d", i);
       if (!gst_structure_get_int (structure, name, &value)) {
@@ -1007,7 +1017,7 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     mpeg2subt->clip_top = mpeg2subt->top;
     mpeg2subt->clip_right = mpeg2subt->right;
     mpeg2subt->clip_bottom = mpeg2subt->bottom;
-    GST_LOG ("Clearing button state");
+    GST_LOG_OBJECT (mpeg2subt, "Clearing button state");
     gst_mpeg2subt_update_still_frame (mpeg2subt);
   } else if (!from_sub_pad && !strcmp (event_type, "dvd-spu-still-frame")) {
     /* Handle a still frame */
