@@ -45,7 +45,8 @@ cdef extern from "dvdread/ifo_types.h":
 
   # Video Attributes.
   ctypedef struct video_attr_t:
-    unsigned int permitted_df
+    unsigned int permitted_df	# High bit: Disallow automatic pan/scan.
+    				# Low bit: Disallow automatic letterbox.
     unsigned int display_aspect_ratio
     unsigned int video_format
     unsigned int mpeg_version

@@ -1,3 +1,20 @@
+2004-07-19  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* dvdread/_dvdread.pyx (VideoTitleSet.__new__): Retry opening the
+	title if it fails initially.
+
+2004-07-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* machine/machine.py (VirtualMachine.updatePipeline): Add basic
+	support for aspect ratios.
+
+	* dvdread/_dvdread.pyx (VideoAttributes): Added support for
+	extracting video attributes.
+	(ProgramChain.getSubpicturePhysStreams): Return a tuple instead of
+	a dictionary.
+	(VideoTitleSet, VideoManager): Add properties to access menu
+	attributes.
+
 2004-07-14  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* machine/machine.py (VirtualMachine.setAudioStream): Added

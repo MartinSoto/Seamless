@@ -33,7 +33,7 @@ class DVDPlayer(Thread):
         self.add(self.demux)
 
         self.videoSink = sinkFromSpec("""
-          { queue name=queue max-size-buffers=600 !
+          { queue name=queue max-size-buffers=150 !
             dxr3videosink }
             """)
         self.add(self.videoSink)

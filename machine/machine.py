@@ -325,6 +325,18 @@ class PlaybackLocation(object):
         else:
             return DOMAIN_TITLE
 
+    def getAttributeContainer(self):
+        """Find the container of the current stream attributes."""
+
+        if isinstance(self.programChain.container, LangUnit):
+            return self.programChain.container.container
+        elif isinstance(self.programChain.container, VideoTitleSet):
+            return self.programChain.container
+        elif isinstance(self.programChain.container, VideoManager):
+            return self.programChain.container
+        else:
+            assert 0, 'Unexpected type for program chain container'
+
     def nextVOBU(self):
         if self.stillEnd != None:
             self.advance()
@@ -332,19 +344,15 @@ class PlaybackLocation(object):
         while self.stillEnd == None and self.sectorNr == None:
             self.advance()
 
-        # Find the current playback domain and titleNr.
+        # Find the current playback title number.
         if isinstance(self.programChain.container, LangUnit):
             titleNr = self.programChain.container.container.titleSetNr
-            domain = DOMAIN_MENU
         elif isinstance(self.programChain.container, VideoTitleSet):
             titleNr = self.programChain.container.titleSetNr
-            domain = DOMAIN_TITLE
         elif isinstance(self.programChain.container, VideoManager):
             titleNr = 0
-            domain = DOMAIN_TITLE
         else:
-            raise MachineException, \
-                  'Unexpected type for program chain container'
+            assert 0, 'Unexpected type for program chain container'
 
         return (self.getDomain(), titleNr, self.useSector())
 
@@ -418,8 +426,10 @@ class VirtualMachine(CommandPerformer):
         self.parentalCountry = 'us'
         self.parentalLevel = 15 # None
 
-        # Prefered display aspect ratio and video mode.
+        # Prefered display aspect ratio
         self.aspectRatio = ASPECT_RATIO_16_9
+
+        # Current video mode.
         self.videoMode = VIDEO_MODE_NORMAL
 
 
@@ -618,8 +628,14 @@ class VirtualMachine(CommandPerformer):
                 if streams == None:
                     physical = -1
                 else:
-                    # FIXME: This should work with all video modes.
-                    physical = streams['widescreen']
+                    if self.location.getAttributeContainer(). \
+                       videoAttributes.aspectRatio == ASPECT_RATIO_4_3:
+                        physical = streams[SUBPICTURE_PHYS_TYPE_4_3]
+                    else:
+                        if self.aspectRatio == ASPECT_RATIO_16_9:
+                            physical = streams[SUBPICTURE_PHYS_TYPE_WIDESCREEN]
+                        else:
+                            physical = streams[SUBPICTURE_PHYS_TYPE_LETTERBOX]
         else:
             physical = 0
 

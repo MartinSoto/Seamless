@@ -1,5 +1,7 @@
 # -*- Python -*-
 
+import time
+
 cdef extern from "Python.h":
     int PyObject_AsReadBuffer(object obj,
                               char **buffer,
@@ -93,25 +95,47 @@ SUBPICTURE_FORMAT_EXTENDED = 1
 SUBPICTURE_FORMAT_OTHER = 2
 
 
-# Supported aspect ratios.
+# Aspect ratios.
 ASPECT_RATIO_4_3 = 0
 ASPECT_RATIO_NOT_SPECIFIED = 1
 ASPECT_RATIO_RESERVED = 2
 ASPECT_RATIO_16_9 = 3
 
 
-# Possible video modes.
+# Video modes.
 VIDEO_MODE_NORMAL = 0
 VIDEO_MODE_PAN_SCAN = 1
 VIDEO_MODE_LETTERBOX = 2
 VIDEO_MODE_RESERVED = 3
 
 
-# Possible highlight statuses.
+# Highlight status values.
 HLSTATUS_NONE = 0		# No highlight info.
 HLSTATUS_NEW_INFO = 1		# New highlight info.
 HLSTATUS_PREVIOUS = 2		# Equal to previous nav packet.
 HLSTATUS_PREVIOUS_CMDS = 3	# Equal to previous nav except for commands.
+
+
+# Video standards.
+VIDEO_STD_NTSC = 0
+VIDEO_STD_PAL = 1
+
+
+# PAL film mode.
+PAL_FILM_MODE_CAMERA = 0
+PAL_FILM_MODE_FIML = 1
+
+
+# Compression types.
+COMPRESSION_TYPE_VARIABLE = 0
+COMPRESSION_TYPE_CONSTANT = 1
+
+
+# Subpicture physical stream types.
+SUBPICTURE_PHYS_TYPE_4_3 = 0
+SUBPICTURE_PHYS_TYPE_WIDESCREEN = 1
+SUBPICTURE_PHYS_TYPE_LETTERBOX = 2
+SUBPICTURE_PHYS_TYPE_PAN_SCAN = 3
 
 
 cdef class Time
@@ -441,10 +465,12 @@ cdef class ProgramChain:
 
         # FIXME: This may have endianness issues.
         if (subp_control >> 24) & 0x80:
-            return {'4:3': (subp_control >> 24) & 0x1f,
-                    'widescreen': (subp_control >> 16) & 0x1f,
-                    'letterbox': (subp_control >> 8) & 0x1f,
-                    'pan&scan': subp_control & 0x1f}
+            # This is to be indexed with the SUBPICTURE_PHYS_TYPE
+            # constants.
+            return ((subp_control >> 24) & 0x1f,
+                    (subp_control >> 16) & 0x1f,
+                    (subp_control >> 8) & 0x1f,
+                    subp_control & 0x1f)
         else:
             return None
 
@@ -606,6 +632,70 @@ cdef class VideoTitle:
         return Chapter(self, chapterNr)
 
 
+cdef class VideoAttributes:
+    cdef video_attr_t *attribs
+
+    def __new__(self):
+        self.attribs = NULL
+
+    cdef void init(self, video_attr_t *attribs):
+        self.attribs = attribs
+
+    property allowLetterbox:
+        def __get__(self):
+            return self.attribs.permitted_df & 0x1 == 0
+
+    property allowPanScan:
+        def __get__(self):
+            return self.attribs.permitted_df & 0x2 == 0
+
+    property aspectRatio:
+        def __get__(self):
+            # Compare to an ASPECT_RATIO constant.
+            return self.attribs.display_aspect_ratio
+
+    property videoStandard:
+        def __get__(self):
+            # Compare to a VIDEO_STD constant
+            return self.attribs.video_format
+
+    property mpegVersion:
+        def __get__(self):
+            # 1 or 2
+            return self.attribs.mpeg_version + 1
+
+    property palFilmMode:
+        def __get__(self):
+            # Compare to a PAL_FILM_MODE constant
+            return self.attribs.film_mode
+
+    property letterboxed:
+        def __get__(self):
+            return self.attribs.letterboxed != 0
+
+    property resolution:
+        def __get__(self):
+            if self.attribs.video_format == 0:
+                return ((720, 480), (704, 480),
+                        (352, 480), (352, 240))[self.attribs.picture_size]
+            else:
+                return ((720, 576), (704, 576),
+                        (352, 576), (352, 288))[self.attribs.picture_size]
+
+    property compressionType:
+        def __get__(self):
+            # Compare to a COMPRESSION_TYPE constant
+            return self.attribs.bit_rate
+
+cdef wrapVideoAttributes(video_attr_t *attribs):
+    cdef VideoAttributes attributes
+
+    attributes = VideoAttributes()
+    attributes.init(attribs)
+
+    return attributes
+
+
 cdef class AudioAttributes:
     cdef audio_attr_t *attribs
 
@@ -713,6 +803,12 @@ cdef class VideoTitleSet:
         self.titleSetNr = titleSetNr
 
         self.handle = ifoOpen(dvd.reader, titleSetNr)
+        retries = 0
+        while self.handle == NULL and retries < 3:
+            time.sleep(2)
+            self.handle = ifoOpen(dvd.reader, titleSetNr)
+            retries = retries + 1
+
         if self.handle == NULL:
             raise DVDReadError, \
                   "Could not open video title set %d" % titleSetNr
@@ -793,6 +889,32 @@ cdef class VideoTitleSet:
         else:
             raise TypeError, \
                   "getLangUnit() arg 2 must be an integer or a string"
+
+    property menuVideoAttributes:
+        def __get__(self):
+            return wrapVideoAttributes(&(self.handle.vtsi_mat. \
+                                         vtsm_video_attr))
+
+    property menuAudioAttributes:
+        def __get__(self):
+            if self.handle.vtsi_mat.nr_of_vtsm_audio_streams == 0:
+                return None
+
+            return wrapAudioAttributes(&(self.handle.vtsi_mat. \
+                                         vtsm_audio_attr), 1)
+
+    property menuSubpictureAttributes:
+        def __get__(self):
+            if self.handle.vtsi_mat.nr_of_vtsm_subp_streams == 0:
+                return None
+
+            return wrapSubpictureAttributes(&(self.handle.vtsi_mat. \
+                                              vtsm_subp_attr), 1)
+
+    property videoAttributes:
+        def __get__(self):
+            return wrapVideoAttributes(&(self.handle.vtsi_mat. \
+                                         vts_video_attr))
 
     property audioStreamCount:
         def __get__(self):
@@ -952,6 +1074,27 @@ cdef class VideoManager:
         else:
             raise TypeError, \
                   "getLangUnit() arg 2 must be an integer or a string"
+
+    property menuVideoAttributes:
+        def __get__(self):
+            return wrapVideoAttributes(&(self.handle.vmgi_mat. \
+                                         vmgm_video_attr))
+
+    property menuAudioAttributes:
+        def __get__(self):
+            if self.handle.vmgi_mat.nr_of_vmgm_audio_streams == 0:
+                return None
+
+            return wrapAudioAttributes(&(self.handle.vmgi_mat. \
+                                         vmgm_audio_attr), 1)
+
+    property menuSubpictureAttributes:
+        def __get__(self):
+            if self.handle.vmgi_mat.nr_of_vmgm_subp_streams == 0:
+                return None
+
+            return wrapSubpictureAttributes(&(self.handle.vmgi_mat. \
+                                              vmgm_subp_attr), 1)
 
 
 cdef class DVDInfo:
