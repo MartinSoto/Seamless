@@ -30,6 +30,7 @@ from gst import *
 import loadplugins
 
 from machine import *
+import wrapclock
 
 
 #
@@ -116,12 +117,10 @@ class DVDPlayer(Thread):
         self.dvdSrc.link_pads('subtitle', self.videoSink, 'subtitle')
         self.dvdSrc.link_pads('audio', self.audioSink, 'audio')
 
-        # Distribute the clock manually.
-        # Hack: use the system clock to avoid blocking.
-        self.clock = self.audioSinkElem.get_clock()
+        # (Not yet!) Wrap the clock in a robust clock.
+        #self.clock = wrapclock.wrap(self.audioSinkElem.get_clock())
         #self.clock = gst.system_clock_obtain()
-        self.videoSink.use_clock(self.clock)
-        self.audioSink.use_clock(self.clock)
+        #self.use_clock(self.clock)
 
         # Wrap the source element in the virtual machine.
         self.machine = VirtualMachine(self.info,

@@ -1,4 +1,4 @@
-SUBDIRS = dvdread machine
+SUBDIRS = dvdread machine wrapclock
 
 pypkgdir = $(pkglibdir)/python
 

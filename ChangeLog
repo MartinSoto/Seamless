@@ -1,3 +1,31 @@
+2004-11-28  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpegstream/gstdvddemux.c: Updated e-mail address.
+
+	* src/seamless.py (main): Check for the PTH version of the fair
+	scheduler before selecting it.
+
+	* src/dvdplayer.py (DVDPlayer.__init__): Do not use the robust
+	clock yet.
+
+	* gst-plugins/alsaspdif/alsaspdifsink.c
+	(alsaspdifsink_handle_event): 
+	(alsaspdifsink_handle_event): Special handling for still frames
+	deleted.
+
+	* src/wrapclock/wrapclock.c: 
+	* src/Makefile.am (SUBDIRS): 
+	* configure.ac: 
+	Added a C module to provide minimal access to the robust clock.
+
+	* gst-plugins/robustclock/robustclock.c: 
+	* gst-plugins/robustclock/robustclock.h: 
+	* gst-plugins/Makefile.am (SUBDIRS): 
+	* gst-plugins/robustclock/Makefile.am (SUBDIRS): 
+	* configure.ac: 
+	Added an implementation for a robust, wrapper clock, that makes
+	an audio clock keep running even if no sound is being sent.
+	
 2004-11-27  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* autogen.sh:

@@ -95,8 +95,10 @@ def main():
         optParser.error("invalid argument(s): %s" % string.join(args, ' '))
 
     # Use the fair scheduler.
-    gst.scheduler_factory_set_default_name('fairpth')
-    #gst.scheduler_factory_set_default_name('fairgthread')
+    if gst.scheduler_factory_find('fairpth'):
+        gst.scheduler_factory_set_default_name('fairpth')
+    else:
+        gst.scheduler_factory_set_default_name('fairgthread')
 
     # Create the main objects.
     player = dvdplayer.DVDPlayer(options)

@@ -666,9 +666,6 @@ alsaspdifsink_handle_event (GstPad *pad, GstEvent *event)
       GST_INFO_OBJECT (sink, "flush event received");
 
       alsaspdifsink_flush (sink);
-      gst_audio_clock_set_active (GST_AUDIO_CLOCK (sink->provided_clock),
-          TRUE);
-      GST_INFO_OBJECT (sink, "clock activated");
       break;
     
     case GST_EVENT_DISCONTINUOUS:
@@ -682,22 +679,6 @@ alsaspdifsink_handle_event (GstPad *pad, GstEvent *event)
           GST_INFO_OBJECT (sink,
               "handling discontinuity: time: %" GST_TIME_FORMAT,
               GST_TIME_ARGS (time));
-        }
-      }
-      break;
-
-    case GST_EVENT_ANY:
-      {
-        GstStructure *structure = event->event_data.structure.structure;
-        const char *event_type =
-          gst_structure_get_string (structure, "event");
-
-        if (strcmp (event_type, "dvd-spu-still-frame") == 0) {
-          GST_INFO_OBJECT (sink, "Handling still frame");
-
-          gst_audio_clock_set_active (
-              GST_AUDIO_CLOCK (sink->provided_clock), FALSE);
-          GST_INFO_OBJECT (sink, "clock deactivated");
         }
       }
       break;

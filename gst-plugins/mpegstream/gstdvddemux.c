@@ -41,7 +41,7 @@ static GstElementDetails dvd_demux_details = {
   "DVD Demuxer",
   "Codec/Demuxer",
   "Demultiplexes DVD (VOB) MPEG2 streams",
-  "Martin Soto <soto@informatik.uni-kl.de>"
+  "Martin Soto <soto@freedesktop.org>"
 };
 
 /* DVDDemux signals and args */

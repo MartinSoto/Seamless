@@ -134,10 +134,12 @@ AC_OUTPUT([
   gst-plugins/iec958/Makefile
   gst-plugins/mpeg2sub/Makefile
   gst-plugins/mpegstream/Makefile
+  gst-plugins/robustclock/Makefile
   m4/Makefile
   src/Makefile
   src/dvdread/Makefile
   src/machine/Makefile
+  src/wrapclock/Makefile
 ])
 
 echo
