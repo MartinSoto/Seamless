@@ -268,7 +268,7 @@ cdef class Cell:
     cdef readonly int cellNr	# Cell number in program chain.
     cdef readonly float startSeconds
     				# Start time in seconds from the
-                                # begining of the program chain.
+                                # beginning of the program chain.
 
     def __new__(self, ProgramChain programChain, int cellNr,
                 float startSeconds):

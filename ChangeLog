@@ -1,3 +1,22 @@
+2005-03-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (CellPlayer): Class renamed from cell
+	navigator. Modified to use itersched all around.
+
+2005-03-20  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py: Don't use "import *" for dvdread and
+	gst.
+
+	* src/machine/events.py: New module for making events.
+
+	* src/machine/itersched.py (Scheduler.__getattr__): Added getAttr
+	method to access attributes and methods in the stacked
+	objects. This functionality is also accessible through
+	__getattr__.
+
+	* configure.ac: Raise required Python version to 2.4
+
 2005-03-11  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/disassemble.py (CommandDisassembler): Machine
