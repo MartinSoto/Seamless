@@ -11,6 +11,8 @@
 	(ProgramChainPlayer, DiscPlayer, TitleSetPlayer, LangUnitPlayer):
 	Renamed from *Navigator.
 	(entryPoint): New wrapper for machine entry points.
+	(ProgramChainPlayer): Methods implemented. Now it is possible to
+	play complete program chains.
 
 2005-03-25  Martin Soto  <martinsoto@users.sourceforge.net>
 

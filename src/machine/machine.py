@@ -433,7 +433,7 @@ class DiscPlayer(object):
         """Jump to the first chapter of the specified title.
 
         The title number is provided with respect to the video
-        manager, i.e. is global the whole disk."""
+        manager, i.e. is global to the whole disk."""
         pass
 
     def jumpToFirstPlay(self):
@@ -522,10 +522,7 @@ class TitleSetPlayer(object):
 
     def linkProgramChain(self, programChainNr):
         """Jump to the program chain identified by 'programChainNr' in
-        the container of the current program chain.
-
-        Containers for program chains are either language units and
-        video title sets."""
+        the current title."""
         pass
 
     def linkChapter(self, chapterNr):
@@ -570,43 +567,66 @@ class LangUnitPlayer(object):
 
     def linkProgramChain(self, programChainNr):
         """Jump to the program chain identified by 'programChainNr' in
-        the container of the current program chain.
-
-        Containers for program chains are either language units and
-        video title sets."""
+        the current language unit."""
         pass
 
 
 class ProgramChainPlayer(object):
-    __slots__ = ('perform')
+    __slots__ = ('perform',
+                 'programChain',
+                 'cell')
 
     def __init__(self, perform):
         self.perform = perform
+        self.programChain = None
+        self.cell = None
 
     @restartPoint
     def playProgramChain(self, programChain):
         """Play the specified program chain."""
-        pass
+        self.programChain = programChain
+        self.cell = None
+
+        # Play the 'pre' commands.
+        # COMMANDS
+
+        # Go to the first cell.
+        yield Chain(self.linkCell(1))
 
     @restartPoint
     def linkCell(self, cellNr):
         """Jump to the specified cell in the current program chain."""
-        pass
+        assert 1 <= cellNr <= self.programChain.cellCount
+
+        self.cell = self.programChain.getCell(cellNr)
+
+        # Play the cell.
+        yield Call(CellPlayer(self.perform).playCell(self.cell))
+
+        # Play the corresponding cell commands.
+        # COMMANDS
+
+        if cellNr == self.programChain.cellCount:
+            # No more cells. Play the "tail".
+            yield Chain(self.linkTailProgramChain(self.programChain))
+        else:
+            # Keep playing cells.
+            yield Chain(self.linkCell(cellNr + 1))
 
     @restartPoint
     def linkTopCell(self):
-        """Jump to beginning of the current cell."""
-        pass
+        """Jump to the beginning of the current cell."""
+        yield Chain(self.linkCell(self.cell.cellNr))
 
     @restartPoint
     def linkNextCell(self):
         """Jump to the beginning of the next cell."""
-        pass
+        yield Chain(self.linkCell(self.cell.cellNr + 1))
 
     @restartPoint
     def linkPrevCell(self):
         """Jump to the beginning of the previous cell."""
-        pass
+        yield Chain(self.linkCell(self.cell.cellNr - 1))
 
     @restartPoint
     def linkProgram(self, programNr):
@@ -615,7 +635,8 @@ class ProgramChainPlayer(object):
 
         Programs are a logical subdivision of program chains. A
         program is characterized by its start cell number."""
-        pass
+        yield Chain(self.linkCell(self.programChain. \
+                                  getProgramCell(programNr).cellNr))
 
     @restartPoint
     def linkTopProgram(self):
@@ -623,7 +644,8 @@ class ProgramChainPlayer(object):
 
         Programs are a logical subdivision of program chains. A
         program is characterized by its start cell number."""
-        pass
+        programNr = self.cell.programNr
+        yield Chain(self.linkProgram(programNr))
 
     @restartPoint
     def linkNextProgram(self):
@@ -631,7 +653,8 @@ class ProgramChainPlayer(object):
 
         Programs are a logical subdivision of program chains. A
         program is characterized by its start cell number."""
-        pass
+        programNr = self.cell.programNr
+        yield Chain(self.linkProgram(programNr + 1))
 
     @restartPoint
     def linkPrevProgram(self):
@@ -639,22 +662,23 @@ class ProgramChainPlayer(object):
 
         Programs are a logical subdivision of program chains. A
         program is characterized by its start cell number."""
-        pass
+        programNr = self.cell.programNr
+        yield Chain(self.linkProgram(programNr - 1))
 
     @restartPoint
     def linkTopProgramChain(self):
         """Jump to the beginning of the current program chain."""
-        pass
+        yield Chain(self.playProgramChain(self.programChain))
 
     @restartPoint
     def linkNextProgramChain(self):
         """Jump to the beginning of the next program chain."""
-        pass
+        yield Chain(self.playProgramChain(self.programChain.nextProgramChain))
 
     @restartPoint
     def linkPrevProgramChain(self):
         """Jump to the beginning of the previous program chain."""
-        pass
+        yield Chain(self.playProgramChain(self.programChain.prevProgramChain))
 
     @restartPoint
     def linkGoUpProgramChain(self):
@@ -662,12 +686,20 @@ class ProgramChainPlayer(object):
 
         The 'up' program chain is explicitly referenced from a given
         program chain."""
-        pass
+        yield Chain(self.playProgramChain(self.programChain.goUpProgramChain))
 
     @restartPoint
     def linkTailProgramChain(self):
         """Jump to the end command block of the current program chain."""
-        pass
+        self.cell = None
+
+        # Play the "post" commands.
+        # COMMANDS
+
+        # If there's a next program chain, link to it.
+        next = self.programChain.nextProgramChain
+        if next != None:
+            yield Chain(self.playProgramChain(next))
 
 
 class CommandBlockPlayer(object):
@@ -844,7 +876,7 @@ class VirtualMachine(object):
         self.perform = PerformMachine()
 
         # Initialize the scheduler.
-        self.sched = Scheduler(CellPlayer(self.perform).playCell(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1).getCell(1)))
+        self.sched = Scheduler(ProgramChainPlayer(self.perform).playProgramChain(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1)))
 
 
     #
@@ -883,6 +915,8 @@ class VirtualMachine(object):
         """The signal handler for the source's vobu-header signal. It
         is only responsible for wrapping the raw header in a NavPacket
         object, and handling control to the vobuHeader entry point."""
+        # This must be done inmediatly. Otherwise, the contents of the
+        # buffer may change before we handle them.
         nav = dvdread.NavPacket(buf.get_data())
         self.vobuHeader(nav)
 
