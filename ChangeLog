@@ -1,3 +1,7 @@
+2005-02-20  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py: New iterator scheduler.
+
 2005-02-11  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (VirtualMachine): Do not inherit from

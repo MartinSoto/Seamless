@@ -1015,8 +1015,8 @@ class VirtualMachine(object):
                                  getProgramCell(programNr + 1))
 
     def linkPrevProgram(self):
-        """Jump the beginning of the previous program. Programs are a
-        logical subdivision of program chains. A program is
+        """Jump to the beginning of the previous program. Programs are
+        a logical subdivision of program chains. A program is
         characterized by its start cell number."""
         programNr = self.location.cell.programNr
         self.location.jumpToUnit(self.location.programChain. \
