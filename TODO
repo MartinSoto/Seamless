@@ -1,16 +1,15 @@
 -*- Text -*-
 
+- Apparently not discont is being sent at the beginning.
+
+- Find a way to automatically detect if fairpth is present and use it.
+
 - BUG: Trying to terminate the program while in a still frame, blocks.
 
 - BUG: The separate xvimagesink window flashes shortly before the
   program starts.
 
-- BUG: Add queueing for subtitles. Animatrix shows subtitles getting erased
-  too soon.
-
 - Some menu subpictures get displayed too early (Matrix PAL). Why?
-
-- BUG: Subtitle palette sometimes get messed up when jumping chapters.
 
 - Implement free changing of streams.
 
@@ -45,3 +44,10 @@
 
 - LIRC component fails miserably when no LIRC kernel modules are
   available.
+
+
+Particular DVDs
+---------------
+
+- Monsters Inc: Language selection still at the beginning doesn't show
+  highlight.

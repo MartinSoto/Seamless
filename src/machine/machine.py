@@ -669,6 +669,7 @@ class VirtualMachine(CommandPerformer):
             st.set_value('event', 'dvd-spu-reset-highlight')
 
         self.queueEvent(event_new_any(st))
+        #self.src.emit('queue-event', event_new_any(st));
 
     def updatePipeline(self):
         # Update the audio, if necessary.

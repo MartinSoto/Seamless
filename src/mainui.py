@@ -46,7 +46,7 @@ class MainUserInterface:
         self.player = player
         self.fullScreen = fullScreen
 
-        # Create and display the window.
+        # Create the main window.
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_title('DVD Player')
         self.window.set_border_width(0)
@@ -60,11 +60,19 @@ class MainUserInterface:
 
         self.video = videowidget.VideoWidget()
         self.window.add(self.video)
-        self.video.set_size_request(400, 400)
         
         self.video.setEventMask(gtk.gdk.BUTTON_PRESS_MASK)
         self.video.connect('button-press-event', self.videoButtonPress)
-        
+
+        # Give the window a decent minimum size.
+        self.window.set_size_request(480, 360)
+
+        # Set the initial dimensions of the window to 75% of the screen.
+        (rootWidth, rootHeight) = \
+                    self.window.get_root_window().get_geometry()[2:4]
+        self.window.set_default_size(int(rootWidth * 0.75),
+                                     int(rootHeight * 0.75))
+
         self.video.show()
         self.window.show()
 

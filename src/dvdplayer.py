@@ -123,22 +123,22 @@ class DVDPlayer(Thread):
         #self.audioSink = sinkFromSpec("""
         #  { queue name=queue ! filesink location=audio.out }
         #  """)
-        #self.audioSink = parse_launch("""
-        #{
-        #  ac3iec958 name=ac3iec958 !
-        #    identity name=audioident !
-        #    alsaspdifsink name=audiosink
-        #}
-        #""")
-        #ghostify(self.audioSink, 'ac3iec958', 'sink', 'audio')
         self.audioSink = parse_launch("""
         {
-          a52dec name=a52dec !
+          ac3iec958 name=ac3iec958 !
             identity name=audioident !
-            alsasink name=audiosink
+            alsaspdifsink name=audiosink
         }
         """)
-        ghostify(self.audioSink, 'a52dec', 'sink', 'audio')
+        ghostify(self.audioSink, 'ac3iec958', 'sink', 'audio')
+#         self.audioSink = parse_launch("""
+#         {
+#           a52dec name=a52dec !
+#             identity name=audioident !
+#             alsasink name=audiosink
+#         }
+#         """)
+#         ghostify(self.audioSink, 'a52dec', 'sink', 'audio')
         self.audioSinkElem = self.audioSink.get_by_name('audiosink')
         self.audioIdent = self.audioSink.get_by_name('audioident')
         self.add(self.audioSink)

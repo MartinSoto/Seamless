@@ -10,3 +10,5 @@ pypkg_PYTHON = \
 	mainui.py \
 	videowidget.py \
 	xscreensaver.py
+
+noinst_PYTHON = config/__init__.py

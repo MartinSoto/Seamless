@@ -57,7 +57,11 @@ struct _GstMpeg2Subt {
 
   GstPad *videopad,*subtitlepad,*srcpad;
 
-  GstBuffer *partialbuf;	/* Collect together subtitle buffers until we have a full control sequence */
+  GstBuffer *partialbuf;	/* Collect together subtitle buffers
+                                   until we have a full control
+                                   sequence */
+  GQueue *subt_queue;		/* Queue of subtitle control sequences
+                                   pending for display */
   GstBuffer *last_frame;	/* Last video frame seen */
 
   guint16 packet_size;
@@ -79,7 +83,6 @@ struct _GstMpeg2Subt {
 
   guint32 current_clut[16];
 
-  gboolean has_title;
   gboolean forced_display;
 
   GstClockTime current_time;

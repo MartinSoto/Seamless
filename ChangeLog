@@ -1,4 +1,22 @@
+2004-11-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c:
+	Added subtitle queueing.
+
 2004-11-20  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainui.py (MainUserInterface.__init__): Set initial window
+	size to 75% of the root window. Set a reasonable minimum size.
+
+	* Makefile.am (SUBDIRS): Added config directory.
+
+	* src/dvdread/Makefile.am: Make sure .pyx files are distributed.
+
+	* config/Makefile.am: Distribute the template files.
+
+	* src/Makefile.am: Distribute (but not install!)
+	config/__init__.py.
 
 	* src/dvdplayer.py: Added copyright notice.
 	(DVDPlayer.__init__): Changed default audio sink to alsasink.

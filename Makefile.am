@@ -1,1 +1,1 @@
-SUBDIRS=gst-plugins src
+SUBDIRS=config gst-plugins src

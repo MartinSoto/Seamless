@@ -1,5 +1,7 @@
 pypkgdir = $(pkglibdir)/python
 
+dist_noinst_DATA = config.py.tmpl seamless.tmpl
+
 bin_SCRIPTS = seamless
 
 pypkg_PYTHON = config.py
