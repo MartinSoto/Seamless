@@ -1,15 +1,125 @@
-Dependencies
+Seamless
+========
 
-- Python 2.3
+Seamless is a simple DVD player for GNU/Linux systems.
 
-- GStreamer, gst-plugins, gst-python
+Seamless was written by Martin Soto <soto@freedesktop.org> and can be
+freely copied and distributed under the terms of the GNU General
+Public License. See the file COPYING in this directory for more
+details.
 
-- PyGTK
+Seamless in based on the great GStreamer media framework
+(http://gstreamer.freedesktop.org/).
+
+
+Compiling from the GNU Arch repository
+--------------------------------------
+
+Seamless is alpha software and still depends on the bleeding edge of
+the GStreamer technology. Unfortunately, compiling it right now is not
+the easiest of all tasks. The following compile instructions are
+intended for experts only. If you don't have a clue what they mean,
+Seamless isn't probably for you at this time (although I hope things
+will get easier soon).
+
+You need to have the following packages installed:
+
+- Glib (http://www.gtk.org/) version 2.0 or newer.
+
+- GStreamer, gst-plugins and gst-python from
+http://gstreamer.freedesktop.org/. Currently you need the CVS
+development versions of them all. Released versions won't work.
+
+- Python (http://www.python.org/) version 2.3 or newer. Make sure the
+corresponding C development files (libraries, headers) are also
+installed.
+
+- PyGTK (http://www.pygtk.org/) version 2.4 or newer. The C
+development files are also necessary.
 
 - libdvdread
+(http://www.dtek.chalmers.se/groups/dvd/downloads.shtml). I'm using
+version 0.9.4.
 
-Additional
+- Pyrex (http://nz.cosc.canterbury.ac.nz/~greg/python/Pyrex/). I'm
+using version 0.9.3.
 
-Pyrex
+- The GNU autotools: Autoconf (http://www.gnu.org/software/autoconf/),
+version 2.59 or later, Automake (http://www.gnu.org/software/automake)
+version 1.7, and libtool (http://www.gnu.org/software/libtool/)
+version 1.5.6 or later.
 
-PyGTK development files
+Except for the GStreamer related packages, which currently must be the
+development versions and have to be downloaded and compiled manually,
+all other packages should be available from your favorite GNU/Linux
+distribution (I'm using Debian unstable here.)
+
+To actually compile, go through the following steps:
+
+1. Compile GStreamer (module gstreamer) from CVS (go to
+http://gstreamer.freedesktop.org/dev/ for details). You can either
+install it, or use it directly from the compile directory if you used
+the --enable-plugin-builddir option to the configure script.
+
+2. Compile gst-plugins just like you did for GStreamer.
+
+3. Compile gst-python, ditto.
+
+4. Put the pkgconfig directory(ies) for gstreamer and gst-plugins in
+your PKG_CONFIG_PATH variable.
+
+5. Move to the Seamless main directory and type
+
+  ./autogen.sh
+  make
+
+If everything went OK, you should be ready to run after this step.
+
+
+Running Seamless
+----------------
+
+Getting Seamless to work may require some understanding of the
+GStreamer technology. The following notes presuppose you are somewhat
+familiar with GStreamer and how it works.
+
+To start the program, run the src/seamless.py script in the source
+tree. The GStreamer pipeline is still sort of hard coded, but you can
+customize it somewhat using the command line options (--help to get a
+list). For example
+
+  src/seamless.py --video-sink='ffcolorspace ! videoscale ! ximagesink'
+
+uses the ximagesink video sink instead of the default xvimagesink,
+
+  src/seamless.py --audio-sink=osssink
+
+plays sound using the OSS sound driver (instead of the default ALSA)
+and
+
+  src/seamless.py --audio-sink='ac3iec958 ! alsaspdifsink' --audio-decode=hard
+
+selects the internal alsaspdifsink element, that is able to play to an
+external AC3 decoder (and for this reason does not require an internal
+AC3 decoder).
+
+Once playing usage is pretty simple so far:
+
+  - Use the arrow keys to move inside menus and the "Return" key to
+    confirm.
+
+  - When playing a film "Esc" takes you to the menu ("menu" key in a
+    normal remote)
+
+  - PageUp and PageDown jump chapters back and forth.
+
+  - Shift + RightArrow and Shift + LeftArrow jump 10 seconds forward and
+backward, respectively.
+
+  - Clicking anywhere on the main window switches between normal and
+    full screen mode.
+
+  - Closing the window terminates the program.
+
+
+-- Martin Soto <soto@freedesktop.org>, 2004/11/29

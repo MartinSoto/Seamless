@@ -1,7 +1,10 @@
 2004-11-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
-	* src/dvdplayer.py (DVDPlayer.__init__): Use the robust clock by
-	default.
+	* README: Write some basic instructions.
+	* src/seamless.py (main):
+	* src/dvdplayer.py (DVDPlayer.__init__):
+	Added clock selection via the --clockcommand line option.
+	Default videosink has no options now.
 
 	* gst-plugins/robustclock/robustclock.h: 
 	* gst-plugins/robustclock/robustclock.c (gst_robust_clock_new) 

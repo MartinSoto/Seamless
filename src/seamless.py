@@ -81,14 +81,22 @@ def main():
     optParser.add_option("--video-sink", dest="videoSink",
                          metavar="SINK",
                          help="video sink is SINK",
-                         default="xvimagesink brightness=40 hue=1000")
+                         default="xvimagesink")
     optParser.add_option("--video-decode", dest="videoDecode",
                          metavar="TYPE",
-                         help="set type to 'hard' if the specified video "
+                         help="'hard' if the specified video "
                          "sink decodes video internally in hardware or "
-                         "to 'soft' if it requires a software decoder",
+                         "'soft' (default) if it requires a software "
+                         "decoder",
                          default="soft",
                          choices = ('soft', 'hard'))
+    optParser.add_option("--clock", dest="clockType",
+                         metavar="TYPE",
+                         help="'robust' to use the special robust clock"
+                         " (default), 'audiosink' to use the audio sink"
+                         " clock or 'system' to use the system clock ",
+                         default="robust",
+                         choices = ('robust', 'audiosink', 'system'))
     (options, args) = optParser.parse_args()
 
     if args != []:
