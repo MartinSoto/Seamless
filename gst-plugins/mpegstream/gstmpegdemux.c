@@ -1093,6 +1093,6 @@ gst_mpeg_demux_get_index (GstElement * element)
 gboolean
 gst_mpeg_demux_plugin_init (GstPlugin * plugin)
 {
-  return gst_element_register (plugin, "seamless-mpegdemux",
+  return gst_element_register (plugin, "mpegdemux",
       GST_RANK_SECONDARY, GST_TYPE_MPEG_DEMUX);
 }
