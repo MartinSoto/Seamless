@@ -103,6 +103,8 @@ class DVDPlayer(Thread):
         self.audioSink = parse_launch("""
         {
           %s
+            audioconvert !
+            audioscale !
             identity name=audioident !
             %s name=audiosink
         }

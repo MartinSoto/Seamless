@@ -3,6 +3,8 @@
 	* src/dvdplayer.py (DVDPlayer.__init__): Pass the DVD device
 	location to the DVD element. Thanks go to Ronald Bultje for the
 	report.
+	(DVDPlayer.__init__): Added audioscale and audioconvert elements
+	to the audio pipeline.
 
 2004-11-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
