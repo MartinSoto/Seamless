@@ -711,6 +711,9 @@ class VirtualMachine(object):
                  'aspectRatio',
                  'videoMode',
                  'generalRegisters',
+                 'systemRegisters',
+                 'location',
+                 'resumeLocation',
                  'sched']
 
     def __init__(self, info, src):
@@ -767,11 +770,11 @@ class VirtualMachine(object):
 
 
         # Location and resume location.
-        self.location = PlaybackLocation(self)
-        self.resumelocation = None
+        self.location = PlaybackLocation()
+        self.resumeLocation = None
 
         # Initialize the scheduler.
-        self.sched = Scheduler(CellPlayer(self))
+        self.sched = Scheduler(CellPlayer(self).playCell(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1).getCell(1)))
 
     #
     # Signal Handling
@@ -788,7 +791,7 @@ class VirtualMachine(object):
         except StopIteration:
             # Time to stop the pipeline.
             self.src.set_eos()
-            self.src.emit('push-event', gst.Event(dvdread.EVENT_EOS));
+            self.src.emit('push-event', gst.Event(gst.EVENT_EOS));
             return
         except:
             # We had an exception in the playback code.
@@ -800,7 +803,7 @@ class VirtualMachine(object):
             self.src.emit('push-event', item);
         else:
             # Otherwise, we have a new playback position in the disc.
-            (domain, titleNr, sectorNr) = self.location.nextVOBU()
+            (domain, titleNr, sectorNr) = item
             src.set_property('domain', domain)
             src.set_property('title', titleNr)
             src.set_property('vobu-start', sectorNr)
@@ -809,7 +812,7 @@ class VirtualMachine(object):
     def vobuHeader(self, src, buf):
         """Invoked by the source element when it sees a VOBU
         header."""
-        nav = dvdread.NavPacket(buffer.get_data())
+        nav = dvdread.NavPacket(buf.get_data())
         self.sched.call(self.sched.setNav(nav))
 
     def flushSource(self):
