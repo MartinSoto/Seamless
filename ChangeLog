@@ -1,5 +1,12 @@
 2004-11-28  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/mpegstream/gstdvddemux.c
+	(gst_dvd_demux_send_discont): Always send new media discont events
+	to force the links to engage.
+
+	* gst-plugins/iec958/ac3iec.c (ac3iec_handle_event): Get rid of
+	stupid discont handling.
+
 	* gst-plugins/mpegstream/gstdvddemux.c: Updated e-mail address.
 
 	* src/seamless.py (main): Check for the PTH version of the fair
@@ -25,7 +32,7 @@
 	* configure.ac: 
 	Added an implementation for a robust, wrapper clock, that makes
 	an audio clock keep running even if no sound is being sent.
-	
+
 2004-11-27  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* autogen.sh:

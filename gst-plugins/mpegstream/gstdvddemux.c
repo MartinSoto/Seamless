@@ -465,6 +465,7 @@ gst_dvd_demux_send_discont (GstMPEGParse * mpeg_parse, GstClockTime time)
   GstDVDDemux *dvd_demux = GST_DVD_DEMUX (mpeg_parse);
   GstEvent *discont;
   gint i;
+  GstEvent *event;
 
   GST_DEBUG_OBJECT (dvd_demux, "sending discontinuity: %0.3fs",
       (double) time / GST_SECOND);
@@ -474,7 +475,7 @@ gst_dvd_demux_send_discont (GstMPEGParse * mpeg_parse, GstClockTime time)
   for (i = 0; i < GST_DVD_DEMUX_NUM_SUBPICTURE_STREAMS; i++) {
     if (dvd_demux->subpicture_stream[i] &&
         GST_PAD_IS_USABLE (dvd_demux->subpicture_stream[i]->pad)) {
-      discont = gst_event_new_discontinuous (FALSE, GST_FORMAT_TIME,
+      discont = gst_event_new_discontinuous (TRUE, GST_FORMAT_TIME,
           time, NULL);
 
       gst_pad_push (dvd_demux->subpicture_stream[i]->pad, GST_DATA (discont));
@@ -483,19 +484,19 @@ gst_dvd_demux_send_discont (GstMPEGParse * mpeg_parse, GstClockTime time)
 
   /* Distribute the event to the "current" pads. */
   if (GST_PAD_IS_USABLE (dvd_demux->cur_video)) {
-    discont = gst_event_new_discontinuous (FALSE, GST_FORMAT_TIME, time, NULL);
+    discont = gst_event_new_discontinuous (TRUE, GST_FORMAT_TIME, time, NULL);
 
     gst_pad_push (dvd_demux->cur_video, GST_DATA (discont));
   }
 
   if (GST_PAD_IS_USABLE (dvd_demux->cur_audio)) {
-    discont = gst_event_new_discontinuous (FALSE, GST_FORMAT_TIME, time, NULL);
+    discont = gst_event_new_discontinuous (TRUE, GST_FORMAT_TIME, time, NULL);
 
     gst_pad_push (dvd_demux->cur_audio, GST_DATA (discont));
   }
 
   if (GST_PAD_IS_USABLE (dvd_demux->cur_subpicture)) {
-    discont = gst_event_new_discontinuous (FALSE, GST_FORMAT_TIME, time, NULL);
+    discont = gst_event_new_discontinuous (TRUE, GST_FORMAT_TIME, time, NULL);
 
     gst_pad_push (dvd_demux->cur_subpicture, GST_DATA (discont));
   }

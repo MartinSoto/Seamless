@@ -263,22 +263,6 @@ ac3iec_handle_event (GstPad *pad, GstEvent *event)
     gst_pad_event_default (pad, event);
     break;
 
-  case GST_EVENT_DISCONTINUOUS:
-    {
-      GstClockTime time;
-	      
-      if (gst_event_discont_get_value (event, GST_FORMAT_TIME, &time)) {
-        GstEvent *discont;
-
-        GST_DEBUG_OBJECT (ac3iec, "forwarding discontinuity, time %0.3fs",
-                          (double) time / GST_SECOND);
-        discont = gst_event_new_discontinuous (FALSE, GST_FORMAT_TIME, 
-                                               time, NULL);
-        gst_pad_push (ac3iec->src, GST_DATA (discont));
-      }
-    }
-    break;
-
   default:
     gst_pad_event_default (pad, event);
     break;
