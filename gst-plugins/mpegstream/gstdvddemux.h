@@ -100,21 +100,21 @@ struct _GstDVDDemux {
   gint cur_audio_nr;		/* Current audio stream number. */
   gint cur_subpicture_nr;	/* Current subpicture stream number. */
 
-  GstClockTime last_end_ptm;	/* End presentation time of the las nav packet
+  GstClockTime last_end_ptm;	/* End presentation time of the last nav packet
                                    event received. */
 
   gboolean just_flushed;	/* The element just received a flush event. */
   GstClockTime discont_time;	/* If different from GST_CLOCK_TIME_NONE, a
                                    discontinuous event should be sent with the
                                    given time, before sending the next dara
-                                   block.. */
+                                   block. */
 
   gint mpeg_version;		/* Version of the MPEG video stream */
 
   GstMPEGStream *subpicture_stream[GST_DVD_DEMUX_NUM_SUBPICTURE_STREAMS];
 				/* Subpicture output streams. */
   GstClockTime   subpicture_time[GST_DVD_DEMUX_NUM_SUBPICTURE_STREAMS];
-  				/* Last timestamp for buffer on each stream */
+  				/* Last timestamp for buffer on each stream. */
 };
 
 

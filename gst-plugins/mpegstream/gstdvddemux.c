@@ -41,7 +41,7 @@ static GstElementDetails dvd_demux_details = {
   "DVD Demuxer",
   "Codec/Demuxer",
   "Demultiplexes DVD (VOB) MPEG2 streams",
-  "Martin Soto <soto@informatik.uni-kl.de>"
+  "Martin Soto <soto@freedesktop.org>"
 };
 
 /* DVDDemux signals and args */
@@ -80,7 +80,7 @@ static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE ("sink",
     "audio/x-raw-int, " \
       "endianness = (int) BIG_ENDIAN, " \
       "signed = (boolean) TRUE, " \
-      "width = (int) { 16, 24 }, " \
+      "width = (int) { 16, 20, 24 }, " \
       "depth = (int) { 16, 20, 24 }, " \
       "rate = (int) { 48000, 96000 }, " \
       "channels = (int) [ 1, 8 ];" \
@@ -257,6 +257,7 @@ gst_dvd_demux_class_init (GstDVDDemuxClass * klass)
 static void
 gst_dvd_demux_init (GstDVDDemux * dvd_demux)
 {
+  GstMPEGParse *mpeg_parse = GST_MPEG_PARSE (dvd_demux);
   GstMPEGDemux *mpeg_demux = GST_MPEG_DEMUX (dvd_demux);
   gint i;
 
@@ -274,6 +275,11 @@ gst_dvd_demux_init (GstDVDDemux * dvd_demux)
   dvd_demux->cur_subpicture =
       DEMUX_CLASS (dvd_demux)->new_output_pad (mpeg_demux, "current_subpicture",
       CLASS (dvd_demux)->cur_subpicture_template);
+  {
+    GstCaps * caps;
+    caps = gst_caps_new_simple ("video/x-dvd-subpicture", NULL);
+    gst_pad_set_explicit_caps (dvd_demux->cur_subpicture, caps);
+  }
   gst_element_add_pad (GST_ELEMENT (mpeg_demux), dvd_demux->cur_subpicture);
 
   dvd_demux->mpeg_version = 0;
@@ -281,8 +287,21 @@ gst_dvd_demux_init (GstDVDDemux * dvd_demux)
   dvd_demux->cur_audio_nr = 0;
   dvd_demux->cur_subpicture_nr = 0;
 
-  /* Start the timestamp sequence in 0. */
-  dvd_demux->last_end_ptm = 0;
+  /* Start the timestamp sequence in an arbitrarily high value. Very
+     often DVD VOBUS contain sound with timestamps that don't exactly
+     fall in the time range specified by the nav packets. This means
+     that if you associate the nav start value with GStreamer
+     timestamp 0, and start playing at a VOBU whose sound timestamps
+     fall before the time range given in the nav, you may end up with
+     negative timestamps. */
+  dvd_demux->last_end_ptm = 2 * GST_SECOND;
+
+  /* Make sure a discont event will be sent with the initial
+     timestamp. */
+  GST_DEBUG_OBJECT (dvd_demux, "Setting discont time to %" GST_TIME_FORMAT,
+      GST_TIME_ARGS (dvd_demux->last_end_ptm));
+  dvd_demux->discont_time = dvd_demux->last_end_ptm;
+  dvd_demux->just_flushed = FALSE;
 
   /* (Ronald) so, this was disabled. I'm enabling (default) it again.
    * Timestamp adjustment is fairly evil, we would ideally use discont
@@ -296,15 +315,12 @@ gst_dvd_demux_init (GstDVDDemux * dvd_demux)
    * websites /media/ directory work fine, especially bullet.vob and
    * barrage.vob.
    */
-#if 0
+#if 1
   /* Try to prevent the mpegparse infrastructure from doing timestamp
      adjustment. */
   mpeg_parse->do_adjust = FALSE;
   mpeg_parse->adjust = 0;
 #endif
-
-  dvd_demux->just_flushed = FALSE;
-  dvd_demux->discont_time = GST_CLOCK_TIME_NONE;
 
   for (i = 0; i < GST_DVD_DEMUX_NUM_SUBPICTURE_STREAMS; i++) {
     dvd_demux->subpicture_stream[i] = NULL;
@@ -367,7 +383,11 @@ gst_dvd_demux_handle_dvd_event (GstDVDDemux * dvd_demux, GstEvent * event)
   if (strcmp (event_type, "dvd-audio-stream-change") == 0) {
     gint stream_nr;
 
-    gst_structure_get_int (structure, "physical", &stream_nr);
+    if (!gst_structure_get_int (structure, "physical", &stream_nr)) {
+      GST_ERROR_OBJECT (dvd_demux,
+          "GstDVDDemux: Invalid audio stream event");
+      return FALSE;
+    }
     if (stream_nr < -1 || stream_nr >= GST_MPEG_DEMUX_NUM_AUDIO_STREAMS) {
       GST_ERROR_OBJECT (dvd_demux,
           "GstDVDDemux: Invalid audio stream %02d", stream_nr);
@@ -380,7 +400,11 @@ gst_dvd_demux_handle_dvd_event (GstDVDDemux * dvd_demux, GstEvent * event)
   else if (strcmp (event_type, "dvd-spu-stream-change") == 0) {
     gint stream_nr;
 
-    gst_structure_get_int (structure, "physical", &stream_nr);
+    if (!gst_structure_get_int (structure, "physical", &stream_nr)) {
+      GST_ERROR_OBJECT (dvd_demux,
+          "GstDVDDemux: Invalid subpicture stream event");
+      return FALSE;
+    }
     if (stream_nr < -1 || stream_nr >= GST_DVD_DEMUX_NUM_SUBPICTURE_STREAMS) {
       GST_ERROR_OBJECT (dvd_demux,
           "GstDVDDemux: Invalid subpicture stream %02d", stream_nr);
@@ -415,6 +439,8 @@ gst_dvd_demux_handle_dvd_event (GstDVDDemux * dvd_demux, GstEvent * event)
          the next sequence time. We don't do it here to reduce the
          time gap between the discontinuity and the subsequent data
          blocks. */
+      GST_DEBUG_OBJECT (dvd_demux, "Setting discont time to %" GST_TIME_FORMAT,
+          GST_TIME_ARGS (start_ptm + mpeg_demux->adjust));
       dvd_demux->discont_time = start_ptm + mpeg_demux->adjust;
       dvd_demux->just_flushed = FALSE;
     }
@@ -811,7 +837,8 @@ gst_dvd_demux_send_subbuffer (GstMPEGDemux * mpeg_demux,
      buffers following it. */
   if (dvd_demux->discont_time != GST_CLOCK_TIME_NONE) {
     PARSE_CLASS (mpeg_demux)->send_discont (mpeg_parse,
-        dvd_demux->discont_time - 200 * GST_MSECOND);
+        dvd_demux->discont_time);
+    GST_DEBUG_OBJECT (dvd_demux, "Setting discont time to NONE");
     dvd_demux->discont_time = GST_CLOCK_TIME_NONE;
   }
 
@@ -925,6 +952,6 @@ gst_dvd_demux_set_cur_subpicture (GstDVDDemux * dvd_demux, gint stream_nr)
 gboolean
 gst_dvd_demux_plugin_init (GstPlugin * plugin)
 {
-  return gst_element_register (plugin, "dvddemux",
+  return gst_element_register (plugin, "seamless-dvddemux",
       GST_RANK_PRIMARY, GST_TYPE_DVD_DEMUX);
 }

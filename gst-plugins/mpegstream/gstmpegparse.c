@@ -289,10 +289,6 @@ gst_mpeg_parse_handle_discont (GstMPEGParse * mpeg_parse, GstEvent * event)
 
     if (CLASS (mpeg_parse)->send_discont)
       CLASS (mpeg_parse)->send_discont (mpeg_parse, time);
-  } else {
-    /* Use the next SCR to send a discontinuous event. */
-    mpeg_parse->discont_pending = TRUE;
-    mpeg_parse->scr_pending = TRUE;
   }
   mpeg_parse->packetize->resync = TRUE;
 
@@ -456,9 +452,12 @@ gst_mpeg_parse_parse_packhead (GstMPEGParse * mpeg_parse, GstBuffer * buffer)
           (gint64) mpeg_parse->next_scr - (gint64) mpeg_parse->current_scr;
 
       GST_DEBUG ("new adjust: %" G_GINT64_FORMAT, mpeg_parse->adjust);
+    }
+#if 0
     } else {
       mpeg_parse->discont_pending = TRUE;
     }
+#endif
   }
 
   if (mpeg_parse->index && GST_INDEX_IS_WRITABLE (mpeg_parse->index)) {
@@ -979,6 +978,6 @@ gst_mpeg_parse_plugin_init (GstPlugin * plugin)
   scr_format =
       gst_format_register ("scr", "The MPEG system clock reference time");
 
-  return gst_element_register (plugin, "mpegparse",
+  return gst_element_register (plugin, "seamless-mpegparse",
       GST_RANK_NONE, GST_TYPE_MPEG_PARSE);
 }
