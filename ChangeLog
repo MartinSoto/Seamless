@@ -1,5 +1,8 @@
 2004-12-04  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/dvdplayer.py (DVDPlayer.__init__): Add audioconvert and
+	audioscale only when doing soft sound decoding.
+
 	* src/mainui.py:
 	Double quuotes substituted by single quotes.
 	(MainUserInterface.__init__, MainUserInterface.videoReady): Trap

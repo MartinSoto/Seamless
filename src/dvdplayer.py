@@ -95,7 +95,8 @@ class DVDPlayer(Thread):
         # The audio playback thread.
         if options.audioDecode == 'soft':
             sinkName = 'a52dec'
-            audioDecoder = 'a52dec name=%s !' % sinkName
+            audioDecoder = 'a52dec name=%s ! audioconvert ! audioscale !' \
+                           % sinkName
         else:
             sinkName = 'audioident'
             audioDecoder = ''
@@ -103,8 +104,6 @@ class DVDPlayer(Thread):
         self.audioSink = parse_launch("""
         {
           %s
-            audioconvert !
-            audioscale !
             identity name=audioident !
             %s name=audiosink
         }
