@@ -24,7 +24,8 @@ import gtk
 import gst
 import gst.interfaces
 
-class VideoWidget(gtk.DrawingArea):
+
+class VideoWidget(gtk.EventBox):
     __gsignals__ = {
         'ready' : (gobject.SIGNAL_RUN_LAST,
                    gobject.TYPE_NONE,
@@ -37,20 +38,30 @@ class VideoWidget(gtk.DrawingArea):
         # A lock to protect accesses to the display window.
         self.xlock = threading.RLock()
 
-        self.connect('realize', self.realizeCb)
+        self.set_visible_window(False)
+        self.set_above_child(True)
+        self.set_events(gtk.gdk.POINTER_MOTION_MASK)
         self.connect('size-allocate', self.sizeAllocateCb)
+        self.connect('motion-notify-event', self.motionCb)
         self.connect('destroy', self.destroyCb)
-        
-        # Background is always black.
-        self.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse('black'))
+
+        self.background = gtk.DrawingArea()
+        self.background.modify_bg(gtk.STATE_NORMAL,
+                                  gtk.gdk.color_parse('black'))
+        self.add(self.background)
+        self.background.show()
+        self.background.connect('realize', self.backgroundRealizeCb)
 
         self.videoWin = None
         self.videoWinExposed = False
 
         self.imageSink = None
 
-        self.desiredAspect = 1
-        self.eventMask = 0
+        self.desiredAspect = 4.0 / 3
+
+        self.cursorTimeout = None
+        self.invisibleCursor = None
+
 
     def setImageSink(self, imageSink):
         assert isinstance(imageSink, gst.interfaces.XOverlay)
@@ -60,11 +71,6 @@ class VideoWidget(gtk.DrawingArea):
 
     def getImageSink(self):
         return self.imageSink
-
-    def setEventMask(self, eventMask):
-        self.eventMask = eventMask
-        if self.window:
-            self.window.set_events(gtk.gdk.EXPOSURE_MASK | eventMask)
 
 
     #
@@ -94,6 +100,19 @@ class VideoWidget(gtk.DrawingArea):
             self.videoWin.move_resize(int(x), int(y), int(width), int(height))
             self.xlock.release()
 
+    def getInvisibleCursor(self):
+        if self.invisibleCursor:
+           return self.invisibleCursor
+
+        display = self.get_display()
+        if display == None:
+            return None
+
+        pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8, 1, 1)
+        pixbuf.fill(0x00000000)
+        self.invisibleCursor = gtk.gdk.Cursor(display, pixbuf, 0, 0);
+        return self.invisibleCursor
+
 
     #
     # Signal Handlers
@@ -108,12 +127,28 @@ class VideoWidget(gtk.DrawingArea):
     # Callbacks
     #
 
-    def realizeCb(self, widget):
-        self.setEventMask(gtk.gdk.EXPOSURE_MASK | self.eventMask)
+    def sizeAllocateCb(self, widget, allocation):
+        self.resizeVideo()
 
+    def motionCb(self, widget, event):
+        if self.cursorTimeout == None:
+            self.window.set_cursor(None)
+        else:
+            gobject.source_remove(self.cursorTimeout)
+        self.cursorTimeout = gobject.timeout_add(5000, self.hidePointer)
+
+    def hidePointer(self):
+        self.window.set_cursor(self.getInvisibleCursor())
+        self.cursorTimeout = None
+        return False
+
+    def destroyCb(self, da):
+        self.imageSink.set_xwindow_id(0L)
+
+    def backgroundRealizeCb(self, widget):
         # Create the video window.
         self.videoWin = gtk.gdk.Window(
-            self.window,
+            self.background.window,
             1, 1,
             gtk.gdk.WINDOW_CHILD,
             gtk.gdk.EXPOSURE_MASK,
@@ -124,17 +159,10 @@ class VideoWidget(gtk.DrawingArea):
 
         self.videoWin.show()
 
-    def sizeAllocateCb(self, widget, allocation):
-        self.resizeVideo()
-
-    def destroyCb(self, da):
-        self.imageSink.set_xwindow_id(0L)
-
     def videoEventFilter(self, event):
         # FIXME: Check for expose event here. Cannot be done now
         # because pygtk seems to have a bug and only reports "NOTHING"
         # events.
-
         self.xlock.acquire()
 
         if not self.videoWinExposed:
@@ -146,10 +174,14 @@ class VideoWidget(gtk.DrawingArea):
                 self.imageSink.set_xwindow_id(self.videoWin.xid)
                 self.videoWinExposed = True
 
+            # Hide the pointer now.
+            self.hidePointer()
+
         self.imageSink.expose()
 
         self.xlock.release()
 
         return gtk.gdk.FILTER_CONTINUE
+
 
 gobject.type_register(VideoWidget)

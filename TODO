@@ -1,7 +1,5 @@
 -*- Text -*-
 
-- Hide cursor in the video window.
-
 - Find out why sounds interrupts shortly when moving in menus and
   using alsasink.
 

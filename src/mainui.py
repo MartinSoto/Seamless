@@ -59,7 +59,7 @@ class MainUserInterface(object):
         self.video = videowidget.VideoWidget()
         self.window.add(self.video)
         
-        self.video.setEventMask(gtk.gdk.BUTTON_PRESS_MASK)
+        self.video.add_events(gtk.gdk.BUTTON_PRESS_MASK)
         self.video.connect('ready', self.videoReady)
         self.video.connect('button-press-event', self.videoButtonPress)
 

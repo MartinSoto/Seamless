@@ -1,5 +1,13 @@
 2004-12-04  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/videowidget.py (VideoWidget.__init__) 
+	(VideoWidget.getInvisibleCursor, VideoWidget.motionCb) 
+	(VideoWidget.videoEventFilter): Hide the pointer in 5 seconds if
+	it is not moved.
+
+	* src/mainui.py (MainUserInterface.__init__): Use standard GTK
+	set_events also for the video widget.
+
 	* src/dvdplayer.py (DVDPlayer.__init__): Add audioconvert and
 	audioscale only when doing soft sound decoding.
 
