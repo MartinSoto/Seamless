@@ -1,3 +1,16 @@
+2005-03-06  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py (YieldOp): Renamed from
+	CallObject. Operations on the scheduler now act directly on it
+	through the modifySched method. This leads to a more efficient and
+	extensible design. 
+	(NoOp): New (no) operation. 
+	(Chain): New chaining operation to yield control to a new
+	iterator. 
+	(Call, Restart, Scheduler.next): Adapt to the new style of yield
+	operations.
+	(__all__): Restrict exported names.
+
 2005-03-05  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/itersched.py: Enhance design again (hopefully this
