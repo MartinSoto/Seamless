@@ -1,6 +1,8 @@
 from gobject import GObject
 from gst import *
 
+import plugin
+
 from machine import *
 
 

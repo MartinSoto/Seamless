@@ -1,5 +1,19 @@
 2004-07-19  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* configure.ac: Heavily changed based on gst-recorder.
+
+	* plugin/__init__.py: 
+	* plugin/_seamlessplugin.pyx:
+	Python module to load the private plugin.
+
+	* gst-plugins/plugininit.c: 
+	* gst-plugins/plugininit.h: 
+	* gst-plugins/Makefile.am: 
+	* gst-plugins/dvdblocksrc.c: 
+	* gst-plugins/plugininit.c:
+	Plugin initialization mechanism completely revamped to allow for
+	private plugin.
+
 	* dvdread/_dvdread.pyx (VideoTitleSet.__new__): Retry opening the
 	title if it fails initially.
 

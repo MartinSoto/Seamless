@@ -1,23 +1,29 @@
 #!/bin/sh
-# you can either set the environment variables AUTOCONF and AUTOMAKE
-# to the right versions, or leave them unset and get the RedHat 7.3 defaults
+
+# Automake
 if test -z $AUTOMAKE; then 
-  export AUTOMAKE=automake 
-  export ACLOCAL='aclocal'
+    export AUTOMAKE=automake 
+    export ACLOCAL='aclocal'
 fi
 
-# if you would want to be running autoheader as well, you will have to do
-# something similar as above for it
-if test -z $AUTOCONF; then export AUTOCONF=autoconf; fi
+# Autoheader
+if test -z $AUTOHEADER; then 
+    export AUTOHEADER=autoheader
+fi
+
+# Autoconf
+if test -z $AUTOCONF; then
+    export AUTOCONF=autoconf
+fi
+
+# Show what we do
 set -x
 
 # if any of these steps fails, the others will not execute, which is good
 # we want to treat errors as soon as possible
 $ACLOCAL && 
 libtoolize --force && \
-# autoheader
+$AUTOHEADER
 $AUTOMAKE -a && \
 $AUTOCONF && \
 ./configure --enable-maintainer-mode
-
-

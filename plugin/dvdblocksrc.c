@@ -134,6 +134,9 @@ dvdblocksrc_get_type (void)
     dvdblocksrc_type = g_type_register_static (GST_TYPE_ELEMENT,
         "DVDBlockSrc",
         &dvdblocksrc_info, 0);
+
+    GST_DEBUG_CATEGORY_INIT (dvdblocksrc_debug, "dvdblocksrc", 0,
+        "DVD block reading element");
   }
   return dvdblocksrc_type;
 }
@@ -543,35 +546,3 @@ dvdblocksrc_close_file (DVDBlockSrc *src)
   src->open_title_num = -1;
   src->open_domain = -1;
 }
-
-
-/*
- * Plugin Initialization
- */
-
-static gboolean
-plugin_init (GstPlugin *plugin)
-{
-  if (!gst_element_register (plugin, "dvdblocksrc", GST_RANK_NONE,
-          GST_TYPE_DVDBLOCKSRC)) {
-    return FALSE;
-  }
-
-  GST_DEBUG_CATEGORY_INIT (dvdblocksrc_debug, "dvdblocksrc", 0,
-      "DVD block reading element");
-
-  return TRUE;
-}
-
-
-GST_PLUGIN_DEFINE (
-    GST_VERSION_MAJOR,
-    GST_VERSION_MINOR,
-    "dvdblocksrc",
-    "DVD block based reading",
-    plugin_init,
-    VERSION,
-    "LGPL",
-    GST_PACKAGE,
-    GST_ORIGIN
-)

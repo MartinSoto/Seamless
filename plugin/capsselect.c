@@ -112,7 +112,7 @@ static void	capsselect_chain	(GstPad *pad, GstData *data);
 
 
 static GstElementClass *parent_class = NULL;
-static guint capsselect_signals[LAST_SIGNAL] = { 0 };
+/* static guint capsselect_signals[LAST_SIGNAL] = { 0 }; */
 
 
 GType
@@ -364,7 +364,6 @@ static gboolean
 capsselect_handle_event (GstPad *pad, GstEvent *event)
 {
   GstEventType type;
-  CapsSelect *capsselect = CAPSSELECT (gst_pad_get_parent (pad));
 
   type = event ? GST_EVENT_TYPE (event) : GST_EVENT_UNKNOWN;
 
@@ -430,6 +429,6 @@ GST_PLUGIN_DEFINE (
   plugin_init,
   VERSION,
   "LGPL",
-  GST_PACKAGE,
-  GST_ORIGIN
+  PACKAGE,
+  "http://seamless.sourceforge.net"
 )

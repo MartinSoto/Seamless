@@ -319,7 +319,6 @@ static gboolean
 capsaggreg_handle_event (GstPad *pad, GstEvent *event)
 {
   GstEventType type;
-  CapsAggreg *capsaggreg = CAPSAGGREG (gst_pad_get_parent (pad));
 
   type = event ? GST_EVENT_TYPE (event) : GST_EVENT_UNKNOWN;
 
@@ -404,6 +403,6 @@ GST_PLUGIN_DEFINE (
   plugin_init,
   VERSION,
   "LGPL",
-  GST_PACKAGE,
-  GST_ORIGIN
+  PACKAGE,
+  "http://seamless.sourceforge.net"
 )

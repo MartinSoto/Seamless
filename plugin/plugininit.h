@@ -1,7 +1,7 @@
-/* GStreamer
- * Copyright (C) 2003 Martin Soto <martinsoto@users.sourceforge.net>
+/* Seamless
+ * Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
  *
- * iec958init.c: ALSA SP/DIF plugin initialization.
+ * plugininit.h: Seamless private plugin initialization.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -19,33 +19,5 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "config.h"
-
-#include <gst/gst.h>
-
-#include "alsaspdifsink.h"
-
-
-static gboolean
-plugin_init (GstPlugin *plugin)
-{
-  if (!gst_element_register (plugin, "alsaspdifsink", GST_RANK_NONE,
-                             GST_TYPE_ALSASPDIFSINK)) {
-    return FALSE;
-  }
-
-  return TRUE;
-}
-
-
-GST_PLUGIN_DEFINE (
-  GST_VERSION_MAJOR,
-  GST_VERSION_MINOR,
-  "alsaspdif",
-  "ALSA SP/DIF output plugin",
-  plugin_init,
-  VERSION,
-  "GPL",
-  GST_PACKAGE,
-  GST_ORIGIN
-)
+void
+seamless_element_init (void);

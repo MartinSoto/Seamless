@@ -1,70 +1,67 @@
-AC_PREREQ(2.57)
-AC_INIT
-AC_CANONICAL_TARGET
+AC_INIT(Seamless DVD Player, 0.0.1)
+AC_CONFIG_SRCDIR(src/seamless)
+AM_INIT_AUTOMAKE(seamless, ${PACKAGE_VERSION})
+PACKAGE_TARNAME=$PACKAGE
 
-PACKAGE=seamless
-VERSION=0.0.1
+AM_CONFIG_HEADER(config.h)
 
-dnl These AC_DEFINE_UNQUOTED's are necessary for make dist to work
-AC_DEFINE_UNQUOTED(PACKAGE, "$PACKAGE")
-AC_DEFINE_UNQUOTED(VERSION, "$VERSION")
-AC_DEFINE_UNQUOTED(RELEASE, "$RELEASE")
-AC_SUBST(PACKAGE)
-AC_SUBST(VERSION)
-AC_SUBST(RELEASE)
+ACLOCAL="$ACLOCAL $ACLOCAL_FLAGS"
 
-AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
-
+dnl libtool
 AC_PROG_CC
+AC_STDC_HEADERS
 
-AC_DISABLE_STATIC
-AC_PROG_LIBTOOL
+AM_DISABLE_STATIC
+AC_LIBTOOL_DLOPEN
+AM_PROG_LIBTOOL
 
-dnl Check for pkgconfig first
-AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+dnl modify pkg-config path
+AC_ARG_WITH(pkg-config-path, 
+   AC_HELP_STRING([--with-pkg-config-path],[colon-separated list of pkg-config(1) dirs]),
+   [export PKG_CONFIG_PATH=${withval}])
 
-dnl Give error and exit if we don't have pkgconfig
-if test "x$HAVE_PKGCONFIG" = "xno"; then
-  AC_MSG_ERROR(You need to have pkgconfig installed!)
-fi
+dnl Check for glib2
+PKG_CHECK_MODULES(GLIB, glib-2.0 gobject-2.0 gthread-2.0 gmodule-2.0, ,
+  AC_MSG_ERROR(You don't have glib-2.0 installed))
+AC_SUBST(GLIB_LIBS)
+AC_SUBST(GLIB_CFLAGS)
 
-dnl Now we're ready to ask for gstreamer libs and cflags
-dnl And we can also ask for the right version of gstreamer
-GST_REQUIRED=0.8.0
+dnl check for gstreamer
+GST_VERSION_MAJOR=0
+GST_VERSION_MINOR=8
+GST_VERSION_RELEASE=0
+GSTREAMER_REQ=$GST_VERSION_MAJOR.$GST_VERSION_MINOR.$GST_VERSION_RELEASE
 
-dnl Check for gstreamer 0.8
+dnl check for 0.8 first
 GST_MAJORMINOR=0.8
-PKG_CHECK_MODULES(GST, \
-  gstreamer-$GST_MAJORMINOR >= $GST_REQUIRED \
-  gstreamer-control-$GST_MAJORMINOR >= $GST_REQUIRED,
-  HAVE_GST=yes,HAVE_GST=no)
-
-if test "x$HAVE_GST" = "xno"; then
-  AC_MSG_ERROR(You need GStreamer development packages installed!)
+PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GSTREAMER_REQ,
+  HAVE_GSTREAMER=yes, HAVE_GSTREAMER=no)
+if test "x$HAVE_GSTREAMER" = "xno"; then
+  GST_MAJORMINOR="0.7"
+  PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GSTREAMER_REQ, ,
+  AC_MSG_ERROR(Gstreamer >= $GSTREAMER_REQ was not found))
 fi
-
-dnl Make GST_CFLAGS and GST_LIBS available
 AC_SUBST(GST_CFLAGS)
 AC_SUBST(GST_LIBS)
 
-dnl Make GST_MAJORMINOR available in Makefile.am
+AC_SUBST(GST_VERSION_MAJOR)
+AC_SUBST(GST_VERSION_MINOR)
 AC_SUBST(GST_MAJORMINOR)
 
-dnl If we need them, we can also use the plugin libraries
-PKG_CHECK_MODULES(GST_LIBS, gstreamer-libs-$GST_MAJORMINOR >= $GST_REQUIRED,
-                  HAVE_GST_LIBS=yes, HAVE_GST_LIBS=no)
+dnl check for GStreamer helper libs
+PKG_CHECK_MODULES(GSTLIBS, gstreamer-interfaces-$GST_MAJORMINOR >= $GSTREAMER_REQ, ,
+  AC_MSG_ERROR(Gstreamer Interfaces or Encoder Profiles >= $GSTREAMER_REQ was not found))
+OLD_CPPFLAGS=$CPPFLAGS
+CPPFLAGS="$CPPFLAGS $GSTLIBS_CFLAGS"
+AC_CHECK_HEADERS([gst/audio/audioclock.h], ,
+  AC_MSG_ERROR(Required interfaces not found - please install these))
+CPPFLAGS=$OLD_CPPFLAGS
+AC_SUBST(GSTLIBS_LIBS)
+AC_SUBST(GSTLIBS_CFLAGS)
 
-dnl Give a warning if we don't have gstreamer libs
-if test "x$HAVE_GST_LIBS" = "xno"; then
-  AC_MSG_NOTICE(no GStreamer plugin libs found)
-fi
-
-dnl Make GST_LIBS_CFLAGS and GST_LIBS_LIBS available
-AC_SUBST(GST_LIBS_CFLAGS)
-AC_SUBST(GST_LIBS_LIBS)
-
-dnl check for glib
-AM_PATH_GLIB_2_0(2.2.0,,[AC_MSG_ERROR(You need GLIB 2.2 or newer to compile Seamless)],gthread)
+AC_SUBST(GST_VERSION_MAJOR)
+AC_SUBST(GST_VERSION_MINOR)
+AC_SUBST(GST_MAJORMINOR)
 
 dnl Check for python
 AM_PATH_PYTHON
@@ -105,18 +102,15 @@ then
 fi
 AC_SUBST(PYREXC)
 
-dnl Add debugging options
-changequote(,)dnl
-if test "x$GCC" = xyes; then
-  case " $CFLAGS " in
-  *[\	\ ]-Wall[\	\ ]*) ;;
-  *) CFLAGS="$CFLAGS -Wall" ;;
-  esac
-fi
-changequote([,])dnl
+dnl be clean and use pure Gtk+-2.0
+EXTRA_CFLAGS="-Wall -Werror -DGTK_DISABLE_DEPRECATED=1 -DG_DISABLE_DEPRECATED=1 -DGDK_DISABLE_DEPRECATED=1 -DGDK_PIXBUF_DISABLE_DEPRECATED=1 -DGNOME_DISABLE_DEPRECATED=1 -DGST_DISABLE_DEPRECATED=1"
+AC_SUBST(EXTRA_CFLAGS)
 
 AC_OUTPUT([
   Makefile
-  gst-plugins/Makefile
+  plugin/Makefile
   dvdread/Makefile
 ])
+
+echo
+echo "Now type 'make' to compile ${PACKAGE_STRING}."
