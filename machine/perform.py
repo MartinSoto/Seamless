@@ -51,6 +51,7 @@ class CommandPerformer(object):
 
     # Select (highlight) a button
     selectButton = makeNotImplemented('selectButton')
+    setSystemParam8 = makeNotImplemented('setSystemParam8')
 
     # Jumps
     jumpToTitle = makeNotImplemented('jumpToTitle')
@@ -392,8 +393,7 @@ class CommandPerformer(object):
         elif op == 4:
             self.setKaraokeMode(getParm(cmd[4] * 0x100 + cmd[5]))
         elif op == 6:
-            self.getSystemParameter(8). \
-                setValue(getParm(cmd[4] * 0x100 + cmd[5]))
+            self.setSystemParam8(getParm(cmd[4] * 0x100 + cmd[5]))
         else:
             assert False, 'Unknown SRPM set operation'
 

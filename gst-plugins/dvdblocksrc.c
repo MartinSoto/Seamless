@@ -408,16 +408,20 @@ dvdblocksrc_loop (GstElement *element)
     gst_pad_push (src->src, GST_DATA (buf));
   }
 
-  /* Determine the size of the new buffer. */
-  if (src->block_count > DVDBLOCKSRC_MAX_BUF_SIZE) {
-    block_count = DVDBLOCKSRC_MAX_BUF_SIZE;
-  } else {
-    block_count = src->block_count;
+  /* Some VOBUs contain only the header. src->block_count could be 0
+     here. */
+  if (src->block_count != 0) {
+    /* Determine the size of the new buffer. */
+    if (src->block_count > DVDBLOCKSRC_MAX_BUF_SIZE) {
+      block_count = DVDBLOCKSRC_MAX_BUF_SIZE;
+    } else {
+      block_count = src->block_count;
+    }
+
+    buf = dvdblocksrc_read (src, block_count);
+
+    gst_pad_push (src->src, GST_DATA (buf));
   }
-
-  buf = dvdblocksrc_read (src, block_count);
-
-  gst_pad_push (src->src, GST_DATA (buf));
 }
 
 

@@ -732,7 +732,8 @@ cdef class VideoTitleSet:
         return wrapProgramChain(self, programChainNr,
                                 self.handle.vts_pgcit.pgci_srp + \
                                 (programChainNr - 1), NULL,
-                                self.handle.vts_tmapt.tmap)
+                                self.handle.vts_tmapt.tmap + \
+                                (programChainNr - 1))
 
     property langUnitCount:
         def __get__(self):
@@ -1098,7 +1099,7 @@ cdef class NavPacket:
             return self.pci.hli.hl_gi.btn_ns
 
     def getButton(self, buttonNr):
-        if buttonNr < 1 or buttonNr > 36:
+        if buttonNr < 1 or buttonNr > self.pci.hli.hl_gi.btn_ns:
             raise IndexError, "button number out of range"
 
         return wrapButton(self, &(self.pci.hli.btnit[buttonNr - 1]))

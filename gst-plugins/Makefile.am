@@ -24,8 +24,8 @@ libgstcapsaggreg_la_CFLAGS = $(GST_CFLAGS)
 libgstcapsaggreg_la_LDFLAGS = $(GST_LIBS_LIBS)
 
 libalsaspdif_la_SOURCES = alsaspdifinit.c alsaspdifsink.c
-libalsaspdif_la_CFLAGS = $(GST_CFLAGS) $(ALSA_CFLAGS) -I$(top_builddir)/gst-libs
-libalsaspdif_la_LIBADD = $(top_builddir)/gst-libs/gst/audio/libgstaudio.la
+libalsaspdif_la_CFLAGS = $(GST_CFLAGS) $(ALSA_CFLAGS) -I$(top_builddir)/../gst-plugins/gst-libs
+libalsaspdif_la_LIBADD = $(top_builddir)/../gst-plugins/gst-libs/gst/audio/libgstaudio.la
 libalsaspdif_la_LDFLAGS = $(GST_LIBS_LIBS) $(ALSA_LIBS)
 
 noinst_HEADERS = ac3_padder.h ac3iec.h 

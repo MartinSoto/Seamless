@@ -1,3 +1,28 @@
+2004-07-04  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* machine/machine.py (disasm): audio, subpicture and angle
+	attributes moved to the VirtualMachine class.
+	Added attribute 'interactive' to properly deal with flushing of
+	the pipeline.
+	(PlaybackLocation.jumpToUnit): New operation, takes part of the
+	functionality of jump.
+	(VirtualMachine.updatePipeline): Be more robust when no audio
+	stream is found.
+	(VirtualMachine.SystemRegister.setValue): Parameter value was
+	missing.
+
+	* machine/perform.py, machine/disassemble.py: add setSystemParam8
+	operation.
+
+	* gst-plugins/Makefile.am: Fix compile flags for plugins.
+
+	* gst-plugins/dvdblocksrc.c (dvdblocksrc_loop): Handle the case
+	where a VOBU contains only the header block.
+
+	* dvdread/_dvdread.pyx (DVDReadError.getProgramChain): Fixed
+	time map retrieving. (DVDReadError.getButton): Accept only
+	existing buttons.
+
 2004-06-28  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* ChangeLog started.

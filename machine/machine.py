@@ -3,6 +3,7 @@ import string
 import copy
 import time
 import traceback
+import threading
 
 from dvdread import *
 from perform import *
@@ -30,7 +31,7 @@ class MachineException(Exception):
 # Command types
 COMMAND_PRE = 1
 COMMAND_CELL = 2
-COMMAND_POST =3
+COMMAND_POST = 3
 
 
 # A command disassembler for debugging.
@@ -56,11 +57,9 @@ class PlaybackLocation(object):
                  'commands',
                  'commandNr',
                  'nav',
-                 'audio',
-                 'subpicture',
-                 'angle',
                  'button',
-                 'stillEnd']
+                 'stillEnd',
+                 'interactive']
 
     def __init__(self, machine, info):
         self.machine = machine
@@ -82,21 +81,37 @@ class PlaybackLocation(object):
         # No still frame in progress.
         self.stillEnd = None
 
+        # Interactive is true while in the middle of performing a
+        # interactive operation.
+        self.interactive = False
+
+    def jumpToUnit(self, unit):
+        if isinstance(unit, VideoTitle):
+            self.title = unit
+            self.chapter = unit.getChapter(1)
+            self.jump(self.chapter.cell.programChain)
+        elif isinstance(unit, Chapter):
+            self.title = unit.title
+            self.chapter = unit
+            if unit.chapterNr == 1:
+                self.jumpToUnit(unit.cell.programChain)
+            else:
+                self.jumpToUnit(unit.cell)
+            return
+        else:
+            self.jump(unit)
+
     def jump(self, subdiv):
         """Set the playback position to the given subdivision.
         """
 
-        if isinstance(subdiv, VideoTitle):
-            self.title = subdiv
-            self.chapter = subdiv.getChapter(1)
-            self.jump(self.chapter.cell.programChain)
-            return
-        elif isinstance(subdiv, Chapter):
-            self.title = subdiv.title
-            self.chapter = subdiv
-            self.jump(subdiv.cell)
-            return
-        elif isinstance(subdiv, ProgramChain):
+        if self.interactive:
+            # Make the interactive operation take place instantly.
+            self.machine.flushEvent()
+            self.machine.flushSource()
+            self.interactive = False
+
+        if isinstance(subdiv, ProgramChain):
             self.programChain = subdiv
             self.cell = None
             self.sectorNr = None
@@ -115,13 +130,8 @@ class PlaybackLocation(object):
         else:
             raise TypeError, "Parameter 2 of 'jump' has wrong type"
 
-        # Stop any still frame.
+        # Suspend a possible still frame.
         self.stillEnd = None
-
-        # FIXME: Ugly hack!
-        if self.machine.flushIfJump:
-            self.machine.flushEvent()
-            self.machine.flushSource()
 
         # Update the machine.
         self.machine.updatePipeline()
@@ -136,6 +146,10 @@ class PlaybackLocation(object):
 
         self.sectorNr = self.lastSectorNr + relSector
         self.lastSectorNr = None
+
+        # If we are trying to advance sectors we are already out of
+        # interactive operation.
+        self.interactive = False
 
     def useSector(self):
         """Retrieve the current sector for playback.
@@ -166,6 +180,9 @@ class PlaybackLocation(object):
             assert False
 
         self.commandNr = commandNr
+
+        # Suspend a possible still frame.
+        self.stillEnd = None
 
     def setNav(self, nav):
         """Set the current navigation packet.
@@ -331,8 +348,6 @@ class VirtualMachine(CommandPerformer):
                  'buttonNav',
                  'highlightArea',
                  'highlightProgramChain',
-                 # FIXME: Hack!
-                 'flushIfJump',
                  'regionCode',
                  'prefMenuLang',
                  'prefAudio',
@@ -369,9 +384,6 @@ class VirtualMachine(CommandPerformer):
         self.highlightArea = None
         self.highlightProgramChain = None
 
-        # FIXME: hack
-        self.flushIfJump = False
-
 
         # Machine options and state:
 
@@ -400,7 +412,7 @@ class VirtualMachine(CommandPerformer):
         self.resumelocation = None
 
         # Start running the first play program chain.
-        self.location.jump(self.info.videoManager.firstPlay)
+        self.location.jumpToUnit(self.info.videoManager.firstPlay)
 
 
     #
@@ -518,7 +530,6 @@ class VirtualMachine(CommandPerformer):
         #print >> sys.stderr, 'New highlight:', self.highlightArea
 
     def updatePipeline(self):
-        #print >> sys.stderr, 'Updating pipeline'
         # Update the audio, if necessary.
         if self.location.getDomain() == DOMAIN_TITLE:
             if self.audio == 15 or \
@@ -528,7 +539,14 @@ class VirtualMachine(CommandPerformer):
                 physical = self.location.programChain. \
                            getAudioPhysStream(self.audio + 1)
                 if physical == None:
+                    # Just pick the first existing stream.
                     physical = -1
+                    for logical in range(1, 9):
+                        newPhys = self.location.programChain. \
+                                  getAudioPhysStream(logical)
+                        if newPhys != None:
+                            physical = newPhys
+                            break
         else:
             physical = 0
 
@@ -544,8 +562,8 @@ class VirtualMachine(CommandPerformer):
                 physical = -1
             else:
                 streams = self.location.programChain. \
-                          getSubpicturePhysStreams((self.location. \
-                                                    subpicture & 0x1f) + 1)
+                          getSubpicturePhysStreams((self.subpicture \
+                                                    & 0x1f) + 1)
                 if streams == None:
                     physical = -1
                 else:
@@ -616,7 +634,7 @@ class VirtualMachine(CommandPerformer):
         def getValue(self):
             return self.method()
 
-        def setValue(self):
+        def setValue(self, value):
              raise MachineException, \
                    'Attempt to directly assign a system register'
 
@@ -781,90 +799,93 @@ class VirtualMachine(CommandPerformer):
         return TRUE
 
     def linkTopCell(self):
-        self.location.jump(self.location.cell)
+        self.location.jumpToUnit(self.location.cell)
 
     def linkNextCell(self):
-        self.location.jump(self.location.programChain. \
-                           getCell(self.location.cell.cellNr + 1))
+        self.location.jumpToUnit(self.location.programChain. \
+                                 getCell(self.location.cell.cellNr + 1))
 
     def linkPrevCell(self):
-        self.location.jump(self.location.programChain. \
-                           getCell(self.location.cell.cellNr - 1))
+        self.location.jumpToUnit(self.location.programChain. \
+                                 getCell(self.location.cell.cellNr - 1))
 
     def linkTopProgram(self):
-        programNr = self.location.cell.programmNr
-        self.location.jump(self.location.programChain. \
-                           getProgramCell(programNr))
+        programNr = self.location.cell.programNr
+        self.location.jumpToUnit(self.location.programChain. \
+                                 getProgramCell(programNr))
 
     def linkNextProgram(self):
-        programNr = self.location.cell.programmNr
-        self.location.jump(self.location.programChain. \
-                           getProgramCell(programNr + 1))
+        programNr = self.location.cell.programNr
+        self.location.jumpToUnit(self.location.programChain. \
+                                 getProgramCell(programNr + 1))
 
     def linkPrevProgram(self):
-        programNr = self.location.cell.programmNr
-        self.location.jump(self.location.programChain. \
-                           getProgramCell(programNr - 1))
+        programNr = self.location.cell.programNr
+        self.location.jumpToUnit(self.location.programChain. \
+                                 getProgramCell(programNr - 1))
 
     def linkTopProgramChain(self):
-        self.location.jump(self.location.programChain)
+        self.location.jumpToUnit(self.location.programChain)
 
     def linkNextProgramChain(self):
-        self.location.jump(self.location.programChain.nextProgramChain)
+        self.location.jumpToUnit(self.location.programChain.nextProgramChain)
 
     def linkPrevProgramChain(self):
-        self.location.jump(self.location.programChain.prevProgramChain)
+        self.location.jumpToUnit(self.location.programChain.prevProgramChain)
 
     def linkGoUpProgramChain(self):
-        self.location.jump(self.location.programChain.goUpProgramChain)
+        self.location.jumpToUnit(self.location.programChain.goUpProgramChain)
 
     def linkTailProgramChain(self):
         self.location.setCommand(COMMAND_POST)
 
     def linkProgramChain(self, programChainNr):
-        self.location.jump(self.location.programChain.container. \
-                           getProgramChain(programChainNr))
+        self.location.jumpToUnit(self.location.programChain.container. \
+                                 getProgramChain(programChainNr))
 
     def linkChapter(self, chapterNr):
-        self.location.jump(self.location.title.getChapter(chapterNr))
+        self.location.jumpToUnit(self.location.title.getChapter(chapterNr))
 
     def linkProgram(self, programNr):
-        self.location.jump(self.location.programChain. \
-                           getProgramCell(programNr))
+        self.location.jumpToUnit(self.location.programChain. \
+                                 getProgramCell(programNr))
 
     def linkCell(self, cellNr):
-        self.location.jump(self.location.programChain.getCell(cellNr))
+        self.location.jumpToUnit(self.location.programChain.getCell(cellNr))
 
     def selectButton(self, buttonNr):
         self.location.button = buttonNr
         self.updatePipeline()
 
+    def setSystemParam8(self, value):
+        self.selectButton(value << 10)
+
     def jumpToTitle(self, titleNr):
-        self.location.jump(self.info.videoManager.getVideoTitle(titleNr))
+        self.location.jumpToUnit(self.info.videoManager.getVideoTitle(titleNr))
 
     def jumpToTitleInSet(self, titleNr):
-        self.location.jump(self.location.title.videoTitleSet. \
-                           getVideoTitle(titleNr))
+        self.location.jumpToUnit(self.location.title.videoTitleSet. \
+                                 getVideoTitle(titleNr))
 
     def jumpToChapterInSet(self, titleNr, chapterNr):
-        self.location.jump(self.location.title.videoTitleSet. \
-                           getVideoTitle(titleNr).getChapter(chapterNr))
+        self.location.jumpToUnit(self.location.title.videoTitleSet. \
+                                 getVideoTitle(titleNr).getChapter(chapterNr))
 
     def jumpToFirstPlay(self):
-        self.location.jump(self.info.videoManager.firstPlay)
+        self.location.jumpToUnit(self.info.videoManager.firstPlay)
 
     def jumpToTitleMenu(self):
         langUnit = self.getLangUnit(self.info.videoManager)
-        self.location.jump(langUnit.getMenuProgramChain(MENU_TYPE_TITLE))
+        self.location.jumpToUnit(langUnit.getMenuProgramChain(MENU_TYPE_TITLE))
 
     def jumpToMenu(self, titleSetNr, menuType):
         langUnit = self.getLangUnit(self.info.videoManager. \
                                     getVideoTitleSet(titleSetNr))
-        self.location.jump(langUnit.getMenuProgramChain(menuType))
+        self.location.jumpToUnit(langUnit.getMenuProgramChain(menuType))
 
     def jumpToManagerProgramChain(self, programChainNr):
         langUnit = self.getLangUnit(self.info.videoManager)
-        self.location.jump(langUnit.getProgramChain(programChainNr))
+        self.location.jumpToUnit(langUnit.getProgramChain(programChainNr))
 
     def setTimedJump(self, programChainNr, seconds):
         print >> sys.stderr, "Timed jump, implement me!"
@@ -924,13 +945,17 @@ class VirtualMachine(CommandPerformer):
         global disasm
 
         disasm.decodeCommand(cmd, self.location.commandNr - 1)
-        print disasm.getText()
+        print >> sys.stderr, disasm.getText()
         disasm.resetText()
 
         try:
             CommandPerformer.performCommand(self, cmd)
         except:
             traceback.print_exc()
+
+    def performCommandInteractive(self, cmd):
+        self.location.interactive = True
+        self.performCommand(cmd)
 
 
     #
@@ -939,7 +964,7 @@ class VirtualMachine(CommandPerformer):
 
     def jump(self, subdiv):
         self.flushEvent()
-        self.location.jump(subdiv)
+        self.location.jumpToUnit(subdiv)
         self.flushSource()
 
     def stop(self):
@@ -985,16 +1010,19 @@ class VirtualMachine(CommandPerformer):
     #
 
     def setButtonNav(self, buttonNav):
+        # Check for forced select.
+        if buttonNav.forcedSelect != 0 and \
+           (self.buttonNav == None or \
+            self.buttonNav.forcedSelect != buttonNav.forcedSelect):
+            self.selectButton(buttonNav.forcedSelect)
+
         self.buttonNav = buttonNav
 
-        update = False
-
-        # Check for forced buttons.
-        if buttonNav.forcedSelect != 0:
-            self.selectButton(buttonNav.forcedSelect)
+        # Check for forced activate.
         if buttonNav.forcedActivate != 0:
             self.selectButton(buttonNav.forcedActivate)
             self.confirm()
+
         if (buttonNav.highlightStatus == HLSTATUS_NONE and \
             self.highlightArea != None) or \
             buttonNav.highlightStatus == HLSTATUS_NEW_INFO:
@@ -1008,6 +1036,13 @@ class VirtualMachine(CommandPerformer):
         else:
             return self.buttonNav.getButton(self.location.button)
 
+    def selectButtonInteractive(self, buttonNr):
+        self.selectButton(buttonNr)
+
+        btnObj = self.getButtonObj()
+        if btnObj != None and btnObj.autoAction:
+            self.confirm()
+
     def up(self):
         btnObj = self.getButtonObj()
         if btnObj == None:
@@ -1015,7 +1050,7 @@ class VirtualMachine(CommandPerformer):
 
         nextBtn = btnObj.up
         if nextBtn != 0:
-            self.selectButton(nextBtn)
+            self.selectButtonInteractive(nextBtn)
 
     def down(self):
         btnObj = self.getButtonObj()
@@ -1024,7 +1059,7 @@ class VirtualMachine(CommandPerformer):
 
         nextBtn = btnObj.down
         if nextBtn != 0:
-            self.selectButton(nextBtn)
+            self.selectButtonInteractive(nextBtn)
 
     def left(self):
         btnObj = self.getButtonObj()
@@ -1033,7 +1068,7 @@ class VirtualMachine(CommandPerformer):
 
         nextBtn = btnObj.left
         if nextBtn != 0:
-            self.selectButton(nextBtn)
+            self.selectButtonInteractive(nextBtn)
 
     def right(self):
         btnObj = self.getButtonObj()
@@ -1042,21 +1077,15 @@ class VirtualMachine(CommandPerformer):
 
         nextBtn = btnObj.right
         if nextBtn != 0:
-            self.selectButton(nextBtn)
+            self.selectButtonInteractive(nextBtn)
 
     def confirm(self):
         btnObj = self.getButtonObj()
         if btnObj == None:
             return
 
-        # FIXME: Ugly hack!
-        self.flushIfJump = True
-
         self.location.setCommand(COMMAND_CELL)
-        self.performCommand(btnObj.command)
-
-        # FIXME: Ugly hack!
-        self.flushIfJump = False
+        self.performCommandInteractive(btnObj.command)
 
     def menu(self):
         if self.location.getDomain() != DOMAIN_TITLE:
