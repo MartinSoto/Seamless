@@ -1,3 +1,9 @@
+2004-12-03  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/dvdplayer.py (DVDPlayer.__init__): Pass the DVD device
+	location to the DVD element. Thanks go to Ronald Bultje for the
+	report.
+
 2004-11-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* README: Write some basic instructions.

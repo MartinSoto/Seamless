@@ -63,7 +63,7 @@ class DVDPlayer(Thread):
 
         self.dvdSrc = parse_launch("""
         (
-          dvdblocksrc name=dvdblocksrc !
+          dvdblocksrc name=dvdblocksrc location=%s !
             seamless-dvddemux name=dvddemux .current_video !
             %s
             queue name=video
@@ -72,7 +72,7 @@ class DVDPlayer(Thread):
           dvddemux.current_audio !
             queue name=audio max-size-buffers=50
         )
-        """ % videoDecoder)
+        """ % (options.location, videoDecoder))
         ghostify(self.dvdSrc, 'video', 'src', 'video')
         ghostify(self.dvdSrc, 'subtitle', 'src', 'subtitle')
         ghostify(self.dvdSrc, 'audio', 'src', 'audio')
