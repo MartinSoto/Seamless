@@ -287,7 +287,7 @@ cdef class ProgramChain:
     cdef pgci_srp_t *pointer	# Pointer structure to the current chain
                         	# (may be NULL).
     cdef pgc_t *chain		# Actual chain structure
-    cdef vts_tmap_t *time_map	# Time map for the chain (may be NULL).
+    cdef vts_tmap_t *timeMap	# Time map for the chain (may be NULL).
 
     cdef object cells		# Array of cells
 
@@ -297,7 +297,7 @@ cdef class ProgramChain:
 
     cdef void init(self, object container, int programChainNr,
                    pgci_srp_t *chainPointer,
-                   pgc_t *chain, vts_tmap_t *time_map):
+                   pgc_t *chain, vts_tmap_t *timeMap):
         cdef int i
         cdef float startSeconds
 
@@ -306,7 +306,7 @@ cdef class ProgramChain:
 
         self.pointer = chainPointer
         self.chain = chain
-        self.time_map = time_map
+        self.timeMap = timeMap
 
         self.cells = []
         startSeconds = 0.0
@@ -396,7 +396,7 @@ cdef class ProgramChain:
 
     property hasTimeMap:
         def __get__(self):
-            return self.time_map != NULL and self.time_map.nr_of_entries > 0
+            return self.timeMap != NULL and self.timeMap.nr_of_entries > 0
 
     def getSectorFromTime(self, float seconds):
         cdef int pos
@@ -408,14 +408,14 @@ cdef class ProgramChain:
         if seconds < 0:
             seconds = 0
 
-        pos = int(seconds + float(self.time_map.tmu) / 2) / self.time_map.tmu
-        if pos >= self.time_map.nr_of_entries:
-            pos = self.time_map.nr_of_entries - 1
+        pos = int(seconds + float(self.timeMap.tmu) / 2) / self.timeMap.tmu
+        if pos >= self.timeMap.nr_of_entries:
+            pos = self.timeMap.nr_of_entries - 1
 
         if pos == 0:
             return self.cells[0].firstSector
         else:
-            return self.time_map.map_ent[pos - 1] & 0x7fffffff
+            return self.timeMap.map_ent[pos - 1] & 0x7fffffff
 
     def getAudioPhysStream(self, int streamNr):
         cdef uint16_t audio_control
@@ -457,18 +457,27 @@ cdef class ProgramChain:
 
     property preCommands:
         def __get__(self):
-            return wrapCommandSet(self.chain.command_tbl.pre_cmds,
-                                  self.chain.command_tbl.nr_of_pre)
+            if self.chain.command_tbl != NULL:
+                return wrapCommandSet(self.chain.command_tbl.pre_cmds,
+                                      self.chain.command_tbl.nr_of_pre)
+            else:
+                return wrapCommandSet(NULL, 0)
 
     property postCommands:
         def __get__(self):
-            return wrapCommandSet(self.chain.command_tbl.post_cmds,
-                                  self.chain.command_tbl.nr_of_post)
+            if self.chain.command_tbl != NULL:
+                return wrapCommandSet(self.chain.command_tbl.post_cmds,
+                                      self.chain.command_tbl.nr_of_post)
+            else:
+                return wrapCommandSet(NULL, 0)
 
     property cellCommands:
         def __get__(self):
-            return wrapCommandSet(self.chain.command_tbl.cell_cmds,
-                                  self.chain.command_tbl.nr_of_cell)
+            if self.chain.command_tbl != NULL:
+                return wrapCommandSet(self.chain.command_tbl.cell_cmds,
+                                      self.chain.command_tbl.nr_of_cell)
+            else:
+                return wrapCommandSet(NULL, 0)
 
 
 cdef ProgramChain wrapProgramChain(object container, int programChainNr,
@@ -729,11 +738,16 @@ cdef class VideoTitleSet:
            programChainNr > self.handle.vts_pgcit.nr_of_pgci_srp:
             raise IndexError, "program chain number out of range"
 
+        cdef vts_tmapt_t *timeMapTable
+        cdef vts_tmap_t *timeMap
+        timeMapTable = self.handle.vts_tmapt
+        if timeMapTable != NULL:
+            timeMap = self.handle.vts_tmapt.tmap + (programChainNr - 1)
+        else:
+            timeMap = NULL
         return wrapProgramChain(self, programChainNr,
                                 self.handle.vts_pgcit.pgci_srp + \
-                                (programChainNr - 1), NULL,
-                                self.handle.vts_tmapt.tmap + \
-                                (programChainNr - 1))
+                                (programChainNr - 1), NULL, timeMap)
 
     property langUnitCount:
         def __get__(self):

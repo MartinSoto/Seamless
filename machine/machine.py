@@ -41,7 +41,7 @@ disasm = disassemble.CommandDisassembler()
 class PlaybackLocation(object):
     """A self-contained representation of a location in a DVD.
 
-    A PlabackLocation contains all information necessary to locate a
+    A PlaybackLocation contains all information necessary to locate a
     position in the DVD and to play back starting from that
     position."""
     
@@ -84,6 +84,19 @@ class PlaybackLocation(object):
         # Interactive is true while in the middle of performing a
         # interactive operation.
         self.interactive = False
+
+    def set(self, location):
+        """Set this location to the given location."""
+
+        if self.interactive:
+            # Make the interactive operation take place instantly.
+            self.machine.flushEvent()
+            self.machine.flushSource()
+            self.interactive = False
+
+        # Copy all slots.
+        for attrName in self.__slots__:
+            setattr(self, attrName, getattr(location, attrName))
 
     def jumpToUnit(self, unit):
         if isinstance(unit, VideoTitle):
@@ -187,8 +200,8 @@ class PlaybackLocation(object):
     def setNav(self, nav):
         """Set the current navigation packet.
 
-        The location uses the uses the navigation packet to tell the
-        location of the next VOBU."""
+        The location uses the navigation packet to tell the location
+        of the next VOBU."""
 
         self.nav = nav
 
@@ -234,10 +247,7 @@ class PlaybackLocation(object):
         """Advance the location in one execution step."""
 
         if self.stillEnd != None:
-            if self.stillEnd == 0 or time.time() < self.stillEnd:
-                # Be nice with the processor.
-                time.sleep(0.1)
-            else:
+            if self.stillEnd != 0 and time.time() >= self.stillEnd:
                 # Still time is over.
                 self.stillEnd = None
 
@@ -273,6 +283,9 @@ class PlaybackLocation(object):
                         self.setCellByNumber(self.cell.cellNr + 1)
                     else:
                         self.setCommand(COMMAND_POST)
+                elif self.commandType == COMMAND_POST and \
+                     self.programChain.nextProgramChain != None:
+                    self.jump(self.programChain.nextProgramChain)
                 else:
                     # If we get to this point, we came out of the post
                     # command set. There's no defined operation to do
@@ -339,6 +352,7 @@ class VirtualMachine(CommandPerformer):
 
     __slots__ = ['info',
                  'src',
+                 'lock',
                  'pendingEvents',
                  'audio',
                  'subpicture',
@@ -363,6 +377,9 @@ class VirtualMachine(CommandPerformer):
     def __init__(self, info, src):
         self.info = info
         self.src = src
+
+        # The synchronized method lock.
+        self.lock = threading.RLock()
 
         # The queue of pending events.
         self.pendingEvents = []
@@ -416,10 +433,28 @@ class VirtualMachine(CommandPerformer):
 
 
     #
+    # Method Synchronization
+    #
+
+    def synchronized(method):
+        def wrapper(self, *args, **keywords):
+            self.lock.acquire()
+            try:
+                method(self, *args, **keywords)
+            finally:
+                self.lock.release()
+
+        return wrapper
+
+
+    #
     # Signal Handling
     #
 
     def vobuRead(self, src):
+        
+        self.lock.acquire()
+        
         try:
             (domain, titleNr, sectorNr) = self.location.nextVOBU()
         except:
@@ -442,6 +477,12 @@ class VirtualMachine(CommandPerformer):
         #print >> sys.stderr, 'Current VOBU:', self.location.lastSectorNr,
         #print >> sys.stderr, '\r',
 
+        self.lock.release()
+        
+        # Be nice to the processor, but don't sleep while blocked.
+        if sectorNr == None:
+            time.sleep(0.1)
+
     def vobuHeader(self, src, buffer):
         nav = NavPacket(buffer.get_data())
 
@@ -457,6 +498,8 @@ class VirtualMachine(CommandPerformer):
         st.set_value('start_ptm', MPEGTimeToGSTTime(nav.startTime))
         st.set_value('end_ptm', MPEGTimeToGSTTime(nav.endTime))
         self.src.get_pad('src').push(event_new_any(st))
+
+    vobuHeader = synchronized(vobuHeader)
 
     def flushSource(self):
         """Stop the source on its tracks."""
@@ -474,6 +517,9 @@ class VirtualMachine(CommandPerformer):
     def flushEvent(self):
         self.pendingEvents = []
         self.queueEvent(Event(EVENT_FLUSH))
+
+        # A flush cleans up the displayed highlight.
+        self.highlightArea = None
 
     def fillerEvent(self):
         self.queueEvent(Event(EVENT_FILLER))
@@ -526,8 +572,11 @@ class VirtualMachine(CommandPerformer):
             st = Structure('application/x-gst-dvd')
             st.set_value('event', 'dvd-spu-reset-highlight')
 
+        # Send the event inmediatly for better interactive response,
+        # but put a delayed version in the queue for situations where
+        # a flush is involved.
         self.src.get_pad('src').push(event_new_any(st))
-        #print >> sys.stderr, 'New highlight:', self.highlightArea
+        self.queueEvent(event_new_any(st))
 
     def updatePipeline(self):
         # Update the audio, if necessary.
@@ -880,7 +929,8 @@ class VirtualMachine(CommandPerformer):
 
     def jumpToMenu(self, titleSetNr, menuType):
         titleSet = self.info.videoManager.getVideoTitleSet(titleSetNr)
-        if self.location.title.videoTitleSet.titleSetNr != titleSetNr:
+        if self.location.title == None or \
+           self.location.title.videoTitleSet.titleSetNr != titleSetNr:
             # Jump first to the video title set to make sure that the
             # location points to the right title.
             title = titleSet.getVideoTitle(1)
@@ -927,10 +977,13 @@ class VirtualMachine(CommandPerformer):
 
     def resume(self):
         if self.resumeLocation == None:
-            return
+            raise PlayerException, "Attempt to resume with no resume info"
 
-        self.location = self.resumeLocation
+        # We set the current location to allow for it to continue
+        # playback from the resume point.
+        self.location.set(self.resumeLocation)
         self.resumeLocation = None
+
         self.updatePipeline()
 
     def setAngle(self, angle):
@@ -959,7 +1012,10 @@ class VirtualMachine(CommandPerformer):
         try:
             CommandPerformer.performCommand(self, cmd)
         except:
+            print >> sys.stderr, "Error while executing command:"
+            print >> sys.stderr, "----- Traceback -----"
             traceback.print_exc()
+            print >> sys.stderr, "----- End traceback -----"
 
     def performCommandInteractive(self, cmd):
         self.location.interactive = True
@@ -975,9 +1031,13 @@ class VirtualMachine(CommandPerformer):
         self.location.jumpToUnit(subdiv)
         self.flushSource()
 
+    jump = synchronized(jump)
+
     def stop(self):
         self.flushEvent()
-        self.flushSource()        
+        self.flushSource()
+
+    stop = synchronized(stop)
 
     def prevProgram(self):
         programNr = self.location.cell.programNr - 1
@@ -986,10 +1046,14 @@ class VirtualMachine(CommandPerformer):
             programNr = 1
         self.jump(self.location.programChain.getProgramCell(programNr))
 
+    prevProgram = synchronized(prevProgram)
+
     def nextProgram(self):
         programNr = self.location.cell.programNr + 1
         if programNr <= self.location.programChain.programCount:
             self.jump(self.location.programChain.getProgramCell(programNr))
+
+    nextProgram = synchronized(nextProgram)
 
 
     #
@@ -1009,8 +1073,13 @@ class VirtualMachine(CommandPerformer):
         self.location.timeJump(seconds)
         self.flushSource()
 
+    timeJump = synchronized(timeJump)
+
     def timeJumpRelative(self, seconds):
+        print 'Current time: %d' % self.location.currentTime
         self.timeJump(self.location.currentTime + seconds)
+
+    timeJumpRelative = synchronized(timeJumpRelative)
 
 
     #
@@ -1060,6 +1129,8 @@ class VirtualMachine(CommandPerformer):
         if nextBtn != 0:
             self.selectButtonInteractive(nextBtn)
 
+    up = synchronized(up)
+
     def down(self):
         btnObj = self.getButtonObj()
         if btnObj == None:
@@ -1068,6 +1139,8 @@ class VirtualMachine(CommandPerformer):
         nextBtn = btnObj.down
         if nextBtn != 0:
             self.selectButtonInteractive(nextBtn)
+
+    down = synchronized(down)
 
     def left(self):
         btnObj = self.getButtonObj()
@@ -1078,6 +1151,8 @@ class VirtualMachine(CommandPerformer):
         if nextBtn != 0:
             self.selectButtonInteractive(nextBtn)
 
+    left = synchronized(left)
+
     def right(self):
         btnObj = self.getButtonObj()
         if btnObj == None:
@@ -1087,6 +1162,8 @@ class VirtualMachine(CommandPerformer):
         if nextBtn != 0:
             self.selectButtonInteractive(nextBtn)
 
+    right = synchronized(right)
+
     def confirm(self):
         btnObj = self.getButtonObj()
         if btnObj == None:
@@ -1094,6 +1171,8 @@ class VirtualMachine(CommandPerformer):
 
         self.location.setCommand(COMMAND_CELL)
         self.performCommandInteractive(btnObj.command)
+
+    confirm = synchronized(confirm)
 
     def menu(self):
         if self.location.getDomain() != DOMAIN_TITLE:
@@ -1104,6 +1183,8 @@ class VirtualMachine(CommandPerformer):
 
         self.callMenu(MENU_TYPE_ROOT)
 
+    menu = synchronized(menu)
+
     def rtn(self):
         if self.location.getDomain() != DOMAIN_MENU:
             return
@@ -1112,3 +1193,5 @@ class VirtualMachine(CommandPerformer):
         self.flushSource()
 
         self.resume()
+
+    rtn = synchronized(rtn)

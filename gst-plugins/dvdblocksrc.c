@@ -410,7 +410,7 @@ dvdblocksrc_loop (GstElement *element)
 
   /* Some VOBUs contain only the header. src->block_count could be 0
      here. */
-  if (src->block_count != 0) {
+  if (src->block_count > 0) {
     /* Determine the size of the new buffer. */
     if (src->block_count > DVDBLOCKSRC_MAX_BUF_SIZE) {
       block_count = DVDBLOCKSRC_MAX_BUF_SIZE;

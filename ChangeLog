@@ -1,5 +1,23 @@
 2004-07-11  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* dvdread/_dvdread.pyx (DVDReadError.getProgramChain): Handle the
+	case where the tmap table is NULL.
+	(DVDReadError.preCommands, DVDReadError.postCommands,
+	DVDReadError.cellCommands,): Handle the case where the command
+	table is NULL.
+
+	* machine/machine.py (VirtualMachine.wrapper): New function to
+	create synchronized methods. The relevant methods are now
+	synchronized.
+	(PlaybackLocation.set): New method to set the location based on
+	another location object.
+	(VirtualMachine.resume): Fixed to use the set location method.
+	(PlaybackLocation.advance): Jump to the next program chain when a
+	program chain reaches its with no branching commands.
+
+	* gst-plugins/dvdblocksrc.c (dvdblocksrc_loop): Be more strict
+	with the value of block count.
+
 	* machine/disassemble.py (CommandDisassembler): Change the
 	direction of the shift operation in setSystemParam8.
 
