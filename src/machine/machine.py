@@ -815,8 +815,8 @@ class CellPlayer(object):
         self.nav = nav
 
         # Play the next VOBU.
-        if nav.nextVOBU != 0x3fffffff:
-            yield Chain(self.playVobu(self.sectorNr + nav.nextVOBU))
+        if nav.nextVobu != 0x3fffffff:
+            yield Chain(self.playVobu(self.sectorNr + nav.nextVobu))
 
 
     #

@@ -323,7 +323,7 @@ cdef class Cell:
         def __get__(self):
             return self.cell.first_sector
 
-    property lastVOBUStartSector:
+    property lastVobuStartSector:
         def __get__(self):
             return self.cell.last_vobu_start_sector
 
@@ -526,7 +526,7 @@ cdef class ProgramChain:
         else:
             return None
 
-    def getCLUTEntry(self, int entryNr):
+    def getClutEntry(self, int entryNr):
         if not 1 <= entryNr <= 16:
             raise IndexError, "CLUT entry number out of range"
 
@@ -1254,15 +1254,15 @@ cdef class NavPacket:
         navRead_PCI(&self.pci, <unsigned char *>data + 0x2d);
         navRead_DSI(&self.dsi, <unsigned char *>data + 0x407);
 
-    property nextVOBU:
+    property nextVobu:
         def __get__(self):
             return self.dsi.vobu_sri.next_vobu & 0x3fffffff
 
-    property prevVOBU:
+    property prevVobu:
         def __get__(self):
             return self.dsi.vobu_sri.prev_vobu & 0x3fffffff
 
-    def getForwardVOBU(self, int intervalId):
+    def getForwardVobu(self, int intervalId):
         cdef uint32_t offset
 
         if intervalId < 0 or intervalId > 18:
@@ -1274,7 +1274,7 @@ cdef class NavPacket:
         else:
             return None
 
-    def getBackwardVOBU(self, int intervalId):
+    def getBackwardVobu(self, int intervalId):
         cdef uint32_t offset
 
         if intervalId < 0 or intervalId > 18:
@@ -1286,11 +1286,11 @@ cdef class NavPacket:
         else:
             return None
 
-    property nextVideoVOBU:
+    property nextVideoVobu:
         def __get__(self):
             return self.dsi.vobu_sri.next_video & 0x3fffffff
 
-    property prevVideoVOBU:
+    property prevVideoVobu:
         def __get__(self):
             return self.dsi.vobu_sri.prev_video & 0x3fffffff
 
@@ -1332,7 +1332,7 @@ cdef class NavPacket:
     # Angles
     #
 
-    def getNonSeamlessNextVOBU(self, angleNr):
+    def getNonSeamlessNextVobu(self, angleNr):
         if not 1 <= angleNr <= 9:
             raise IndexError, "Angle number out of range"
 
@@ -1354,7 +1354,7 @@ cdef class NavPacket:
         def __get__(self):
             return self.dsi.sml_pbi.size
 
-    def getSeamlessNextVOBU(self, angleNr):
+    def getSeamlessNextVobu(self, angleNr):
         if not 1 <= angleNr <= 9:
             raise IndexError, "Angle number out of range"
 

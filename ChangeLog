@@ -1,3 +1,16 @@
+2005-03-28  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (CellPlayer.setNav): nextVOBU ->
+	nextVobu.
+
+	* src/dvdread/_dvdread.pyx(ProgramChain.getClutEntry,
+	Cell.lastVobuStartSector, NavPacket.nextVobu, NavPacket.prevVobu,
+	NavPacket.getForwardVobu, NavPacket.getBackwardVobu,
+	NavPacket.nextVideoVobu, NavPacket.prevVideoVobu,
+	NavPacket.getNonSeamlessNextVobu, NavPacket.getSeamlessNextVobu):
+	Renamed. Use only first letter capitalized in acronyms.
+
+
 2005-03-27  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (PlaybackLocation): Rewrite the whole
