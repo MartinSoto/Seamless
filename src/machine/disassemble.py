@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -18,10 +18,13 @@
 
 import string
 
-from perform import *
+import decode
 
 
 class IndentedText(object):
+    __slots__ = ('indentLevel',
+                 'lines')
+
     def __init__(self):
         self.indentLevel = 0
         self.lines = []
@@ -48,8 +51,16 @@ class IndentedText(object):
     __repr__ = getText
 
 
-class CommandDisassembler(CommandPerformer):
+class CommandDisassembler(decode.CommandDecoder):
+    """A disassembler for DVD virtual machine commands."""
+
+    __slots__ = ('text',)
+
+    
     def __init__(self):
+        # This object works as its own machine.
+        decode.CommandDecoder.__init__(self, self)
+
         self.resetText()
 
 
@@ -153,7 +164,10 @@ class CommandDisassembler(CommandPerformer):
     # Registers
     #
 
-    class Register(CommandPerformer.Register):
+    class Register(decode.Register):
+        __slots__ = ('parent',
+                     'name')
+
         def __init__(self, parent, name):
             self.parent = parent
             self.name = name

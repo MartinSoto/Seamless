@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -19,109 +19,37 @@
 import operator
 import random
 
-def makeNotImplemented(name):
-    def reportNotImpl(self, *args):
-        raise NotImplementedError, \
-              "Operation '%s' not implemented" % name
 
-    return reportNotImpl
+class Register(object):
+    """A base class for all register types.
+
+    Implementations of the machine interface must use this class as
+    base class for all objects returned as registers."""
+
+    __slots__ = ()
 
 
-#
-# Basic Decoding Procedures
-#
+class CommandDecoder(object):
+    """A decoder for DVD virtual machine commands."""
 
-class CommandPerformer(object):
+    __slots__ = ('machine',)
 
-    #
-    # Machine Operations
-    #
 
-    # Basic operations.
-    nop = makeNotImplemented('nop')
-    goto = makeNotImplemented('goto')
-    brk = makeNotImplemented('break')
-    exit = makeNotImplemented('exit')
-
-    # Parental management
-
-    openSetParentalLevel = makeNotImplemented('openSetParentalLevel')
-    closeSetParentalLevel = makeNotImplemented('closeSetParentalLevel')
-
-    # Links.
-    linkTopCell = makeNotImplemented('linkTopCell')
-    linkNextCell = makeNotImplemented('linkNextCell')
-    linkPrevCell = makeNotImplemented('linkPrevCell')
-    linkTopProgram = makeNotImplemented('linkTopProgram')
-    linkNextProgram = makeNotImplemented('linkNextProgram')
-    linkPrevProgram = makeNotImplemented('linkPrevProgram')
-    linkTopProgramChain = makeNotImplemented('linkTopProgramChain')
-    linkNextProgramChain = makeNotImplemented('linkNextProgramChain')
-    linkPrevProgramChain = makeNotImplemented('linkPrevProgramChain')
-    linkGoUpProgramChain = makeNotImplemented('linkGoUpProgramChain')
-    linkTailProgramChain = makeNotImplemented('linkTailProgramChain')
-    linkProgramChain = makeNotImplemented('linkProgramChain')
-    linkChapter = makeNotImplemented('linkChapter')
-    linkProgram = makeNotImplemented('linkProgram')
-    linkCell = makeNotImplemented('linkCell')
-
-    # Select (highlight) a button
-    selectButton = makeNotImplemented('selectButton')
-    setSystemParam8 = makeNotImplemented('setSystemParam8')
-
-    # Jumps
-    jumpToTitle = makeNotImplemented('jumpToTitle')
-    jumpToTitleInSet = makeNotImplemented('jumpToTitleInSet')
-    jumpToChapterInSet = makeNotImplemented('jumpToChapterInSet')
-
-    jumpToFirstPlay = makeNotImplemented('jumpToFirstPlay')
-    jumpToTitleMenu = makeNotImplemented('jumpToTitleMenu')
-    jumpToMenu = makeNotImplemented('jumpToMenu')
-    jumpToManagerProgramChain = \
-        makeNotImplemented('jumpToManagerProgramChain')
-
-    # Timed jump
-    setTimedJump = makeNotImplemented('setTimedJump')
-
-    # Call and resume
-    callFirstPlay = makeNotImplemented('callFirstPlay')
-    callTitleMenu = makeNotImplemented('callTitleMenu')
-    callMenu = makeNotImplemented('callMenu')
-    callManagerProgramChain = makeNotImplemented('callManagerProgramChain')
-    resume = makeNotImplemented('resume')
-
-    # Selectable streams
-    setAngle = makeNotImplemented('setAngle')
-    setAudio = makeNotImplemented('setAudio')
-    setSubpicture = makeNotImplemented('setSubpicture')
-
-    # Karaoke control
-    setKaraokeMode = makeNotImplemented('setKaraokeMode')
+    def __init__(self, machine):
+        """Creates a new CommandDecoder that uses the specified
+        virtual machine to execute the commands."""
+        self.machine = machine
 
 
     #
     # Registers
     #
-
-    class Register(object):
-        getValue = makeNotImplemented('Register.getValue')
-        setValue = makeNotImplemented('Register.setValue')
-
-    dummyRegister = Register()
-
-    def getGeneralPurpose(self, regNr):
-        assert 0 <= regNr <= 15
-        return self.dummyRegister
-
-    def getSystemParameter(self, regNr):
-        assert 0 <= regNr <= 23
-        return self.dummyRegister
-
+    
     def getRegister(self, regNr):
         if regNr & 0x80:
-            return self.getSystemParameter(regNr & 0x7f)
+            return self.machine.getSystemParameter(regNr & 0x7f)
         else:
-            return self.getGeneralPurpose(regNr)
+            return self.machine.getGeneralPurpose(regNr)
 
 
     #
@@ -174,9 +102,9 @@ class CommandPerformer(object):
         (pos1, pos2, dbl) = self.condOperands[cmd[0] >> 4]
         if pos1 == 1:
             # Special case, we are interested in the second nibble of byte 1.
-            op1 = self.getGeneralPurpose(cmd[1] & 0xf).getValue()
+            op1 = self.machine.getGeneralPurpose(cmd[1] & 0xf).getValue()
         else:
-            op1 = self.getGeneralPurpose(cmd[pos1]).getValue()
+            op1 = self.machine.getGeneralPurpose(cmd[pos1]).getValue()
 
         # Get the second operand. It could be the value of a register
         # or a constant.
@@ -205,20 +133,6 @@ class CommandPerformer(object):
     # Link Operations
     #
 
-    simpleLinkOpNames = {
-        0x01: 'linkTopCell',
-        0x02: 'linkNextCell',
-        0x03: 'linkPrevCell',
-        0x05: 'linkTopProgram',
-        0x06: 'linkNextProgram',
-        0x07: 'linkPrevProgram',
-        0x09: 'linkTopProgramChain',
-        0x0a: 'linkNextProgramChain',
-        0x0b: 'linkPrevProgramChain',
-        0x0c: 'linkGoUpProgramChain',
-        0x0d: 'linkTailProgramChain',
-        0x10: 'resume'}
-
     def performLink(self, cmd):
         if 0x8 <= cmd[0] >> 4 <= 0xd:
             # Commands in this range are limited to simple links.
@@ -229,23 +143,42 @@ class CommandPerformer(object):
         if linkType == 0x0:
             return
         elif linkType == 0x1:
-            # Call by name to allow for operation redefinition.
-            try:
-                methodName = self.simpleLinkOpNames[cmd[7]]
-            except KeyError:
-                return
-            getattr(self, methodName)()
+            if cmd[7] == 0x01:
+                self.machine.linkTopCell()
+            elif cmd[7] == 0x02:
+                self.machine.linkNextCell()
+            elif cmd[7] == 0x03:
+                self.machine.linkPrevCell()
+            elif cmd[7] == 0x05:
+                self.machine.linkTopProgram()
+            elif cmd[7] == 0x06:
+                self.machine.linkNextProgram()
+            elif cmd[7] == 0x07:
+                self.machine.linkPrevProgram()
+            elif cmd[7] == 0x09:
+                self.machine.linkTopProgramChain()
+            elif cmd[7] == 0x0a:
+                self.machine.linkNextProgramChain()
+            elif cmd[7] == 0x0b:
+                self.machine.linkPrevProgramChain()
+            elif cmd[7] == 0x0c:
+                self.machine.linkGoUpProgramChain()
+            elif cmd[7] == 0x0d:
+                self.machine.linkTailProgramChain()
+            elif cmd[7] == 0x10:
+                self.machine.resume()
+
             self.performButton(cmd)
         elif linkType == 0x4:
-            self.linkProgramChain(cmd[6] * 0x100 + cmd[7])
+            self.machine.linkProgramChain(cmd[6] * 0x100 + cmd[7])
         elif linkType == 0x5:
-            self.linkChapter((cmd[6] & 0x3) * 0x100 + cmd[7])
+            self.machine.linkChapter((cmd[6] & 0x3) * 0x100 + cmd[7])
             self.performButton(cmd)
         elif linkType == 0x6:
-            self.linkProgram(cmd[7])
+            self.machine.linkProgram(cmd[7])
             self.performButton(cmd)
         elif linkType == 0x7:
-            self.linkCell(cmd[7])
+            self.machine.linkCell(cmd[7])
             self.performButton(cmd)
         else:
             assert False, 'Unknown link operation'
@@ -254,7 +187,7 @@ class CommandPerformer(object):
         # Handle the select button operation.
         button = cmd[6] >> 2
         if button != 0:
-            self.selectButton(button)
+            self.machine.selectButton(button)
 
 
     #
@@ -284,17 +217,17 @@ class CommandPerformer(object):
         if op == 0:
             return
 
-        dest = self.getGeneralPurpose(regNr)
+        dest = self.machine.getGeneralPurpose(regNr)
         if op == 2:
             # Perform a register swap.
-            assert isinstance(source, self.Register)
+            assert isinstance(source, Register)
             tmp = dest.getValue()
             dest.setValue(source.getValue())
             source.setValue(tmp)
         else:
             opFunc = self.arithOps[op]
 
-            if isinstance(source, self.Register):
+            if isinstance(source, Register):
                 value = source.getValue()
             else:
                 value = source
@@ -312,15 +245,15 @@ class CommandPerformer(object):
 
         op = cmd[1] & 0xf
         if op == 0:
-            self.nop()
+            self.machine.nop()
         elif op == 1:
-            self.goto(cmd[7])
+            self.machine.goto(cmd[7])
         elif op == 2:
-            self.brk()
+            self.machine.brk()
         elif op == 3:
-            if self.openSetParentalLevel(cmd):
-                self.goto(cmd[7])
-                self.closeSetParentalLevel(cmd)
+            if self.machine.openSetParentalLevel(cmd):
+                self.machine.goto(cmd[7])
+                self.machine.closeSetParentalLevel(cmd)
 
         self.closeCondition(cmd)
 
@@ -338,37 +271,39 @@ class CommandPerformer(object):
 
         op = cmd[1] & 0xf
         if op == 1:
-            self.exit()
+            self.machine.exit()
         elif op == 2:
-            self.jumpToTitle(cmd[5])
+            self.machine.jumpToTitle(cmd[5])
         elif op == 3:
-            self.jumpToTitleInSet(cmd[5])
+            self.machine.jumpToTitleInSet(cmd[5])
         elif op == 5:
-            self.jumpToChapterInSet(cmd[5], cmd[2] * 0x100 + cmd[3])
+            self.machine.jumpToChapterInSet(cmd[5], cmd[2] * 0x100 + cmd[3])
         elif op == 6:
             subop = cmd[5] >> 4
             if subop == 0x0:
-                self.jumpToFirstPlay()
+                self.machine.jumpToFirstPlay()
             elif subop == 0x4:
-                self.jumpToTitleMenu()
+                self.machine.jumpToTitleMenu()
             elif subop == 0x8:
-                self.jumpToMenu(cmd[4], cmd[3], cmd[5] & 0xf)
+                self.machine.jumpToMenu(cmd[4], cmd[3], cmd[5] & 0xf)
             elif subop == 0xc:
-                self.jumpToManagerProgramChain(cmd[2] * 0x100 + cmd[3])
+                self.machine.jumpToManagerProgramChain(cmd[2] * 0x100
+                                                       + cmd[3])
             else:
-                assert False, 'Jump supoberation unknown'
+                assert False, 'Jump suboberation unknown'
         elif op == 8:
             subop = cmd[5] >> 4
             if subop == 0x0:
-                self.callFirstPlay(cmd[4])
+                self.machine.callFirstPlay(cmd[4])
             elif subop == 0x4:
-                self.callTitleMenu(cmd[4])
+                self.machine.callTitleMenu(cmd[4])
             elif subop == 0x8:
-                self.callMenu(cmd[5] & 0xf, cmd[4])
+                self.machine.callMenu(cmd[5] & 0xf, cmd[4])
             elif subop == 0xc:
-                self.callManagerProgramChain(cmd[2] * 0x100 + cmd[3], cmd[4])
+                self.machine.callManagerProgramChain(cmd[2] * 0x100
+                                                     + cmd[3], cmd[4])
             else:
-                assert False, 'Jump supoberation unknown'
+                assert False, 'Jump suboberation unknown'
         else:
             assert False, 'Unknown jump/call operation'
         
@@ -391,24 +326,24 @@ class CommandPerformer(object):
         op = cmd[0] & 0xf
         if op == 1:
             if cmd[3] & 0x80:
-                self.setAudio(getParm(cmd[3] & 0x7f))
+                self.machine.setAudio(getParm(cmd[3] & 0x7f))
             if cmd[4] & 0x80:
-                self.setSubpicture(getParm(cmd[4] & 0x7f))
+                self.machine.setSubpicture(getParm(cmd[4] & 0x7f))
             if cmd[5] & 0x80:
-                self.setAngle(getParm(cmd[5] & 0x7f))
+                self.machine.setAngle(getParm(cmd[5] & 0x7f))
         elif op == 2:
-            self.setTimedJump(cmd[4] * 0x100 + cmd[5], getParm(cmd[3]))
+            self.machine.setTimedJump(cmd[4] * 0x100 + cmd[5], getParm(cmd[3]))
         elif op == 3:
             regNr = cmd[5] & 0xf
             value = getParm(cmd[2] * 0x100 + cmd[3])
             if cmd[5] & 0x80:
-                self.getGeneralPurpose(regNr).setValue(value, True)
+                self.machine.getGeneralPurpose(regNr).setValue(value, True)
             else:
-                self.getGeneralPurpose(regNr).setValue(value)
+                self.machine.getGeneralPurpose(regNr).setValue(value)
         elif op == 4:
-            self.setKaraokeMode(getParm(cmd[4] * 0x100 + cmd[5]))
+            self.machine.setKaraokeMode(getParm(cmd[4] * 0x100 + cmd[5]))
         elif op == 6:
-            self.setSystemParam8(getParm(cmd[4] * 0x100 + cmd[5]))
+            self.machine.setSystemParam8(getParm(cmd[4] * 0x100 + cmd[5]))
         else:
             assert False, 'Unknown SRPM set operation'
 

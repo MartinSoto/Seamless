@@ -50,3 +50,9 @@ Particular DVDs
 - A Bug's Life: Initial language selection frame doesn't display the
   first time. Scene selection doesn't work. Seems to be a machine
   problem.
+
+- Lord of the Rings, The Two Towers: No character voices (only
+  background sounds and music) when playing with the a52dec
+  element. Apparently it cannot handle Dolby Digital EX sound
+  properly. This DVD works fine with the external decoder.
+

@@ -1,3 +1,35 @@
+2005-02-11  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine): Do not inherit from
+	CommandPerformer any more.
+	(VirtualMachine.__slots__): Added 'decoder', 'systemRegisters' and
+	'resumeLocation'. The class worked only because it was derived
+	from CommandPerformed, which had no __slots__ declaration at all.
+	(VirtualMachine.__init__): Create the new command decoder. Fix
+	capitalization of 'resumeLocation'.
+	(VirtualMachine.Register): Inherit from decode.Register.
+	(VirtualMachine.Register.__slots__): Added.
+	(VirtualMachine.SystemRegister.__slots__): Added.
+	(VirtualMachine.performCommand): Invoke the command decoder
+	properly.
+
+	* src/machine/disassemble.py (IndentedText.__slots__): Added.
+	(CommandDisassembler.__slots__): Added.
+	(CommandDisassembler.__init__): Initialize command decoder
+	properly.
+	(CommandDisassembler.Register): Now inherit from decode.Register
+	(CommandDisassembler.Register.__slots__): Added.
+
+	* src/machine/decode.py: Renamed from perform.py
+	(CommandDecoder): Class renamed from CommandPerformed. The
+	execution machine used to inherit from this class. Now the
+	constructor receives a machine object as parameter and all
+	operations rely on it.
+	(Register): New class. Replaces the old CommandPerformer.Register.
+	(CommandDecoder.__slots__): Added.
+	(CommandDecoder.performLink): Call the link operations explicitly
+	instead of recurring to an introspection trick.
+
 2005-02-09  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/seamless.py: Don't select a python version number in the #!

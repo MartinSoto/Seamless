@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -24,7 +24,7 @@ import traceback
 import threading
 
 from dvdread import *
-from perform import *
+import decode
 import disassemble
 
 from gobject import GObject
@@ -68,7 +68,7 @@ class PlaybackLocation(object):
     position in the DVD and to play back starting from that
     position."""
     
-    __slots__ = ['machine',
+    __slots__ = ('machine',
                  'info',
                  'title',
                  'chapter',
@@ -83,7 +83,7 @@ class PlaybackLocation(object):
                  'button',
                  'stillEnd',
                  'interactive',
-                 'cellCurrentTime']
+                 'cellCurrentTime')
 
     def __init__(self, machine, info):
         self.machine = machine
@@ -444,10 +444,11 @@ class PlaybackLocation(object):
         return (self.getDomain(), titleNr, self.useSector())
 
 
-class VirtualMachine(CommandPerformer):
+class VirtualMachine(object):
     """A DVD playback virtual machine implementation."""
 
-    __slots__ = ['info',
+    __slots__ = ('decoder',
+                 'info',
                  'src',
                  'lock',
                  'pendingEvents',
@@ -468,12 +469,16 @@ class VirtualMachine(CommandPerformer):
                  'aspectRatio',
                  'videoMode',
                  'generalRegisters',
+                 'systemRegisters',
                  'location',
-                 'resumelocation']
+                 'resumeLocation')
 
     def __init__(self, info, src):
         self.info = info
         self.src = src
+
+        # A command decoder.
+        self.decoder = decode.CommandDecoder(self)
 
         # The synchronized method lock.
         self.lock = threading.RLock()
@@ -525,7 +530,7 @@ class VirtualMachine(CommandPerformer):
 
         # Location and resume location.
         self.location = PlaybackLocation(self, info)
-        self.resumelocation = None
+        self.resumeLocation = None
 
         # Start running the first play program chain.
         self.location.jumpToUnit(self.info.videoManager.firstPlay)
@@ -777,10 +782,12 @@ class VirtualMachine(CommandPerformer):
     # Registers
     #
 
-    class Register(object):
-        pass
+    class Register(decode.Register):
+        __slots__ = ()
 
     class GeneralRegister(Register):
+        __slots__ = ('value',)
+
         def __init__(self):
             self.value = 0
 
@@ -794,6 +801,8 @@ class VirtualMachine(CommandPerformer):
 
 
     class SystemRegister(Register):
+        __slots__ = ('method',)
+
         def __init__(self, method):
             self.method = method
 
@@ -934,10 +943,14 @@ class VirtualMachine(CommandPerformer):
                 self.SystemRegister(getattr(self, "getSystem%d" % i)))
 
     def getGeneralPurpose(self, regNr):
+        """Return the object corresponding to the specified general
+        purpose register."""
         assert 0 <= regNr <= 15
         return self.generalRegisters[regNr]
 
     def getSystemParameter(self, regNr):
+        """Return the object corresponding to the specified system
+        parameter."""
         assert 0 <= regNr <= 23
         return self.systemRegisters[regNr]
 
@@ -1230,7 +1243,7 @@ class VirtualMachine(CommandPerformer):
         disasm.resetText()
 
         try:
-            CommandPerformer.performCommand(self, cmd)
+            self.decoder.performCommand(cmd)
         except:
             print >> sys.stderr, "Error while executing command:"
             print >> sys.stderr, "----- Traceback -----"
