@@ -134,9 +134,11 @@ cdef extern from "dvdread/nav_types.h":
     # Seamless Playback Information
     ctypedef struct sml_pbi_t:
         uint16_t category	# 'category' of seamless VOBU
-        uint32_t ilvu_ea	# end address of interleaved Unit
-        uint32_t ilvu_sa	# start address of next interleaved unit
-        uint16_t size		# size of next interleaved unit
+        uint32_t ilvu_ea	# Relative offset to the last sector
+                                # of the current interleaved unit.
+        uint32_t ilvu_sa	# Relative offset to the first sector
+                                # of the next interleaved unit.
+        uint16_t size		# Size of next interleaved unit.
         uint32_t vob_v_s_s_ptm	# video start ptm in vob
         uint32_t vob_v_e_e_ptm	# video end ptm in vob
         vob_a_t vob_a[8]
@@ -146,7 +148,7 @@ cdef extern from "dvdread/nav_types.h":
         uint32_t address	# offset to next ILVU, high bit is before/after
         uint16_t size		# byte size of the ILVU pointed to by address
 
-    # Seamless Angle Infromation
+    # Seamless Angle Information
     ctypedef struct sml_agli_t:
         sml_agl_data_t data[9]
 

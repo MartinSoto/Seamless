@@ -32,3 +32,6 @@
   smartly.
 
 - Implement auto NTSC/PAL mode.
+
+- LIRC component fails miserably when no LIRC kernel modules are
+  available.

@@ -50,7 +50,7 @@ GST_DEBUG_CATEGORY_STATIC (alsaspdifsink_debug);
 /* Maximal synchronization difference.  Measures will be taken if
    block timestamps differ from actual playing time in more than this
    value. */
-#define MAX_SYNC_DIFF (IEC958_FRAME_DURATION * 0.7)
+#define MAX_SYNC_DIFF (IEC958_FRAME_DURATION * 0.8)
 
 
 /* Size in bytes of an ALSA PCM frame. */
@@ -64,7 +64,6 @@ GST_DEBUG_CATEGORY_STATIC (alsaspdifsink_debug);
 /* Number of ALSA PCM frames for the given playing time. */
 #define ALSASPDIFSINK_FRAMES_PER_TIME(sink, time) \
   (((GstClockTime) (sink)->out_config.rate * (time)) / GST_SECOND)
-
 
 /* ElementFactory information. */
 static GstElementDetails alsaspdifsink_details = {
@@ -485,8 +484,8 @@ alsaspdifsink_alsa_open (AlsaSPDIFSink *sink)
                        GST_ERROR_SYSTEM);
     goto __close;
   }
-  GST_DEBUG_OBJECT (sink, "buffer size set to %0.3fs",
-                    (double) buffer_time / 1000000);
+  GST_DEBUG_OBJECT (sink, "buffer size set to %" GST_TIME_FORMAT,
+                    GST_TIME_ARGS (buffer_time));
 
   step = 2;
   period_time = 10000 * 2;
@@ -536,7 +535,7 @@ alsaspdifsink_alsa_open (AlsaSPDIFSink *sink)
     goto __close;
   }
 
-  avail_min = 4800;
+  avail_min = 48000 * 0.15;
   err = snd_pcm_sw_params_set_avail_min (sink->pcm, sw_params, avail_min);
   if (err < 0) {
     GST_ELEMENT_ERROR (sink, RESOURCE, OPEN_WRITE,
@@ -577,7 +576,7 @@ alsaspdifsink_write_samples (AlsaSPDIFSink *sink, gint16 *output_samples,
   do {
     if (res == -EPIPE) {
       /* Underrun. */
-      GST_DEBUG_OBJECT (sink, "buffer underrun");
+      GST_INFO_OBJECT (sink, "buffer underrun");
       res = snd_pcm_prepare (sink->pcm);
     }
     else if (res == -ESTRPIPE) {
@@ -665,31 +664,49 @@ alsaspdifsink_handle_event (GstPad *pad, GstEvent *event)
   type = event ? GST_EVENT_TYPE (event) : GST_EVENT_UNKNOWN;
 
   switch (type) {
-  case GST_EVENT_FLUSH:
-    GST_INFO_OBJECT (sink, "flush event received");
+    case GST_EVENT_FLUSH:
+      GST_INFO_OBJECT (sink, "flush event received");
 
-    alsaspdifsink_flush (sink);
-    break;
+      alsaspdifsink_flush (sink);
+      gst_audio_clock_set_active (GST_AUDIO_CLOCK (sink->provided_clock),
+          TRUE);
+      GST_INFO_OBJECT (sink, "clock activated");
+      break;
+    
+    case GST_EVENT_DISCONTINUOUS:
+      {
+        GstClockTime time, delay;
 
-  case GST_EVENT_DISCONTINUOUS:
-    {
-      GstClockTime time, delay;
-	      
-      if (gst_event_discont_get_value (event, GST_FORMAT_TIME, &time)) {
-        delay = alsaspdifsink_current_delay (sink);
-        gst_element_set_time_delay (GST_ELEMENT (sink), time, delay);
-        sink->cur_ts = time;
-        GST_INFO_OBJECT (sink,
-            "handling discontinuity: time: %0.3fs, base: %0.3fs",
-            (double) time / GST_SECOND,
-            (double) GST_ELEMENT (sink)->base_time / GST_SECOND);
+        if (gst_event_discont_get_value (event, GST_FORMAT_TIME, &time)) {
+          delay = alsaspdifsink_current_delay (sink);
+          gst_element_set_time_delay (GST_ELEMENT (sink), time, delay);
+          sink->cur_ts = time;
+          GST_INFO_OBJECT (sink,
+              "handling discontinuity: time: %" GST_TIME_FORMAT,
+              GST_TIME_ARGS (time));
+        }
       }
-    }
-    break;
+      break;
 
-  default:
-    gst_pad_event_default (pad, event);
-    break;
+    case GST_EVENT_ANY:
+      {
+        GstStructure *structure = event->event_data.structure.structure;
+        const char *event_type =
+          gst_structure_get_string (structure, "event");
+
+        if (strcmp (event_type, "dvd-spu-still-frame") == 0) {
+          GST_INFO_OBJECT (sink, "Handling still frame");
+
+          gst_audio_clock_set_active (
+              GST_AUDIO_CLOCK (sink->provided_clock), FALSE);
+          GST_INFO_OBJECT (sink, "clock deactivated");
+        }
+      }
+      break;
+
+    default:
+      gst_pad_event_default (pad, event);
+      break;
   }
 
   return TRUE;
@@ -715,21 +732,22 @@ alsaspdifsink_chain (GstPad *pad, GstData *_data)
   buf = GST_BUFFER (_data);
   sink = ALSASPDIFSINK (gst_pad_get_parent (pad));
 
+  GST_LOG_OBJECT (sink, "Current element time: %" GST_TIME_FORMAT,
+      GST_TIME_ARGS (gst_element_get_time (GST_ELEMENT (sink))));
+
   if (GST_FLAG_IS_SET (sink, ALSASPDIFSINK_OPEN)) {
 
     timestamp = GST_BUFFER_TIMESTAMP (buf);
     if (timestamp != GST_CLOCK_TIME_NONE) {
-      GST_LOG_OBJECT (sink, "new timestamp: %0.3fs",
-                      (double) timestamp / GST_SECOND);
+      GST_LOG_OBJECT (sink, "new timestamp: %" GST_TIME_FORMAT,
+          GST_TIME_ARGS (timestamp));
 
 #ifndef GST_DISABLE_GST_DEBUG
       if (ABS (GST_CLOCK_DIFF (timestamp, sink->cur_ts) > 1000)) {
-        GST_DEBUG_OBJECT (sink, "internal sound discontinuity %0.4fs (%"
-                          G_GINT64_FORMAT "), cur_ts: %0.3fs",
-                          (double) GST_CLOCK_DIFF (timestamp, sink->cur_ts)
-                          / GST_SECOND,
-                          GST_CLOCK_DIFF (timestamp, sink->cur_ts),
-                          (double) sink->cur_ts / GST_SECOND);
+        GST_DEBUG_OBJECT (sink, "internal sound discontinuity %0.4fs"
+            ", cur_ts: %" GST_TIME_FORMAT,
+            (double) GST_CLOCK_DIFF (timestamp, sink->cur_ts) / GST_SECOND,
+            GST_TIME_ARGS (sink->cur_ts));
       }
 #endif
 
@@ -740,8 +758,8 @@ alsaspdifsink_chain (GstPad *pad, GstData *_data)
       alsaspdifsink_current_delay (sink);
 
 /*     fprintf (stderr, "Drift: % 0.6fs, delay: % 0.6fs\r",  */
-/*              (double) GST_CLOCK_DIFF (sink->cur_ts, next_write) / GST_SECOND, */
-/*              (double) alsaspdifsink_current_delay (sink) / GST_SECOND); */
+/*              GST_TIME_ARGS (GST_CLOCK_DIFF (sink->cur_ts, next_write)), */
+/*              GST_TIME_ARGS (alsaspdifsink_current_delay (sink))); */
 
     if (sink->cur_ts > next_write + MAX_SYNC_DIFF) {
       static gint16 blank[1024 * 8];
@@ -752,9 +770,9 @@ alsaspdifsink_chain (GstPad *pad, GstData *_data)
       blank_frames =
         (sizeof blank / snd_pcm_frames_to_bytes (sink->pcm, 1)) / 2;
 
-      GST_DEBUG_OBJECT (sink, "playing %0.3fs silence (%d frames)",
-                        (double) (sink->cur_ts - next_write)
-                        / GST_SECOND, total_frames);
+      GST_DEBUG_OBJECT (sink, "playing %" GST_TIME_FORMAT
+          " silence (%d frames)",
+          GST_TIME_ARGS ((sink->cur_ts - next_write)), total_frames);
 
       snd_pcm_format_set_silence (SND_PCM_FORMAT_S16_LE, blank,
                                   blank_frames);
@@ -767,9 +785,8 @@ alsaspdifsink_chain (GstPad *pad, GstData *_data)
       }
     }
     else if (sink->cur_ts + MAX_SYNC_DIFF < next_write) {
-      GST_DEBUG_OBJECT (sink, "skipping buffer for %0.3fs",
-                        (double) (next_write - sink->cur_ts)
-                        / GST_SECOND);
+      GST_DEBUG_OBJECT (sink, "skipping buffer for %" GST_TIME_FORMAT,
+                        GST_TIME_ARGS ((next_write - sink->cur_ts)));
       goto end;
     }
   }
@@ -829,15 +846,15 @@ alsaspdifsink_change_state (GstElement *element)
       break;
   }
 
-  GST_INFO_OBJECT (element, "time before: %0.3fs",
-      (double) gst_element_get_time (element) / GST_SECOND);
+  GST_INFO_OBJECT (element, "time before: %" GST_TIME_FORMAT,
+      GST_TIME_ARGS (gst_element_get_time (element)));
 
   if (GST_ELEMENT_CLASS (parent_class)->change_state) {
     return GST_ELEMENT_CLASS (parent_class)->change_state (element);
   }
 
-  GST_INFO_OBJECT (element, "time after: %0.3fs",
-      (double) gst_element_get_time (element) / GST_SECOND);
+  GST_INFO_OBJECT (element, "time after: %" GST_TIME_FORMAT,
+      GST_TIME_ARGS (gst_element_get_time (element)));
 
   return GST_STATE_SUCCESS;
 }

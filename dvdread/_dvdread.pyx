@@ -137,6 +137,16 @@ SUBPICTURE_PHYS_TYPE_WIDESCREEN = 1
 SUBPICTURE_PHYS_TYPE_LETTERBOX = 2
 SUBPICTURE_PHYS_TYPE_PAN_SCAN = 3
 
+# Cell block modes.
+CELL_BLOCK_MODE_NORMAL = 0
+CELL_BLOCK_MODE_ANGLE_FIRST = 1
+CELL_BLOCK_MODE_ANGLE_MIDDLE = 2
+CELL_BLOCK_MODE_ANGLE_lAST = 3
+
+# Cell block types.
+CELL_BLOCK_TYPE_NORMAL = 0
+CELL_BLOCK_TYPE_ANGLE = 1
+
 
 cdef class Time
 cdef class Cell
@@ -254,6 +264,30 @@ cdef class Cell:
             
         self.cell = self.programChain.chain.cell_playback + (cellNr - 1);
         self.cellPos = self.programChain.chain.cell_position + (cellNr - 1);
+
+    property blockMode:
+        def __get__(self):
+            return self.cell.block_mode
+
+    property blockType:
+        def __get__(self):
+            return self.cell.block_type
+
+    property seamlessPlay:
+        def __get__(self):
+            return self.cell.seamless_play != 0
+
+    property interleaved:
+        def __get__(self):
+            return self.cell.interleaved != 0
+
+    property discontinuity:
+        def __get__(self):
+            return self.cell.stc_discontinuity != 0
+
+    property seamlessAngle:
+        def __get__(self):
+            return self.cell.seamless_angle != 0
 
     property playbackTime:
         def __get__(self):
@@ -1259,7 +1293,7 @@ cdef class NavPacket:
             return self.pci.hli.hl_gi.btn_ns
 
     def getButton(self, buttonNr):
-        if buttonNr < 1 or buttonNr > self.pci.hli.hl_gi.btn_ns:
+        if not 1 <= buttonNr <= self.pci.hli.hl_gi.btn_ns:
             raise IndexError, "button number out of range"
 
         return wrapButton(self, &(self.pci.hli.btnit[buttonNr - 1]))
@@ -1275,3 +1309,41 @@ cdef class NavPacket:
     property forcedActivate:
         def __get__(self):
             return self.pci.hli.hl_gi.foac_btnn
+
+    #
+    # Angles
+    #
+
+    def getNonSeamlessNextVOBU(self, angleNr):
+        if not 1 <= angleNr <= 9:
+            raise IndexError, "Angle number out of range"
+
+        return self.pci.nsml_agli.nsml_agl_dsta[angleNr - 1]
+
+    property seamlessFlags:
+        def __get__(self):
+            return self.dsi.sml_pbi.category
+
+    property seamlessEndInterleavedUnit:
+        def __get__(self):
+            return self.dsi.sml_pbi.ilvu_ea
+
+    property seamlessNextInterleavedUnit:
+        def __get__(self):
+            return self.dsi.sml_pbi.ilvu_sa
+
+    property seamlessInterlevedUnitSize:
+        def __get__(self):
+            return self.dsi.sml_pbi.size
+
+    def getSeamlessNextVOBU(self, angleNr):
+        if not 1 <= angleNr <= 9:
+            raise IndexError, "Angle number out of range"
+
+        return self.dsi.sml_agli.data[angleNr - 1].address
+
+    def getSeamlessNextSize(self, angleNr):
+        if not 1 <= angleNr <= 9:
+            raise IndexError, "Angle number out of range"
+
+        return self.dsi.sml_agli.data[angleNr - 1].size

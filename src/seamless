@@ -1,4 +1,4 @@
-#!/usr/bin/python2.3 -i
+#!/usr/bin/python2.4 -i
 
 import os
 import sys
@@ -7,12 +7,18 @@ import traceback
 
 import lirc
 
+import gobject
+try:
+    gobject.threads_init()
+except:
+    print "WARNING: gobject doesn't have threads_init, no threadsafety"
+
 import gst
 
 from dvdplayer import *
 
 #scheduler_factory_set_default_name ('fairpth')
-#scheduler_factory_set_default_name ('fairgthread')
+scheduler_factory_set_default_name ('fairgthread')
 
 def remote():
     global player

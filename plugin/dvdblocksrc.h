@@ -78,6 +78,9 @@ struct _DVDBlockSrc {
   dvd_file_t *file;	/* The current DVD file object. */
 
   GstPad *src;		/* The source pad. */
+
+  GAsyncQueue *event_queue;
+  			/* Queue of pending events. */
 };
 
 
@@ -85,8 +88,9 @@ struct _DVDBlockSrcClass {
   GstElementClass parent_class;
 
   /* Signals */
-  void (*vobu_read)		(DVDBlockSrc *src);
-  void (*vobu_header)		(DVDBlockSrc *src, GstBuffer *header);
+  void (*vobu_read)		(DVDBlockSrc * src);
+  void (*vobu_header)		(DVDBlockSrc * src, GstBuffer * header);
+  void (*queue_event)		(DVDBlockSrc * src, GstEvent * event);
 };
 
 

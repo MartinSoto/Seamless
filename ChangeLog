@@ -1,3 +1,28 @@
+2004-11-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* machine/machine.py: 
+	Started support for angles (not complete). Event handling fixed to
+	work with the fair scheduler (events can only be sent while
+	handling dvdblocksrc's signals).
+	* plugin/alsaspdifsink.c (alsaspdifsink_handle_event): 
+	Deactivate clock during still frames and activate it again after
+	flush.
+	* plugin/dvdblocksrc.c: 
+	* plugin/dvdblocksrc.h: 
+	Added support for an event queue stored in the component.
+	* dvdread/nav_types.pyx: 
+	* dvdread/_dvdread.pyx:
+	Added support for cell properties.
+	* src/dvdplayer.py: Adapted to work with standard
+	components. Dependency on the DXR3 card lifted.
+	* src/seamless: Use python2.4. Added explicit gobject import.
+
+2004-08-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* dvdread/_dvdread.pyx (NavPacket): Added properties and functions
+	to access angle information.
+	(Cell): Added missing properties.
+
 2004-08-04  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* plugin/alsaspdifsink.c (alsaspdifsink_alsa_open): Set avail_min

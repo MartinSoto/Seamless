@@ -158,6 +158,20 @@ class PlaybackLocation(object):
 
         self.jump(self.programChain.getCell(cellNr))
 
+        cell = self.programChain.getCell(cellNr)
+
+        print >> sys.stderr, "New cell %d, command_nr %d, block_mode %d, bloc_type %d" \
+              % (cellNr, cell.commandNr, cell.blockMode, cell.blockType),
+        if cell.seamlessPlay:
+            print >> sys.stderr, ", seamless play",
+        if cell.interleaved:
+            print >> sys.stderr, ", interleaved",
+        if cell.discontinuity:
+            print >> sys.stderr, ", discontinuity",
+        if cell.seamlessAngle:
+            print >> sys.stderr, ", seamless angle",
+        print >> sys.stderr
+
     def advanceSector(self, relSector):
         """Advance the current sector to the given relative postion."""
 
@@ -204,12 +218,59 @@ class PlaybackLocation(object):
     def setNav(self, nav):
         """Set the current navigation packet.
 
-        The location uses the navigation packet to tell the location
-        of the next VOBU."""
+        The location object uses this packet packet to determine the
+        physical position of the next VOBU."""
 
         self.nav = nav
 
         self.cellCurrentTime = nav.cellElapsedTime.seconds
+
+        flags = nav.seamlessFlags
+        if flags & 0xc000:
+            if flags & 0x2000:
+                print >> sys.stderr, 'Start Unit'
+
+            if flags & 0x8000:
+                print >> sys.stderr, ' PreU sequence: 0x%x' % self.lastSectorNr
+            else:
+                print >> sys.stderr, ' Interleaved block: 0x%x' % \
+                      self.lastSectorNr
+
+            print >> sys.stderr, \
+                  '  Next VOBU: 0x%x' % \
+                  (self.lastSectorNr + nav.nextVOBU)
+            print >> sys.stderr, \
+                  '  Next Video VOBU: 0x%x' % \
+                  (self.lastSectorNr + nav.nextVideoVOBU)
+            print >> sys.stderr, \
+                  '  End interleaved: 0x%x' % \
+                  (self.lastSectorNr + nav.seamlessEndInterleavedUnit)
+            print >> sys.stderr, \
+                  '  Next interleaved: 0x%x' % \
+                  (self.lastSectorNr + nav.seamlessNextInterleavedUnit)
+            print >> sys.stderr, \
+                  '  Interleaved size: 0x%x' % nav.seamlessInterlevedUnitSize
+
+            for angle in range(1, 10):
+                nextVOBU = nav.getNonSeamlessNextVOBU(angle)
+                if nextVOBU != nav.getNonSeamlessNextVOBU(angle):
+                    print >> sys.stderr, \
+                          '  Non-seamless angle %d next VOBU: 0x%x' % \
+                          (angle,
+                           self.lastSectorNr + nextVOBU)
+                nextVOBU = nav.getSeamlessNextVOBU(angle)
+                if nextVOBU != 0:
+                    print >> sys.stderr, \
+                          '  Seamless angle %d next VOBU: 0x%x' % \
+                          (angle, self.lastSectorNr + nextVOBU)
+                    print >> sys.stderr, \
+                          '  Seamless angle %d ILVU size: 0x%x' % \
+                          (angle,
+                           self.lastSectorNr + nav.getSeamlessNextSize(angle))
+
+            if flags & 0x1000:
+                print >> sys.stderr, 'End Unit'
+                print >> sys.stderr
 
 
     #
@@ -252,6 +313,9 @@ class PlaybackLocation(object):
             if self.stillEnd != 0 and time.time() >= self.stillEnd:
                 # Still time is over.
                 self.stillEnd = None
+
+                # Flush the pipeline to clean up the still frame.
+                self.machine.flushEvent()
 
                 # Progress to the next cell at this point, waiting for
                 # the next iteration will restart the still frame.
@@ -514,7 +578,7 @@ class VirtualMachine(CommandPerformer):
     vobuHeader = synchronized(vobuHeader)
 
     def flushSource(self):
-        """Stop the source on its tracks."""
+        """Stop the source element on its tracks."""
 
         self.src.set_property('block-count', 0)
 
@@ -540,20 +604,23 @@ class VirtualMachine(CommandPerformer):
         st = Structure('application/x-gst-dvd');
         st.set_value('event', 'dvd-spu-still-frame')
         self.queueEvent(event_new_any(st))
+        print >> sys.stderr, 'Still frame set'
 
     def audioEvent(self):
-        st = Structure('application/x-gst-dvd');
-        st.set_value('event', 'dvd-audio-stream-change')
-        st.set_value('physical', self.audioPhys)
+        st = structure_from_string(
+          'application/x-gst-dvd,'
+            'event = (string) "dvd-audio-stream-change",'
+            'physical = (int) %d;' % self.audioPhys)
         self.queueEvent(event_new_any(st))
-        #print >> sys.stderr, 'New audio:', self.audioPhys
+        print >> sys.stderr, 'New audio:', self.audioPhys
 
     def subpictureEvent(self):
-        st = Structure('application/x-gst-dvd');
-        st.set_value('event', 'dvd-spu-stream-change')
-        st.set_value('physical', self.subpicturePhys)
+        st = structure_from_string(
+          'application/x-gst-dvd,'
+            'event = (string) "dvd-spu-stream-change",'
+            'physical = (int) %d;' % self.subpicturePhys)
         self.queueEvent(event_new_any(st))
-        #print >> sys.stderr, 'New subpicture:', self.subpicturePhys
+        print >> sys.stderr, 'New subpicture:', self.subpicturePhys
 
     def subpictureCLUTEvent(self):
         st = Structure('application/x-gst-dvd');
@@ -561,7 +628,6 @@ class VirtualMachine(CommandPerformer):
 
         # Each value is stored in a separate field.
         for i in range(16):
-
             st.set_value('clut%02d' % i,
                          self.highlightProgramChain.getCLUTEntry(i + 1))
 
@@ -584,10 +650,6 @@ class VirtualMachine(CommandPerformer):
             st = Structure('application/x-gst-dvd')
             st.set_value('event', 'dvd-spu-reset-highlight')
 
-        # Send the event inmediatly for better interactive response,
-        # but put a delayed version in the queue for situations where
-        # a flush is involved.
-        self.src.get_pad('src').push(event_new_any(st))
         self.queueEvent(event_new_any(st))
 
     def updatePipeline(self):

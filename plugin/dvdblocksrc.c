@@ -1,5 +1,5 @@
 /* GStreamer
- * Copyright (C) 2003 Martin Soto <martinsoto@users.sourceforge.net>
+ * Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
  *
  * dvdblocksrc.c: Block based DVD reading element.
  *
@@ -48,6 +48,7 @@ static GstElementDetails dvdblocksrc_details = {
 enum {
   VOBU_READ_SIGNAL,
   VOBU_HEADER_SIGNAL,
+  QUEUE_EVENT_SIGNAL,
   LAST_SIGNAL,
 };
 
@@ -108,6 +109,9 @@ static void
 dvdblocksrc_open_file (DVDBlockSrc *src);
 static void
 dvdblocksrc_close_file (DVDBlockSrc *src);
+
+static void
+dvdblocksrc_queue_event (DVDBlockSrc * src, GstEvent * event);
 
 
 static GstElementClass *parent_class = NULL;
@@ -171,7 +175,8 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
         G_STRUCT_OFFSET (DVDBlockSrcClass, vobu_read),
         NULL, NULL,
         g_cclosure_marshal_VOID__VOID,
-        G_TYPE_NONE, 0);
+        G_TYPE_NONE,
+        0);
   dvdblocksrc_signals[VOBU_HEADER_SIGNAL] =
     g_signal_new ("vobu-header",
         G_TYPE_FROM_CLASS (klass),
@@ -179,7 +184,17 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
         G_STRUCT_OFFSET (DVDBlockSrcClass, vobu_header),
         NULL, NULL,
         gst_marshal_VOID__POINTER,
-        G_TYPE_NONE, 1, GST_TYPE_BUFFER);
+        G_TYPE_NONE,
+        1, GST_TYPE_BUFFER);
+  dvdblocksrc_signals[QUEUE_EVENT_SIGNAL] =
+    g_signal_new ("queue-event",
+        G_TYPE_FROM_CLASS (klass),
+        G_SIGNAL_ACTION,
+        G_STRUCT_OFFSET (DVDBlockSrcClass, queue_event),
+        NULL, NULL,
+        gst_marshal_VOID__POINTER,
+        G_TYPE_NONE,
+        1, GST_TYPE_EVENT);
 
   g_object_class_install_property (gobject_class, ARG_LOCATION,
       g_param_spec_string ("location", "location",
@@ -209,6 +224,8 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
   gobject_class->finalize = dvdblocksrc_finalize;
 
   gstelement_class->change_state = dvdblocksrc_change_state;
+
+  klass->queue_event = dvdblocksrc_queue_event;
 }
 
 
@@ -237,6 +254,8 @@ dvdblocksrc_init (DVDBlockSrc *src)
 
   src->reader = NULL;
   src->file = NULL;
+
+  src->event_queue = g_async_queue_new ();
 }
 
 
@@ -363,6 +382,14 @@ dvdblocksrc_loop (GstElement *element)
   DVDBlockSrc *src = DVDBLOCKSRC(element);
   GstBuffer *buf;
   int block_count;
+  GstEvent *event;
+
+  /* Send any queued events. */
+  event = g_async_queue_try_pop (src->event_queue);
+  while (event) {
+    gst_pad_push (src->src, GST_DATA (event));
+    event = g_async_queue_try_pop (src->event_queue);
+  }
 
   if (src->block_count == 0 && src->vobu_start == -1) {
     /* No more work to do. */
@@ -545,4 +572,11 @@ dvdblocksrc_close_file (DVDBlockSrc *src)
   src->file = NULL;
   src->open_title_num = -1;
   src->open_domain = -1;
+}
+
+
+static void
+dvdblocksrc_queue_event (DVDBlockSrc * src, GstEvent * event)
+{
+  g_async_queue_push (src->event_queue, event);
 }

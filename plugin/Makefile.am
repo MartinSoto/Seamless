@@ -7,7 +7,7 @@ libseamlesselements_la_SOURCES = plugininit.c ac3iec.c \
 libseamlesselements_la_CFLAGS = $(GLIB_CFLAGS) $(GST_CFLAGS) \
     $(GSTLIBS_CFLAGS) $(EXTRA_CFLAGS) $(DVDREAD_CFLAGS) $(ALSA_CFLAGS)
 libseamlesselements_la_LIBADD = $(GLIB_LIBS) $(GST_LIBS) $(GSTLIBS_LIBS) \
-    $(DVDREAD_LIBS) $(ALSA_LIBS)
+    $(DVDREAD_LIBS) $(ALSA_LIBS) ../../gst-plugins/gst-libs/gst/audio/libgstaudio.la
 
 noinst_HEADERS = ac3_padder.h ac3iec.h 
 
