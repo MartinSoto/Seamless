@@ -1,3 +1,8 @@
+2005-02-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/seamless.py: Don't select a python version number in the #!
+	start line. This is only used for testing anyway.
+
 2005-02-06  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py: Document the command execution functions
