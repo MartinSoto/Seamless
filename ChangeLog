@@ -1,3 +1,46 @@
+2004-11-20  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/dvdplayer.py: Added copyright notice.
+	(DVDPlayer.__init__): Changed default audio sink to alsasink.
+
+	* config/seamless.tmpl:
+	* config/config.py.tmpl:
+	* src/machine/perform.py:
+	* src/machine/machine.py:
+	* src/machine/__init__.py:
+	* src/machine/disassemble.py:
+	* src/dvdread/__init__.py:
+	* src/dvdread/_dvdread.pyx:
+	* src/config/__init__.py:
+	* src/xscreensaver.py:
+	* src/videowidget.py:
+	* src/seamless.py:
+	* src/mainui.py:
+	* src/lirc.py:
+	Added copyright notice.
+
+	* src/dvdread/nav_types.pyx:
+	* src/dvdread/ifo_types.pyx:
+	* gst-plugins/iec958/ac3_padder.h:
+	* gst-plugins/iec958/ac3_padder.c:
+	* gst-plugins/dvdblock/dvdblocksrc.c:
+	* gst-plugins/dvdblock/dvdblocksrc.h:
+	* gst-plugins/alsaspdif/alsaspdifsink.h:
+	* gst-plugins/alsaspdif/alsaspdifsink.c:
+	Update copyright notices.
+
+	* gst-plugins/iec958/ac3iec.c:
+	* gst-plugins/capspipe/capspipeinit.c:
+	Change license to LGPL.
+
+	* acinclude.m4: Added to repository.
+
+2004-11-17  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* General: Building system completed.
+	* src/loadplugins.py (pluginList): Automatic dynamic plugin
+	loaded. Some gst-plugins copied for convenience.
+
 2004-11-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* machine/machine.py: 

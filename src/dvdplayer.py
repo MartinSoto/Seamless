@@ -1,12 +1,33 @@
-import gobject
-try:
-    gobject.threads_init()
-except:
-    print "WARNING: gobject doesn't have threads_init, no threadsafety"
+# Seamless DVD Player
+# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 2 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+# USA
 
+import time
+
+import gobject
+
+import gst
+import gst.interfaces
+
+# FIXME: get rid of this
 from gst import *
 
-import plugin
+# Load private GStreamer plugins.
+import loadplugins
 
 from machine import *
 
@@ -25,7 +46,7 @@ class DVDPlayer(Thread):
     """
     """
 
-    def __init__(self, name, location="/dev/dvd"):
+    def __init__(self, name="player", location="/dev/dvd"):
         Thread.__init__(self, name)
 
         # Create an info object for the DVD.
@@ -33,18 +54,20 @@ class DVDPlayer(Thread):
 
         # Build the pipeline.
 
+        #timeout = "timeout=10000000"
+        timeout = ""
         self.dvdSrc = parse_launch("""
         (
           dvdblocksrc name=dvdblocksrc !
-            dvddemux name=dvddemux .current_video !
+            seamless-dvddemux name=dvddemux .current_video !
             mpeg2dec name=mpeg2dec !
-            queue name=video block-timeout=10000000
+            queue name=video %s
           dvddemux.current_subpicture !
-            queue name=subtitle block-timeout=10000000
+            queue name=subtitle %s
           dvddemux.current_audio !
             queue name=audio max-size-buffers=50
         )
-        """)
+        """ % (timeout, timeout))
         ghostify(self.dvdSrc, 'video', 'src', 'video')
         ghostify(self.dvdSrc, 'subtitle', 'src', 'subtitle')
         ghostify(self.dvdSrc, 'audio', 'src', 'audio')
@@ -69,11 +92,21 @@ class DVDPlayer(Thread):
         #    """)
         self.videoSink = parse_launch("""
         {
-         mpeg2subt name=mpeg2subt !
+          seamless-mpeg2subt name=mpeg2subt !
             identity name=videoident !
-            xvimagesink name=videosink brightness=50 hue=1000
+            xvimagesink name=videosink brightness=40 hue=1000
         }
         """)
+        # For 16:9:  pixel-aspect-ratio=4/3
+#         self.videoSink = parse_launch("""
+#         {
+#           mpeg2subt name=mpeg2subt !
+#             identity name=videoident !
+#             ffcolorspace !
+#             videoscale !
+#             ximagesink name=videosink
+#         }
+#         """)
         ghostify(self.videoSink, 'mpeg2subt', 'video')
         ghostify(self.videoSink, 'mpeg2subt', 'subtitle')
         self.videoSinkElem = self.videoSink.get_by_name('videosink')
@@ -90,14 +123,22 @@ class DVDPlayer(Thread):
         #self.audioSink = sinkFromSpec("""
         #  { queue name=queue ! filesink location=audio.out }
         #  """)
+        #self.audioSink = parse_launch("""
+        #{
+        #  ac3iec958 name=ac3iec958 !
+        #    identity name=audioident !
+        #    alsaspdifsink name=audiosink
+        #}
+        #""")
+        #ghostify(self.audioSink, 'ac3iec958', 'sink', 'audio')
         self.audioSink = parse_launch("""
         {
-          ac3iec958 name=ac3iec958 !
+          a52dec name=a52dec !
             identity name=audioident !
-            alsaspdifsink name=audiosink
+            alsasink name=audiosink
         }
         """)
-        ghostify(self.audioSink, 'ac3iec958', 'sink', 'audio')
+        ghostify(self.audioSink, 'a52dec', 'sink', 'audio')
         self.audioSinkElem = self.audioSink.get_by_name('audiosink')
         self.audioIdent = self.audioSink.get_by_name('audioident')
         self.add(self.audioSink)
@@ -119,9 +160,12 @@ class DVDPlayer(Thread):
         #self.audioIdent.connect('handoff', self.identHandoff)
 
 
-    def identHandoff(self, object, buffer):
-        #print object.get_name()
-        pass
+    def identHandoff(self, elem, *args):
+        print "Handoff: %s" % elem.get_name()
+        #pass
+
+    def getVideoSink(self):
+        return self.videoSinkElem
 
 
     #
@@ -138,6 +182,10 @@ class DVDPlayer(Thread):
     def stop(self):
         self.machine.stop()
         self.set_state(STATE_NULL)
+
+        # Wait for the pipeline to actually stop.
+        while self.get_state() != gst.STATE_NULL:
+            time.sleep(0,1)
 
 
     def backward10(self):

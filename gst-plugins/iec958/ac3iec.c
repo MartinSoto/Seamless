@@ -392,6 +392,6 @@ GST_PLUGIN_DEFINE (
   "Conversion elements to the iec958 SP/DIF format",
   plugin_init,
   VERSION,
-  "GPL",
+  "LGPL",
   PACKAGE,
   "http://seamless.sourceforge.net");

@@ -51,7 +51,7 @@ GST_PLUGIN_DEFINE (
   "Route buffers based on capabilities",
   plugin_init,
   VERSION,
-  "GPL",
+  "LGPL",
   PACKAGE,
   "http://seamless.sourceforge.net"
 )

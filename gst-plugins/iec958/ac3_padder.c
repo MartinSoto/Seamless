@@ -1,5 +1,5 @@
 /* GStreamer
- * Copyright (C) 2003 Martin Soto <martinsoto@users.sourceforge.net>
+ * Copyright (C) 2003, 2004 Martin Soto <martinsoto@users.sourceforge.net>
  *
  * ac3_padder.c: Pad AC3 frames for use with an SPDIF interface.
  *

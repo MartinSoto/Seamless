@@ -16,13 +16,18 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-# Check if we have a libtool compilation directory and add it to the
-# path.  This is necessary to be able to run directly from the
-# development directory.
-import sys, os
-libtool_dir = os.path.join(__path__[0], '.libs')
-if os.path.exists(libtool_dir):
-   sys.path.append(libtool_dir)
-del sys, os, libtool_dir
+# This package is used only to configure Seamless to work localy
+# without requiring an installation. Installed version of Seamless
+# use a generated config.py file.
 
-from _dvdread import *
+import os
+import sys
+
+# The suffix for plugin files.
+pluginSuffix = '.so'
+
+# The base source directory.
+base = os.path.split(os.path.split(__path__[0])[0])[0]
+
+# The directory containing the GStreamer plugins.
+gstPlugins = os.path.join(base, 'gst-plugins')
