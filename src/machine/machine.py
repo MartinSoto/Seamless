@@ -196,7 +196,7 @@ class PlaybackLocation(object):
         print >> sys.stderr
 
     def advanceSector(self, relSector):
-        """Advance the current sector to the given relative postion."""
+        """Advance the current sector to the given relative position."""
 
         self.sectorNr = self.lastSectorNr + relSector
         self.lastSectorNr = None
@@ -513,7 +513,7 @@ class VirtualMachine(CommandPerformer):
         self.parentalCountry = 'us'
         self.parentalLevel = 15 # None
 
-        # Prefered display aspect ratio
+        # Preferred display aspect ratio
         self.aspectRatio = ASPECT_RATIO_16_9
 
         # Current video mode.
@@ -551,6 +551,9 @@ class VirtualMachine(CommandPerformer):
     #
 
     def vobuRead(self, src):
+        """Invoked by the source element after reading a complete
+        VOBU."""
+
         self.lock.acquire()
         
         try:
@@ -588,6 +591,9 @@ class VirtualMachine(CommandPerformer):
             time.sleep(0.1)
 
     def vobuHeader(self, src, buffer):
+        """Invoked by the source element when it finds a VOBU
+        header."""
+
         nav = NavPacket(buffer.get_data())
 
         self.location.setNav(nav)
@@ -755,6 +761,11 @@ class VirtualMachine(CommandPerformer):
     #
 
     def getLangUnit(self, container):
+        """Retrieve a language unit from 'container' based on the
+        preferred language set for this object.
+        
+        If there's no corresponding language unit, language unit
+        number 1 will be used instead."""
         unit = container.getLangUnit(self.prefMenuLang)
         if unit == None:
             unit = container.getLangUnit(1)
@@ -936,79 +947,116 @@ class VirtualMachine(CommandPerformer):
     #
 
     def nop(self):
+        """No operation."""
         pass
 
     def goto(self, commandNr):
+        """Go to command 'commandNr' in the current command block."""
         self.location.commandNr = commandNr
 
     def brk(self):
+        """Terminate executing (break from) the current command block."""
         # 'Go to' an inexistent command. The location will do the rest.
         self.location.commandNr = self.location.commands.count + 1
 
     def exit(self):
+        """End execution of the machine."""
         # FIXME
         print >> sys.stderr, "Machine exited"
 
     def openSetParentalLevel(self, cmd):
+        """Try to set parental level.
+
+        If successful, jump to the specified command."""
         print >> sys.stderr, "Set parental level tried, implement me!"
         return TRUE
 
     def linkTopCell(self):
+        """Jump to beginning of the current cell."""
         self.location.jumpToUnit(self.location.cell)
 
     def linkNextCell(self):
+        """Jump to the beginning of the next cell."""
         self.location.jumpToUnit(self.location.programChain. \
                                  getCell(self.location.cell.cellNr + 1))
 
     def linkPrevCell(self):
+        """Jump to the beginning of the previous cell."""
         self.location.jumpToUnit(self.location.programChain. \
                                  getCell(self.location.cell.cellNr - 1))
 
     def linkTopProgram(self):
+        """Jump to the beginning of the current program. Programs are
+        a logical subdivision of program chains. A program is
+        characterized by its start cell number."""
         programNr = self.location.cell.programNr
         self.location.jumpToUnit(self.location.programChain. \
                                  getProgramCell(programNr))
 
     def linkNextProgram(self):
+        """Jump to the beginning of the next program. Programs are a
+        logical subdivision of program chains. A program is
+        characterized by its start cell number."""
         programNr = self.location.cell.programNr
         self.location.jumpToUnit(self.location.programChain. \
                                  getProgramCell(programNr + 1))
 
     def linkPrevProgram(self):
+        """Jump the beginning of the previous program. Programs are a
+        logical subdivision of program chains. A program is
+        characterized by its start cell number."""
         programNr = self.location.cell.programNr
         self.location.jumpToUnit(self.location.programChain. \
                                  getProgramCell(programNr - 1))
 
     def linkTopProgramChain(self):
+        """Jump to the beginning of the current program chain."""
         self.location.jumpToUnit(self.location.programChain)
 
     def linkNextProgramChain(self):
+        """Jump to the beginning of the next program chain."""
         self.location.jumpToUnit(self.location.programChain.nextProgramChain)
 
     def linkPrevProgramChain(self):
+        """Jump to the beginning of the previous program chain."""
         self.location.jumpToUnit(self.location.programChain.prevProgramChain)
 
     def linkGoUpProgramChain(self):
+        """Jump to the 'up' program chain. The 'up' program chain is
+        explicitly referenced from a given program chain."""
         self.location.jumpToUnit(self.location.programChain.goUpProgramChain)
 
     def linkTailProgramChain(self):
+        """Jump to the end command block of the current program chain."""
         self.location.setCommand(COMMAND_POST)
 
     def linkProgramChain(self, programChainNr):
+        """Jump to the program chain identified by 'programChainNr' in
+        the container of the current program chain. Containers for
+        program chains are either language units and video title sets."""
         self.location.jumpToUnit(self.location.programChain.container. \
                                  getProgramChain(programChainNr))
 
     def linkChapter(self, chapterNr):
+        """Jump to the specified chapter in the current video title
+        set. Chapters are a logical subdivision of video title
+        sets. Each chapter is characterized by the program chain and
+        program where it starts."""
         self.location.jumpToUnit(self.location.title.getChapter(chapterNr))
 
     def linkProgram(self, programNr):
+        """Jump to the specified program in the current program
+        cell. Programs are a logical subdivision of program chains. A
+        program is characterized by its start cell number."""
         self.location.jumpToUnit(self.location.programChain. \
                                  getProgramCell(programNr))
 
     def linkCell(self, cellNr):
+        """Jump to the specified cell in the current program chain."""
         self.location.jumpToUnit(self.location.programChain.getCell(cellNr))
 
     def selectButton(self, buttonNr):
+        """Select the specified button in the current menu."""
         if not 0 <= buttonNr <= 36:
             raise MachineException, "Button number out of range"
 
@@ -1016,27 +1064,54 @@ class VirtualMachine(CommandPerformer):
         self.updatePipeline()
 
     def setSystemParam8(self, value):
+        """Select the button specified by the 6 most significant bits
+        of the 16 value 'value'."""
         self.selectButton(value >> 10)
 
     def jumpToTitle(self, titleNr):
+        """Jump to the first chapter of the specified title. The title
+        number is provided with respect to the video manager, i.e. is
+        global the whole disk."""
         self.location.jumpToUnit(self.info.videoManager.getVideoTitle(titleNr))
 
     def jumpToTitleInSet(self, titleNr):
+        """Jump to the first chapter of the specified title. The title
+        number is provided with respect to the current video title
+        set."""
         self.location.jumpToUnit(self.location.title.videoTitleSet. \
                                  getVideoTitle(titleNr))
 
     def jumpToChapterInSet(self, titleNr, chapterNr):
+        """Jump to the specified chapter in the specified title. The
+        title number is provided with respect to the current video
+        title set."""
         self.location.jumpToUnit(self.location.title.videoTitleSet. \
                                  getVideoTitle(titleNr).getChapter(chapterNr))
 
     def jumpToFirstPlay(self):
+        """Jump to the first play program chain. The first play
+        program chain is a special program chain in the disk that is
+        intended to be the first element played in that disk when
+        playback starts."""
         self.location.jumpToUnit(self.info.videoManager.firstPlay)
 
     def jumpToTitleMenu(self):
+        """Jump to the title menu. The title menu is a menu allowing
+        to select one of the available titles in a disk. Not all disks
+        offer a title menu."""
         langUnit = self.getLangUnit(self.info.videoManager)
         self.location.jumpToUnit(langUnit.getMenuProgramChain(MENU_TYPE_TITLE))
 
     def jumpToMenu(self, titleSetNr, titleNr, menuType):
+        """Jump to menu 'menuType' in title 'titleNr' of video title
+        set 'titleSetNr'. Specifying 0 as 'titleSetNr' chooses the
+        video manager, i.e. the title number will be used to select a
+        title from the video manager.
+
+        The menu type is one of dvdread.MENU_TYPE_TITLE,
+        dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
+        dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
+        dvdread.MENU_TYPE_CHAPTER."""
         # Get the title set. Title set 0 is the video manager.
         if titleSetNr == 0:
             titleSet = self.info.videoManager
@@ -1048,46 +1123,75 @@ class VirtualMachine(CommandPerformer):
         title = titleSet.getVideoTitle(titleNr)
         self.location.jumpToUnit(title)
         
-        # Now jump to the actual program chain corresponding to the menu..
+        # Now jump to the actual program chain corresponding to the menu.
         langUnit = self.getLangUnit(title.videoTitleSet)
         self.location.jumpToUnit(langUnit.getMenuProgramChain(menuType))
 
     def jumpToManagerProgramChain(self, programChainNr):
+        """Jump to the specified program chain in the video
+        manager. Program chains directly associated to the video
+        manager are only for menus."""
         langUnit = self.getLangUnit(self.info.videoManager)
         self.location.jumpToUnit(langUnit.getProgramChain(programChainNr))
 
     def setTimedJump(self, programChainNr, seconds):
+        """Sets the special purpose registers (SPRMs) 10 and 9 with
+        'programChainNr' and 'seconds', respectively. SPRM 9 will be
+        set with a time value in seconds and the machine decreases its
+        value automatically every second. When the value reaches 0, an
+        automatic jump to the video manager program chain stored in
+        register 10 will happen."""
         print >> sys.stderr, "Timed jump, implement me!"
 
     def saveLocation(self, rtn=0):
-        """Save the current location in the resume location.
-
-        If rtn is not zero, it specifies the cell number to return to
-        when the saved state is resumed."""
-
+        """Save the current location in the resume location. If 'rtn'
+        is not zero, it specifies the cell number to return to when
+        the saved state is resumed."""
         if rtn != 0:
             self.linkCell(rtn)
         self.resumeLocation = copy.copy(self.location)
 
     def callFirstPlay(self, rtn=0):
+        """Save the current location and jump to the first play
+        program chain. The first play program chain is a special
+        program chain in the disk that is intended to be the first
+        element played in that disk when playback starts. If 'rtn' is
+        not zero, it specifies the cell number to return to when the
+        saved state is resumed."""
         self.saveLocation(rtn)
         self.jumpToFirstPlay()
 
     def callTitleMenu(self, rtn=0):
+        """Save the current location and jump to the title menu. The
+        title menu is a menu allowing to select one of the available
+        titles in a disk. Not all disks offer a title menu. If 'rtn' is
+        not zero, it specifies the cell number to return to when the
+        saved state is resumed."""
         self.saveLocation(rtn)
         self.jumpToTitleMenu()
 
     def callMenu(self, menuType, rtn=0):
+        """Save the current location and jump to the menu of the
+        specified type in the current title.
+
+        The menu type is one of dvdread.MENU_TYPE_TITLE,
+        dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
+        dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
+        dvdread.MENU_TYPE_CHAPTER."""
         self.saveLocation(rtn)
         titleSetNr = self.location.title.videoTitleSet.titleSetNr
         titleNr = self.location.title.titleNr
         self.jumpToMenu(titleSetNr, titleNr, menuType)
 
     def callManagerProgramChain(self, programChainNr, rtn=0):
+        """Save the current location and jump to the specified program
+        chain in the video manager. Program chains directly associated
+        to the video manager are only for menus."""
         self.saveLocation(rtn)
         self.jumpToManagerProgramChain(programChainNr)
 
     def resume(self):
+        """Resume playback at the previously saved location."""
         if self.resumeLocation == None:
             raise PlayerException, "Attempt to resume with no resume info"
 
@@ -1099,19 +1203,23 @@ class VirtualMachine(CommandPerformer):
         self.updatePipeline()
 
     def setAngle(self, angle):
+        """Set the current angle to the specified angle number."""
         if self.angle != angle:
             self.angle = angle
 
     def setAudio(self, audio):
+        """Set the current audio stream as specified."""
         if self.audio != audio:
             self.audio = audio
 
     def setSubpicture(self, subpicture):
+        """Set the current subpicture stream as specified."""
         if self.subpicture != subpicture:
             self.subpicture = subpicture
 
     def setKaraokeMode(self, mode):
-        print >> sys.stderr, "Attemp to set karaoke mode, implement me!"
+        """Set the karaoke mode."""
+        print >> sys.stderr, "Attempt to set karaoke mode, implement me!"
 
 
     def performCommand(self, cmd):

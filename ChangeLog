@@ -1,3 +1,8 @@
+2005-02-06  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py: Document the command execution functions
+	in preparation for the split-up of the machine.
+
 2005-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/dvdplayer.py (DVDPlayer.__init__): Use seamless-queue instead
