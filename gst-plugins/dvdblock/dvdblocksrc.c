@@ -33,7 +33,7 @@ GST_DEBUG_CATEGORY_STATIC (dvdblocksrc_debug);
 #define DVDBLOCKSRC_BLOCK_SIZE 2048
 
 /* Number of 2048 byte blocks in the read buffer. */
-#define DVDBLOCKSRC_MAX_BUF_SIZE 16
+#define DVDBLOCKSRC_MAX_BUF_SIZE 1
 
 
 /* ElementFactory information. */
@@ -50,6 +50,7 @@ enum {
   VOBU_READ_SIGNAL,
   VOBU_HEADER_SIGNAL,
   QUEUE_EVENT_SIGNAL,
+  PUSH_EVENT_SIGNAL,
   LAST_SIGNAL,
 };
 
@@ -111,6 +112,8 @@ dvdblocksrc_open_file (DVDBlockSrc *src);
 static void
 dvdblocksrc_close_file (DVDBlockSrc *src);
 
+static void
+dvdblocksrc_push_event (DVDBlockSrc * src, GstEvent * event);
 static void
 dvdblocksrc_queue_event (DVDBlockSrc * src, GstEvent * event);
 
@@ -184,16 +187,25 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
         G_SIGNAL_RUN_LAST,
         G_STRUCT_OFFSET (DVDBlockSrcClass, vobu_header),
         NULL, NULL,
-        gst_marshal_VOID__POINTER,
+        gst_marshal_VOID__BOXED,
         G_TYPE_NONE,
         1, GST_TYPE_BUFFER);
   dvdblocksrc_signals[QUEUE_EVENT_SIGNAL] =
     g_signal_new ("queue-event",
         G_TYPE_FROM_CLASS (klass),
-        G_SIGNAL_ACTION,
+        G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
         G_STRUCT_OFFSET (DVDBlockSrcClass, queue_event),
         NULL, NULL,
-        gst_marshal_VOID__POINTER,
+        gst_marshal_VOID__BOXED,
+        G_TYPE_NONE,
+        1, GST_TYPE_EVENT);
+  dvdblocksrc_signals[PUSH_EVENT_SIGNAL] =
+    g_signal_new ("push-event",
+        G_TYPE_FROM_CLASS (klass),
+        G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+        G_STRUCT_OFFSET (DVDBlockSrcClass, push_event),
+        NULL, NULL,
+        gst_marshal_VOID__BOXED,
         G_TYPE_NONE,
         1, GST_TYPE_EVENT);
 
@@ -227,6 +239,7 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
   gstelement_class->change_state = dvdblocksrc_change_state;
 
   klass->queue_event = dvdblocksrc_queue_event;
+  klass->push_event = dvdblocksrc_push_event;
 }
 
 
@@ -577,8 +590,21 @@ dvdblocksrc_close_file (DVDBlockSrc *src)
 
 
 static void
+dvdblocksrc_push_event (DVDBlockSrc * src, GstEvent * event)
+{
+  /* Hack: gst-python should do this somehow. */
+  gst_event_ref (event);
+
+  gst_pad_push (src->src, GST_DATA (event));
+}
+
+
+static void
 dvdblocksrc_queue_event (DVDBlockSrc * src, GstEvent * event)
 {
+  /* Hack: gst-python should do this somehow. */
+  gst_event_ref (event);
+
   g_async_queue_push (src->event_queue, event);
 }
 

@@ -88,6 +88,7 @@ struct _DVDBlockSrcClass {
   /* Signals */
   void (*vobu_read)		(DVDBlockSrc * src);
   void (*vobu_header)		(DVDBlockSrc * src, GstBuffer * header);
+  void (*push_event)		(DVDBlockSrc * src, GstEvent * event);
   void (*queue_event)		(DVDBlockSrc * src, GstEvent * event);
 };
 

@@ -1088,7 +1088,7 @@ plugin_init (GstPlugin * plugin)
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    "mpeg2sub",
+    "seamless-mpeg2sub",
     "MPEG-2 video subtitle parser",
     plugin_init, VERSION, "LGPL",
     PACKAGE " (temporary fork from gst-plugins)",

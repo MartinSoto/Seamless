@@ -574,9 +574,9 @@ class VirtualMachine(CommandPerformer):
             if isinstance(event, EosEvent):
                 # Time to stop the pipeline.
                 self.src.set_eos()
-                self.src.get_pad('src').push(Event(EVENT_EOS))
+                self.src.emit('push-event', Event(EVENT_EOS));
             else:
-                self.src.get_pad('src').push(event)
+                self.src.emit('push-event', event);
 
         #print >> sys.stderr, 'Current VOBU:', self.location.lastSectorNr,
         #print >> sys.stderr, '\r',
@@ -599,9 +599,9 @@ class VirtualMachine(CommandPerformer):
         # Send a nav-packet event
         st = Structure('application/x-gst-dvd')
         st.set_value('event', 'dvd-nav-packet')
-        st.set_value('start_ptm', MPEGTimeToGSTTime(nav.startTime))
-        st.set_value('end_ptm', MPEGTimeToGSTTime(nav.endTime))
-        self.src.get_pad('src').push(event_new_any(st))
+        st.set_value('start_ptm', MPEGTimeToGSTTime(nav.startTime), 'uint64')
+        st.set_value('end_ptm', MPEGTimeToGSTTime(nav.endTime), 'uint64')
+        self.src.emit('push-event', event_new_any(st));
 
     vobuHeader = synchronized(vobuHeader)
 
@@ -635,18 +635,16 @@ class VirtualMachine(CommandPerformer):
         print >> sys.stderr, 'Still frame set'
 
     def audioEvent(self):
-        st = structure_from_string(
-          'application/x-gst-dvd,'
-            'event = (string) "dvd-audio-stream-change",'
-            'physical = (int) %d;' % self.audioPhys)
+        st = Structure('application/x-gst-dvd');
+        st.set_value('event', 'dvd-audio-stream-change')
+        st.set_value('physical', self.audioPhys, 'int')
         self.queueEvent(event_new_any(st))
         print >> sys.stderr, 'New audio:', self.audioPhys
 
     def subpictureEvent(self):
-        st = structure_from_string(
-          'application/x-gst-dvd,'
-            'event = (string) "dvd-spu-stream-change",'
-            'physical = (int) %d;' % self.subpicturePhys)
+        st = Structure('application/x-gst-dvd');
+        st.set_value('event', 'dvd-spu-stream-change')
+        st.set_value('physical', self.subpicturePhys, 'int')
         self.queueEvent(event_new_any(st))
         print >> sys.stderr, 'New subpicture:', self.subpicturePhys
 
@@ -678,8 +676,7 @@ class VirtualMachine(CommandPerformer):
             st = Structure('application/x-gst-dvd')
             st.set_value('event', 'dvd-spu-reset-highlight')
 
-        self.queueEvent(event_new_any(st))
-        #self.src.emit('queue-event', event_new_any(st));
+        self.src.emit('queue-event', event_new_any(st));
 
     def updatePipeline(self):
         # Update the audio, if necessary.

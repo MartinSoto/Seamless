@@ -48,7 +48,7 @@ plugin_init (GstPlugin * plugin)
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    "mpegstream",
+    "seamless-mpegstream",
     "MPEG system stream parser",
     plugin_init, VERSION, "LGPL",
     PACKAGE " (temporary fork from gst-plugins)",

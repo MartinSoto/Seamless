@@ -1,4 +1,28 @@
+2004-11-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.vobuRead) 
+	(VirtualMachine.highlightEvent): Use the new "push-event" and
+	"queue-event" signals to send events.
+	(VirtualMachine.vobuHeader, VirtualMachine.audioEvent) 
+	(VirtualMachine.subpictureEvent): Add proper type names to
+	set_value operations.
+
+	* gst-plugins/dvdblock/dvdblocksrc.h: Add push_event signal.
+	* gst-plugins/dvdblock/dvdblocksrc.c (dvdblocksrc_push_event) 
+	(dvdblocksrc_class_init): New signal "push-event".
+	(dvdblocksrc_queue_event): Add a ref operation to the
+	"queue-event" signal.
+
+	* gst-plugins/mpegstream/gstmpegstream.c: Local version of
+	mpegstream plugin properly renamed to seamless-mpegstream.
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c: Local version of mpeg2sub
+	plugin properly renamed to seamless-mpeg2sub.
+
 2004-11-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.c (dvdblocksrc_class_init):
+	GstEvent and GstBuffers are boxed types, so use appropriate
+	marshalers.
 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c
 	(gst_mpeg2subt_handle_video): Pass unhandled events to
