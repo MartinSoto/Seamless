@@ -1,3 +1,8 @@
+2004-07-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* machine/machine.py (PlaybackLocation): Add cellCurrentTime
+	attribute and use it to handle current time.
+
 2004-07-11  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* dvdread/_dvdread.pyx (DVDReadError.getProgramChain): Handle the

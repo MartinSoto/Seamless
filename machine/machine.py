@@ -59,7 +59,8 @@ class PlaybackLocation(object):
                  'nav',
                  'button',
                  'stillEnd',
-                 'interactive']
+                 'interactive',
+                 'cellCurrentTime']
 
     def __init__(self, machine, info):
         self.machine = machine
@@ -84,6 +85,8 @@ class PlaybackLocation(object):
         # Interactive is true while in the middle of performing a
         # interactive operation.
         self.interactive = False
+
+        self.cellCurrentTime = 0
 
     def set(self, location):
         """Set this location to the given location."""
@@ -127,6 +130,7 @@ class PlaybackLocation(object):
         if isinstance(subdiv, ProgramChain):
             self.programChain = subdiv
             self.cell = None
+            self.cellCurrentTime = 0
             self.sectorNr = None
             self.lastSectorNr = None
 
@@ -205,6 +209,8 @@ class PlaybackLocation(object):
 
         self.nav = nav
 
+        self.cellCurrentTime = nav.cellElapsedTime.seconds
+
 
     #
     # Time Based Navigation
@@ -215,11 +221,7 @@ class PlaybackLocation(object):
             raise PlayerException, \
                   'No program chain currently playing'
 
-        time = self.cell.startSeconds
-        if self.nav != None:
-            time += self.nav.cellElapsedTime.seconds
-
-        return time
+        return  self.cell.startSeconds + self.cellCurrentTime
 
     currentTime = property(getCurrentTime)
 
@@ -1076,7 +1078,6 @@ class VirtualMachine(CommandPerformer):
     timeJump = synchronized(timeJump)
 
     def timeJumpRelative(self, seconds):
-        print 'Current time: %d' % self.location.currentTime
         self.timeJump(self.location.currentTime + seconds)
 
     timeJumpRelative = synchronized(timeJumpRelative)

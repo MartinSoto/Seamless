@@ -4,11 +4,12 @@
 
 - Implement free changing of streams.
 
-- Fix time jumping: Current time calculation is wrong.
-
 - Support angles.
 
 - Implement support for other sound types.
+
+- Implement the cell time as still time thing. Monsters Inc seems to
+  use that in the warnings before the film.
 
 - Put copyright/license notices in files.
 
