@@ -1249,3 +1249,7 @@ class VirtualMachine(CommandPerformer):
         self.resume()
 
     rtn = synchronized(rtn)
+
+    def force(self):
+        # A hack to handle misbehaving menus.
+        self.selectButtonInteractive(1)

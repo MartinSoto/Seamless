@@ -333,11 +333,15 @@ alsaspdifsink_alsa_open (AlsaSPDIFSink *sink)
   const char *pcm_name = sink->out_config.pcm_name;
   char devstr[128];
   snd_pcm_hw_params_t *params;
+  snd_pcm_sw_params_t *sw_params;
   unsigned int rate, buffer_time, period_time, tmp;
   snd_pcm_format_t format =
     sink->out_config.bits == 16 ? SND_PCM_FORMAT_S16 : SND_PCM_FORMAT_U8;
+  snd_pcm_uframes_t avail_min;
   int err, step;
+
   snd_pcm_hw_params_alloca (&params);
+  snd_pcm_sw_params_alloca (&sw_params);
 
   GST_INFO_OBJECT (sink, "PCM name: %s", sink->out_config.pcm_name);
   GST_INFO_OBJECT (sink, "card: %s", sink->out_config.card);
@@ -523,6 +527,25 @@ alsaspdifsink_alsa_open (AlsaSPDIFSink *sink)
                         GST_ERROR_SYSTEM);
     goto __close;
   }
+
+  err = snd_pcm_sw_params_current (sink->pcm, sw_params);
+  if (err < 0) {
+    GST_ELEMENT_ERROR (sink, RESOURCE, OPEN_WRITE,
+                       ("Cannot retrieve software params"),
+                       GST_ERROR_SYSTEM);
+    goto __close;
+  }
+
+  avail_min = 4800;
+  err = snd_pcm_sw_params_set_avail_min (sink->pcm, sw_params, avail_min);
+  if (err < 0) {
+    GST_ELEMENT_ERROR (sink, RESOURCE, OPEN_WRITE,
+                       ("Cannot set avail min"),
+                       GST_ERROR_SYSTEM);
+    goto __close;
+  }
+  snd_pcm_sw_params_get_avail_min (sw_params, &avail_min);
+  GST_DEBUG_OBJECT (sink, "Avail min set to:%lu frames", avail_min);
 
   return 0;
 	

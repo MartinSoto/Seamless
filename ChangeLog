@@ -1,3 +1,11 @@
+2004-08-04  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* plugin/alsaspdifsink.c (alsaspdifsink_alsa_open): Set avail_min
+	software parameter to a higher value. Seems to almost eliminate
+	glitches in sound playback.
+	* machine/machine.py (VirtualMachine.force): Hack to force a
+	button in missbehaving menus.
+
 2004-07-19  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* configure.ac: Heavily changed based on gst-recorder.
