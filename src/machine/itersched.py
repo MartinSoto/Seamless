@@ -19,6 +19,9 @@
 class IterSchedError(Exception):
     pass
 
+class NoIterError(IterSchedError):
+    pass
+
 
 def checkItr(itr):
     assert hasattr(itr, 'next') and hasattr(itr, '__iter__'), \
@@ -88,6 +91,9 @@ class RestartableIterator(object):
     __slots__ = ('instance', 'iter', 'next')
 
     def __init__(self, instance, iterator):
+        if not hasattr(iterator, 'next'):
+            raise NoIterError
+
         self.instance = instance
         self.iter = iterator
         self.next = iterator.next
@@ -97,8 +103,16 @@ class RestartableIterator(object):
 
 def restartPoint(method):
     def wrapper(self, *posArgs, **kwArgs):
-        return RestartableIterator(self, method(self, *posArgs, **kwArgs))
-        
+        try:
+            return RestartableIterator(self,
+                                       method(self, *posArgs, **kwArgs))
+        except NoIterError:
+            raise NoIterError("Function or method '%s' (%s: %d) must "
+                              "be a generator or return an iterator." % \
+                              (method.func_name,
+                               method.func_code.co_filename,
+                               method.func_code.co_firstlineno))
+
     return wrapper
 
 
@@ -149,5 +163,5 @@ class Scheduler(object):
         self.current = getattr(self.current.instance,
                                methodName)(*posArgs, **kwArgs)
 
-__all__ = ('IterSchedError', 'NoOp', 'Call', 'Chain', 'Restart',
-           'restartPoint', 'Scheduler')
+__all__ = ('IterSchedError', 'NoIterError', 'NoOp', 'Call', 'Chain',
+           'Restart', 'restartPoint', 'Scheduler')

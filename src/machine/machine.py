@@ -18,11 +18,13 @@
 
 """Main implementation of DVD virtual machine."""
 
-import sys
-import traceback
 import threading
+import traceback
+import string
+import sys
 
-from itersched import *
+import itersched
+from itersched import NoOp, Call, Chain, Restart, restartPoint
 
 import dvdread
 import decode
@@ -77,6 +79,8 @@ class GeneralRegister(Register):
 
         self.value = value & 0xffff
 
+        yield NoOp
+
 
 class SystemRegister(Register):
     __slots__ = ('method',)
@@ -90,13 +94,6 @@ class SystemRegister(Register):
     def setValue(self, value):
         raise MachineException, \
               'Attempt to directly assign a system register'
-
-
-def makeMachineOperation(method):
-    def restartOp(self, *args):
-        yield getattr(Restart, method)(*args)
-
-    return restartOp
 
 
 class PlaybackLocation(object):
@@ -134,6 +131,24 @@ class PlaybackLocation(object):
         self.button = 1
 
         self.cellCurrentTime = 0
+
+
+def makeMachineOperation(method):
+    def restartOp(self, *args, **keywords):
+        yield getattr(Restart, method)(*args, **keywords)
+
+    return restartOp
+
+# FIXME: Erase this all opearations get implemented properly.
+def makeDummyOperation(method):
+    def printOp(self, *args, **keywords):
+        lArgs = [repr(i) for i in args]
+        lKw = ['%s=%s' % (name, str(value))
+               for name, value in keywords.items()]
+        print "Invoked: %s(%s)" % (method, string.join(lArgs + lKw, ', '))
+        yield NoOp
+
+    return printOp
 
 
 class PerformMachine(object):
@@ -210,64 +225,67 @@ class PerformMachine(object):
     #
 
     # Basic operations.
-    nop = makeMachineOperation('nop')
+    def nop(self):
+        """No operation."""
+        yield NoOp
+
     goto = makeMachineOperation('goto')
     brk = makeMachineOperation('break')
-    exit = makeMachineOperation('exit')
+    exit = makeDummyOperation('exit')
 
     # Parental management
-    openSetParentalLevel = makeMachineOperation('openSetParentalLevel')
+    openSetParentalLevel = makeDummyOperation('openSetParentalLevel')
 
     # Links.
-    linkTopCell = makeMachineOperation('linkTopCell')
-    linkNextCell = makeMachineOperation('linkNextCell')
-    linkPrevCell = makeMachineOperation('linkPrevCell')
-    linkTopProgram = makeMachineOperation('linkTopProgram')
-    linkNextProgram = makeMachineOperation('linkNextProgram')
-    linkPrevProgram = makeMachineOperation('linkPrevProgram')
-    linkTopProgramChain = makeMachineOperation('linkTopProgramChain')
-    linkNextProgramChain = makeMachineOperation('linkNextProgramChain')
-    linkPrevProgramChain = makeMachineOperation('linkPrevProgramChain')
-    linkGoUpProgramChain = makeMachineOperation('linkGoUpProgramChain')
-    linkTailProgramChain = makeMachineOperation('linkTailProgramChain')
-    linkProgramChain = makeMachineOperation('linkProgramChain')
-    linkChapter = makeMachineOperation('linkChapter')
-    linkProgram = makeMachineOperation('linkProgram')
-    linkCell = makeMachineOperation('linkCell')
+    linkTopCell = makeDummyOperation('linkTopCell')
+    linkNextCell = makeDummyOperation('linkNextCell')
+    linkPrevCell = makeDummyOperation('linkPrevCell')
+    linkTopProgram = makeDummyOperation('linkTopProgram')
+    linkNextProgram = makeDummyOperation('linkNextProgram')
+    linkPrevProgram = makeDummyOperation('linkPrevProgram')
+    linkTopProgramChain = makeDummyOperation('linkTopProgramChain')
+    linkNextProgramChain = makeDummyOperation('linkNextProgramChain')
+    linkPrevProgramChain = makeDummyOperation('linkPrevProgramChain')
+    linkGoUpProgramChain = makeDummyOperation('linkGoUpProgramChain')
+    linkTailProgramChain = makeDummyOperation('linkTailProgramChain')
+    linkProgramChain = makeDummyOperation('linkProgramChain')
+    linkChapter = makeDummyOperation('linkChapter')
+    linkProgram = makeDummyOperation('linkProgram')
+    linkCell = makeDummyOperation('linkCell')
 
     # Select (highlight) a button
-    selectButton = makeMachineOperation('selectButton')
-    setSystemParam8 = makeMachineOperation('selectButton')
+    selectButton = makeDummyOperation('selectButton')
+    setSystemParam8 = makeDummyOperation('selectButton')
 
     # Jumps
-    jumpToTitle = makeMachineOperation('jumpToTitle')
-    jumpToTitleInSet = makeMachineOperation('jumpToTitleInSet')
-    jumpToChapterInSet = makeMachineOperation('jumpToChapterInSet')
+    jumpToTitle = makeDummyOperation('jumpToTitle')
+    jumpToTitleInSet = makeDummyOperation('jumpToTitleInSet')
+    jumpToChapterInSet = makeDummyOperation('jumpToChapterInSet')
 
-    jumpToFirstPlay = makeMachineOperation('jumpToFirstPlay')
-    jumpToTitleMenu = makeMachineOperation('jumpToTitleMenu')
-    jumpToMenu = makeMachineOperation('jumpToMenu')
+    jumpToFirstPlay = makeDummyOperation('jumpToFirstPlay')
+    jumpToTitleMenu = makeDummyOperation('jumpToTitleMenu')
+    jumpToMenu = makeDummyOperation('jumpToMenu')
     jumpToManagerProgramChain = \
-        makeMachineOperation('jumpToManagerProgramChain')
+        makeDummyOperation('jumpToManagerProgramChain')
 
     # Timed jump
-    setTimedJump = makeMachineOperation('setTimedJump')
+    setTimedJump = makeDummyOperation('setTimedJump')
 
     # Call and resume
-    callFirstPlay = makeMachineOperation('callFirstPlay')
-    callTitleMenu = makeMachineOperation('callTitleMenu')
-    callMenu = makeMachineOperation('callMenu')
+    callFirstPlay = makeDummyOperation('callFirstPlay')
+    callTitleMenu = makeDummyOperation('callTitleMenu')
+    callMenu = makeDummyOperation('callMenu')
     callManagerProgramChain = \
-        makeMachineOperation('callManagerProgramChain')
-    resume = makeMachineOperation('resume')
+        makeDummyOperation('callManagerProgramChain')
+    resume = makeDummyOperation('resume')
 
     # Selectable streams
-    setAngle = makeMachineOperation('setAngle')
-    setAudio = makeMachineOperation('setAudio')
-    setSubpicture = makeMachineOperation('setSubpicture')
+    setAngle = makeDummyOperation('setAngle')
+    setAudio = makeDummyOperation('setAudio')
+    setSubpicture = makeDummyOperation('setSubpicture')
 
     # Karaoke control
-    setKaraokeMode = makeMachineOperation('setKaraokeMode')
+    setKaraokeMode = makeDummyOperation('setKaraokeMode')
 
 
     #
@@ -420,10 +438,6 @@ class DiscPlayer(object):
 
     def __init__(self, perform):
         self.perform = perform
-
-    def nop(self):
-        """No operation."""
-        pass
 
     def exit(self):
         """End execution of the machine."""
@@ -588,7 +602,8 @@ class ProgramChainPlayer(object):
         self.cell = None
 
         # Play the 'pre' commands.
-        # COMMANDS
+        yield Call(CommandBlockPlayer(self.perform). \
+                   playBlock(self.programChain.preCommands))
 
         # Go to the first cell.
         yield Chain(self.linkCell(1))
@@ -604,7 +619,10 @@ class ProgramChainPlayer(object):
         yield Call(CellPlayer(self.perform).playCell(self.cell))
 
         # Play the corresponding cell commands.
-        # COMMANDS
+        if self.cell.commandNr != 0:
+            yield Call(CommandBlockPlayer(self.perform). \
+                       playBlock(self.programChain.cellCommands,
+                                 self.cell.commandNr))
 
         if cellNr == self.programChain.cellCount:
             # No more cells. Play the "tail".
@@ -694,7 +712,8 @@ class ProgramChainPlayer(object):
         self.cell = None
 
         # Play the "post" commands.
-        # COMMANDS
+        yield Call(CommandBlockPlayer(self.perform). \
+                   playBlock(self.programChain.postCommands))
 
         # If there's a next program chain, link to it.
         next = self.programChain.nextProgramChain
@@ -704,25 +723,54 @@ class ProgramChainPlayer(object):
 
 class CommandBlockPlayer(object):
     __slots__ = ('perform',
-                 'decoder')
+                 'decoder',
+                 'commands',
+                 'commandNr')
 
     def __init__(self, perform):
         self.perform = perform
-        self.decoder = decode.CommandDecoder(PerformMachine(perform))
 
+        self.decoder = decode.CommandDecoder(perform)
+
+        self.commands = None
+        self.commandNr = 0
+
+    @restartPoint
+    def playBlock(self, commands, commandNr=1):
+        self.commands = commands
+        yield Chain(self.goto(commandNr))
+
+    @restartPoint
     def goto(self, commandNr):
         """Go to command 'commandNr' in the current command block."""
-        pass
+        assert commandNr > 0
 
+        self.commandNr = commandNr
+
+        while self.commandNr <= self.commands.count:
+            # Actually perform the command.
+            print disassemble.disassemble(self.commands.get(self.commandNr),
+                                          pos=self.commandNr)
+            yield Call(self.decoder.performCommand( \
+                self.commands.get(self.commandNr)))
+
+            self.commandNr += 1
+
+    @restartPoint
     def brk(self):
         """Terminate executing (break from) the current command block."""
-        pass
+        # Just doing nothing should do the trick :-)
+        yield NoOp
 
-    def openSetParentalLevel(self, cmd):
+    @restartPoint
+    def openSetParentalLevel(self, commandNr):
         """Try to set parental level.
 
         If successful, jump to the specified command."""
-        pass
+        print "Attempt to set parental level, implement me!"
+
+        # For the moment, just jump inconditionally.
+        yield Chain(self.goto(commandNr))
 
 
 class CellPlayer(object):
@@ -876,7 +924,7 @@ class VirtualMachine(object):
         self.perform = PerformMachine()
 
         # Initialize the scheduler.
-        self.sched = Scheduler(ProgramChainPlayer(self.perform).playProgramChain(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1)))
+        self.sched = itersched.Scheduler(ProgramChainPlayer(self.perform).playProgramChain(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1)))
 
 
     #

@@ -1,3 +1,23 @@
+2005-03-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (makeDummyOperation, PerformMachine):
+	Operations are now dummy, i.e. they only print the
+	invokation. Dummy operations will be gradually replaced by actual
+	operations as the implementation progresses.
+	(GeneralRegister.setValue): Is now a generator.
+
+	* src/machine/itersched.py (RestartableIterator.__init__) 
+	(restartPoint.wrapper): Added more robust error handling for cases
+	where a @restartPoint method does not produce an iterator.
+	(__all__): Export 'NoIterError'.
+
+	* src/machine/machine.py (CommandBlockPlayer): Methods
+	implemented.
+	(ProgramChainPlayer.playProgramChain) 
+	(ProgramChainPlayer.linkCell) 
+	(ProgramChainPlayer.linkTailProgramChain): Actually execute
+	commands.
+
 2005-03-26  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/itersched.py (Scheduler.restart): Get rid of the
