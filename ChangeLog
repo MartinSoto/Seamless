@@ -1,3 +1,8 @@
+2005-02-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py: Simplify design to make it more
+	flexible.
+
 2005-02-20  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/itersched.py: New iterator scheduler.
