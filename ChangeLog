@@ -1,3 +1,10 @@
+2005-03-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py: Enhance design again (hopefully this
+	time it'll be right.) The scheduler manages a stack of objects and
+	it is possible to restart an arbitrary method of one of the
+	objects.
+
 2005-02-27  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/itersched.py: Simplify design to make it more

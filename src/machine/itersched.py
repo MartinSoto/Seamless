@@ -30,26 +30,39 @@ class CallObject(object):
 class Call(CallObject):
     pass
 
-class Restart(CallObject):
-    def __init__(self, called):
-        assert isinstance(called, RestartableIterator)
-        self.called = called
+
+class RestartInstance(CallObject):
+    __slots__ = ('methodName', 'posArgs', 'kwArgs')
+
+    def __init__(self, methodName, posArgs, kwArgs):
+        self.methodName = methodName
+        self.posArgs = posArgs
+        self.kwArgs = kwArgs
+
+class RestartFactory(object):
+    __slots__ = ()
+
+    def __getattr__(self, name):
+        return lambda *posArgs, **kwArgs: \
+               RestartInstance(name, posArgs, kwArgs)
+
+Restart = RestartFactory()
 
 
 class RestartableIterator(object):
-    __slots__ = ('proc', 'iter', 'next')
+    __slots__ = ('instance', 'iter', 'next')
 
-    def __init__(self, proc, iterator):
-        self.proc = proc
+    def __init__(self, instance, iterator):
+        self.instance = instance
         self.iter = iterator
         self.next = iterator.next
 
     def __iter__(self):
         return self
 
-def restartable(proc):
-    def wrapper(*posArgs, **kwArgs):
-        return RestartableIterator(proc, proc(*posArgs, **kwArgs))
+def restartable(method):
+    def wrapper(self, *posArgs, **kwArgs):
+        return RestartableIterator(self, method(self, *posArgs, **kwArgs))
         
     return wrapper
 
@@ -68,8 +81,8 @@ class Scheduler(object):
 
                 if isinstance(next, Call):
                     self.call(next.called)
-                elif isinstance(next, Restart):
-                    self.restart(next.called)
+                elif isinstance(next, RestartInstance):
+                    self.restart(next.methodName, next.posArgs, next.kwArgs)
                 else:
                     return next
             except StopIteration:
@@ -81,18 +94,22 @@ class Scheduler(object):
     def __iter__(self):
         return self
 
-    def call(self, iterator):
-        self.stack.append(self.current)
-        self.current = iterator
-
-    def restart(self, restartable):
+    def call(self, restartable):
         assert isinstance(restartable, RestartableIterator)
 
-        while not isinstance(self.current, RestartableIterator) or \
-              self.current.proc != restartable.proc:
+        self.stack.append(self.current)
+        self.current = restartable
+
+    def restart(self, methodName, posArgs, kwArgs):
+        # Go down the stack searching for an instance having a method
+        # with the specified name.
+        while not hasattr(self.current.instance, methodName):
             try:
                 self.current = self.stack.pop()
             except IndexError:
                 raise IterSchedError, \
-                      "Restart of %s failed" % str(restartable.proc)
-        self.current = restartable
+                      "Restart of method '%s' failed" % methodName
+
+        # Perform the actual restart.
+        self.current = getattr(self.current.instance,
+                               methodName)(*posArgs, **kwArgs)
