@@ -1,4 +1,4 @@
-#!/usr/bin/python2.3
+#!/usr/bin/python
 
 # Seamless DVD Player
 # Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
