@@ -72,6 +72,362 @@ class EosEvent(object):
     pass
 
 
+class Register(decode.Register):
+    __slots__ = ()
+
+
+class GeneralRegister(Register):
+    __slots__ = ('value',)
+
+    def __init__(self):
+        self.value = 0
+
+    def getValue(self):
+        return self.value
+
+    def setValue(self, value):
+        assert isinstance(value, int)
+
+        self.value = value & 0xffff
+
+
+class SystemRegister(Register):
+    __slots__ = ('method',)
+
+    def __init__(self, method):
+        self.method = method
+
+    def getValue(self):
+        return self.method()
+
+    def setValue(self, value):
+        raise MachineException, \
+              'Attempt to directly assign a system register'
+
+
+def makeMachineOperation(method):
+    def restartOp(self, *args):
+        yield getattr(Restart, method)(*args)
+
+    return restartOp
+
+
+class PlaybackLocation(object):
+    """A self-contained representation of a location in a DVD.
+
+    A PlaybackLocation contains all information necessary to locate a
+    position in the DVD and to play back starting from that
+    position."""
+    
+    __slots__ = ('title',
+                 'chapter',
+                 'programChain',
+                 'cell',
+                 'sectorNr',
+                 'lastSectorNr',
+                 'commandType',
+                 'commands',
+                 'commandNr',
+                 'nav',
+                 'button',
+                 'cellCurrentTime')
+
+    def __init__(self):
+        self.title = None
+        self.chapter = None
+
+        self.programChain = None
+        self.nav = None
+        self.commandType = None
+
+        self.sectorNr = None
+        self.lastSectorNr = None
+
+        # Button one is highlighted by default (???)
+        self.button = 1
+
+        self.cellCurrentTime = 0
+
+
+class PerformMachine(object):
+    __slots__ = ('audio',
+                 'subpicture',
+                 'angle',
+                 'audioPhys',
+                 'subpicturePhys',
+                 'buttonNav',
+                 'highlightArea',
+                 'highlightProgramChain',
+                 'regionCode',
+                 'prefMenuLang',
+                 'prefAudio',
+                 'prefSubpicture',
+                 'parentalCountry',
+                 'parentalLevel',
+                 'aspectRatio',
+                 'videoMode',
+
+                 'location',
+                 'resumeLocation',
+
+                 'generalRegisters',
+                 'systemRegisters')
+
+    def __init__(self):
+        # Current logical audio and subpicture streams and current
+        # angle. The values follow the conventions of system registers
+        # 1, 2, and 3, respectively.
+        self.audio = 0		# This seems to be needed by some DVDs.
+        self.subpicture = 0x3e	# None
+        self.angle = 1
+
+        # Pipeline state.
+        self.audioPhys = -1
+        self.subpicturePhys = -1
+        self.buttonNav = None
+        self.highlightArea = None
+        self.highlightProgramChain = None
+
+        # Machine options and state:
+
+        # Region Code
+        self.regionCode = 0  # Region free.
+
+        # Preferred languages.
+        self.prefMenuLang = 'en'
+        self.prefAudio = None
+        self.prefSubpicture = None
+
+        # Parental level country and level value.
+        self.parentalCountry = 'us'
+        self.parentalLevel = 15 # None
+
+        # Preferred display aspect ratio
+        self.aspectRatio = dvdread.ASPECT_RATIO_16_9
+
+        # Current video mode.
+        self.videoMode = dvdread.VIDEO_MODE_NORMAL
+
+        # Location and resume location.
+        self.location = PlaybackLocation()
+        self.resumeLocation = None
+
+        # Initialize all machine registers.
+        self.generalRegisters = None
+        self.systemRegisters = None
+        self.initializeRegisters()
+
+
+    #
+    # Machine Operations
+    #
+
+    # Basic operations.
+    nop = makeMachineOperation('nop')
+    goto = makeMachineOperation('goto')
+    brk = makeMachineOperation('break')
+    exit = makeMachineOperation('exit')
+
+    # Parental management
+    openSetParentalLevel = makeMachineOperation('openSetParentalLevel')
+
+    # Links.
+    linkTopCell = makeMachineOperation('linkTopCell')
+    linkNextCell = makeMachineOperation('linkNextCell')
+    linkPrevCell = makeMachineOperation('linkPrevCell')
+    linkTopProgram = makeMachineOperation('linkTopProgram')
+    linkNextProgram = makeMachineOperation('linkNextProgram')
+    linkPrevProgram = makeMachineOperation('linkPrevProgram')
+    linkTopProgramChain = makeMachineOperation('linkTopProgramChain')
+    linkNextProgramChain = makeMachineOperation('linkNextProgramChain')
+    linkPrevProgramChain = makeMachineOperation('linkPrevProgramChain')
+    linkGoUpProgramChain = makeMachineOperation('linkGoUpProgramChain')
+    linkTailProgramChain = makeMachineOperation('linkTailProgramChain')
+    linkProgramChain = makeMachineOperation('linkProgramChain')
+    linkChapter = makeMachineOperation('linkChapter')
+    linkProgram = makeMachineOperation('linkProgram')
+    linkCell = makeMachineOperation('linkCell')
+
+    # Select (highlight) a button
+    selectButton = makeMachineOperation('selectButton')
+    setSystemParam8 = makeMachineOperation('selectButton')
+
+    # Jumps
+    jumpToTitle = makeMachineOperation('jumpToTitle')
+    jumpToTitleInSet = makeMachineOperation('jumpToTitleInSet')
+    jumpToChapterInSet = makeMachineOperation('jumpToChapterInSet')
+
+    jumpToFirstPlay = makeMachineOperation('jumpToFirstPlay')
+    jumpToTitleMenu = makeMachineOperation('jumpToTitleMenu')
+    jumpToMenu = makeMachineOperation('jumpToMenu')
+    jumpToManagerProgramChain = \
+        makeMachineOperation('jumpToManagerProgramChain')
+
+    # Timed jump
+    setTimedJump = makeMachineOperation('setTimedJump')
+
+    # Call and resume
+    callFirstPlay = makeMachineOperation('callFirstPlay')
+    callTitleMenu = makeMachineOperation('callTitleMenu')
+    callMenu = makeMachineOperation('callMenu')
+    callManagerProgramChain = \
+        makeMachineOperation('callManagerProgramChain')
+    resume = makeMachineOperation('resume')
+
+    # Selectable streams
+    setAngle = makeMachineOperation('setAngle')
+    setAudio = makeMachineOperation('setAudio')
+    setSubpicture = makeMachineOperation('setSubpicture')
+
+    # Karaoke control
+    setKaraokeMode = makeMachineOperation('setKaraokeMode')
+
+
+    #
+    # Registers
+    #
+
+    def getSystem0(self):
+        """Return the value of system register 0 (menu_language)."""
+        return strToIso639(self.prefMenuLang)
+
+    def getSystem1(self):
+        """Return the value of system register 1 (audio_stream)."""
+        return self.audio
+
+    def getSystem2(self):
+        """Return the value of system register 2 (subpicture_stream)."""
+        return self.subpicture
+
+    def getSystem3(self):
+        """Return the value of system register 3 (angle)."""
+        return self.angle
+
+    def getSystem4(self):
+        """Return the value of system register 4 (title_in_volume)."""
+        if self.location.title != None:
+            return self.location.title.globalTitleNr
+        else:
+            return 1
+
+    def getSystem5(self):
+        """Return the value of system register 5 (title_in_vts)."""
+        if self.location.title != None:
+            return self.location.title.titleNr
+        else:
+            return 1
+
+    def getSystem6(self):
+        """Return the value of system register 6 (program_chain)."""
+        if self.location.programChain != None:
+            return self.location.programChain.programChainNr
+        else:
+            return 0
+
+    def getSystem7(self):
+        """Return the value of system register 7 (chapter)."""
+        if self.location.chapter != None:
+            return self.location.chapter.chapterNr
+        else:
+            return 1
+
+    def getSystem8(self):
+        """Return the value of system register 8 (highlighted_button)."""
+        return self.location.button << 10
+
+    def getSystem9(self):
+        """Return the value of system register 9 (navigation_timer)."""
+        print >> sys.stderr, "Navigation timer checked, implement me!"
+        return 0
+
+    def getSystem10(self):
+        """Return the value of system register 10 (program_chain_for_timer)."""
+        print >> sys.stderr, "Navigation timer checked, implement me!"
+        return 0
+
+    def getSystem11(self):
+        """Return the value of system register 11 (karaoke_mode)."""
+        print >> sys.stderr, "Karaoke mode checked, implement me!"
+        return 0
+
+    def getSystem12(self):
+        """Return the value of system register 12 (parental_country)."""
+        return strToIso639(self.parentalCountry)
+
+    def getSystem13(self):
+        """Return the value of system register 13 (parental_level)."""
+        return self.parentalLevel
+
+    def getSystem14(self):
+        """Return the value of system register 14 (video_mode_pref)."""
+        return self.aspectRatio << 10 | self.videoMode << 8
+
+    def getSystem15(self):
+        """Return the value of system register 15 (audio_caps)."""
+        return 0x4000
+
+    def getSystem16(self):
+        """Return the value of system register 16 (audio_lang_pref)."""
+        if self.prefAudio != None:
+            return self.prefAudio
+        else:
+            return 0xffff  # Not specified
+
+    def getSystem17(self):
+        """Return the value of system register 17 (audio_ext_pref)."""
+        return 0
+
+    def getSystem18(self):
+        """Return the value of system register 18 (subpicture_lang_pref)."""
+        if self.prefSubpicture != None:
+            return self.prefSubpicture
+        else:
+            return 0xffff  # Not specified
+
+    def getSystem19(self):
+        """Return the value of system register 19 (subpicture_ext_pref)."""
+        return 0
+
+    def getSystem20(self):
+        """Return the value of system register 20 (region_code)."""
+        return self.regionCode
+
+    def getSystem21(self):
+        """Return the value of system register 21 (reserved)."""
+        return 0
+
+    def getSystem22(self):
+        """Return the value of system register 22 (reserved)."""
+        return 0
+
+    def getSystem23(self):
+        """Return the value of system register 23 (reserved_ext_playback)."""
+        return 0
+
+
+    def initializeRegisters(self):
+        self.generalRegisters = []
+        for i in range(16):
+            self.generalRegisters.append(GeneralRegister())
+
+        self.systemRegisters = []
+        for i in range(24):
+            self.systemRegisters.append( \
+                SystemRegister(getattr(self, "getSystem%d" % i)))
+
+    def getGeneralPurpose(self, regNr):
+        """Return the object corresponding to the specified general
+        purpose register."""
+        assert 0 <= regNr <= 15
+        return self.generalRegisters[regNr]
+
+    def getSystemParameter(self, regNr):
+        """Return the object corresponding to the specified system
+        parameter."""
+        assert 0 <= regNr <= 23
+        return self.systemRegisters[regNr]
+
+
 class DiscNavigator(object):
     __slots__ = ('machine')
 
@@ -332,100 +688,18 @@ class CommandBlockNavigator(object):
         pass
 
 
-def makeMachineOperation(method):
-    def restartOp(self, *args):
-        yield getattr(Restart, method)(*args)
-
-    return restartOp
-
-class PerformMachine(object):
-    __slots__ = ('machine',)
-
-    def __init__(self, machine):
-        self.machine = machine
-
-        # Relay register access to the machine.
-        self.getGeneralPurpose = machine.getGeneralPurpose
-        self.getSystemParameter = machine.getSystemParameter
-    
-
-    #
-    # Machine Operations
-    #
-
-    # Basic operations.
-    nop = makeMachineOperation('nop')
-    goto = makeMachineOperation('goto')
-    brk = makeMachineOperation('break')
-    exit = makeMachineOperation('exit')
-
-    # Parental management
-    openSetParentalLevel = makeMachineOperation('openSetParentalLevel')
-
-    # Links.
-    linkTopCell = makeMachineOperation('linkTopCell')
-    linkNextCell = makeMachineOperation('linkNextCell')
-    linkPrevCell = makeMachineOperation('linkPrevCell')
-    linkTopProgram = makeMachineOperation('linkTopProgram')
-    linkNextProgram = makeMachineOperation('linkNextProgram')
-    linkPrevProgram = makeMachineOperation('linkPrevProgram')
-    linkTopProgramChain = makeMachineOperation('linkTopProgramChain')
-    linkNextProgramChain = makeMachineOperation('linkNextProgramChain')
-    linkPrevProgramChain = makeMachineOperation('linkPrevProgramChain')
-    linkGoUpProgramChain = makeMachineOperation('linkGoUpProgramChain')
-    linkTailProgramChain = makeMachineOperation('linkTailProgramChain')
-    linkProgramChain = makeMachineOperation('linkProgramChain')
-    linkChapter = makeMachineOperation('linkChapter')
-    linkProgram = makeMachineOperation('linkProgram')
-    linkCell = makeMachineOperation('linkCell')
-
-    # Select (highlight) a button
-    selectButton = makeMachineOperation('selectButton')
-    setSystemParam8 = makeMachineOperation('selectButton')
-
-    # Jumps
-    jumpToTitle = makeMachineOperation('jumpToTitle')
-    jumpToTitleInSet = makeMachineOperation('jumpToTitleInSet')
-    jumpToChapterInSet = makeMachineOperation('jumpToChapterInSet')
-
-    jumpToFirstPlay = makeMachineOperation('jumpToFirstPlay')
-    jumpToTitleMenu = makeMachineOperation('jumpToTitleMenu')
-    jumpToMenu = makeMachineOperation('jumpToMenu')
-    jumpToManagerProgramChain = \
-        makeMachineOperation('jumpToManagerProgramChain')
-
-    # Timed jump
-    setTimedJump = makeMachineOperation('setTimedJump')
-
-    # Call and resume
-    callFirstPlay = makeMachineOperation('callFirstPlay')
-    callTitleMenu = makeMachineOperation('callTitleMenu')
-    callMenu = makeMachineOperation('callMenu')
-    callManagerProgramChain = \
-        makeMachineOperation('callManagerProgramChain')
-    resume = makeMachineOperation('resume')
-
-    # Selectable streams
-    setAngle = makeMachineOperation('setAngle')
-    setAudio = makeMachineOperation('setAudio')
-    setSubpicture = makeMachineOperation('setSubpicture')
-
-    # Karaoke control
-    setKaraokeMode = makeMachineOperation('setKaraokeMode')
-
-
 class CellPlayer(object):
     """A player for DVD cells."""
 
-    __slots__ = ('machine',
+    __slots__ = ('perform',
                  'cell',	# Cell currently being played.
                  'domain',	# Playback domain this cell belongs to.
                  'titleNr',	# DVD title number the cell is in.
                  'sectorNr',	# Last sector played.
                  'nav')		# Last nav packet seen.
 
-    def __init__(self, machine):
-        self.machine = machine
+    def __init__(self, perform):
+        self.perform = perform
         self.cell = None
         self.domain = None
         self.titleNr = None
@@ -613,108 +887,14 @@ class CellPlayer(object):
         pass
 
 
-class PlaybackLocation(object):
-    """A self-contained representation of a location in a DVD.
-
-    A PlaybackLocation contains all information necessary to locate a
-    position in the DVD and to play back starting from that
-    position."""
-    
-    __slots__ = ['title',
-                 'chapter',
-                 'programChain',
-                 'cell',
-                 'sectorNr',
-                 'lastSectorNr',
-                 'commandType',
-                 'commands',
-                 'commandNr',
-                 'nav',
-                 'button',
-                 'interactive',
-                 'cellCurrentTime']
-
-    def __init__(self):
-        self.title = None
-        self.chapter = None
-
-        self.programChain = None
-        self.nav = None
-        self.commandType = None
-
-        self.sectorNr = None
-        self.lastSectorNr = None
-
-        # Button one is highlighted by default (???)
-        self.button = 1
-
-        # Interactive is true when performing an interactive
-        # operation.
-        self.interactive = False
-
-        self.cellCurrentTime = 0
-
-
-class Register(decode.Register):
-    __slots__ = ()
-
-
-class GeneralRegister(Register):
-    __slots__ = ('value',)
-
-    def __init__(self):
-        self.value = 0
-
-    def getValue(self):
-        return self.value
-
-    def setValue(self, value):
-        assert isinstance(value, int)
-
-        self.value = value & 0xffff
-
-
-class SystemRegister(Register):
-    __slots__ = ('method',)
-
-    def __init__(self, method):
-        self.method = method
-
-    def getValue(self):
-        return self.method()
-
-    def setValue(self, value):
-        raise MachineException, \
-              'Attempt to directly assign a system register'
-
-
 class VirtualMachine(object):
     """A DVD playback virtual machine implementation."""
 
-    __slots__ = ['info',
+    __slots__ = ('info',
                  'src',
                  'lock',
-                 'audio',
-                 'subpicture',
-                 'angle',
-                 'audioPhys',
-                 'subpicturePhys',
-                 'buttonNav',
-                 'highlightArea',
-                 'highlightProgramChain',
-                 'regionCode',
-                 'prefMenuLang',
-                 'prefAudio',
-                 'prefSubpicture',
-                 'parentalCountry',
-                 'parentalLevel',
-                 'aspectRatio',
-                 'videoMode',
-                 'generalRegisters',
-                 'systemRegisters',
-                 'location',
-                 'resumeLocation',
-                 'sched']
+                 'perform',
+                 'sched')
 
     def __init__(self, info, src):
         self.info = info
@@ -727,54 +907,11 @@ class VirtualMachine(object):
         src.connect('vobu-read', self.vobuRead)
         src.connect('vobu-header', self.vobuHeader)
 
-        # Current logical audio and subpicture streams and current
-        # angle. The values follow the conventions of system registers
-        # 1, 2, and 3, respectively.
-        self.audio = 0		# This seems to be needed by some DVDs.
-        self.subpicture = 0x3e	# None
-        self.angle = 1
-
-        # Pipeline state.
-        self.audioPhys = -1
-        self.subpicturePhys = -1
-        self.buttonNav = None
-        self.highlightArea = None
-        self.highlightProgramChain = None
-
-
-        # Machine options and state:
-
-        # Region Code
-        self.regionCode = 0  # Region free.
-
-        # Preferred languages.
-        self.prefMenuLang = 'en'
-        self.prefAudio = None
-        self.prefSubpicture = None
-
-        # Parental level country and level value.
-        self.parentalCountry = 'us'
-        self.parentalLevel = 15 # None
-
-        # Preferred display aspect ratio
-        self.aspectRatio = dvdread.ASPECT_RATIO_16_9
-
-        # Current video mode.
-        self.videoMode = dvdread.VIDEO_MODE_NORMAL
-
-
-        # Initialize all machine registers.
-        self.generalRegisters = None
-        self.systemRegisters = None
-        self.initializeRegisters()
-
-
-        # Location and resume location.
-        self.location = PlaybackLocation()
-        self.resumeLocation = None
+        # The perform machine.
+        self.perform = PerformMachine()
 
         # Initialize the scheduler.
-        self.sched = Scheduler(CellPlayer(self).playCell(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1).getCell(1)))
+        self.sched = Scheduler(CellPlayer(self.perform).playCell(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1).getCell(1)))
 
     #
     # Signal Handling
@@ -820,148 +957,3 @@ class VirtualMachine(object):
         middle of a VOBU playback and its necessary for fast
         interactive response."""
         self.src.set_property('block-count', 0)
-
-
-    #
-    # Registers
-    #
-
-    def getSystem0(self):
-        """Return the value of system register 0 (menu_language)."""
-        return strToIso639(self.prefMenuLang)
-
-    def getSystem1(self):
-        """Return the value of system register 1 (audio_stream)."""
-        return self.audio
-
-    def getSystem2(self):
-        """Return the value of system register 2 (subpicture_stream)."""
-        return self.subpicture
-
-    def getSystem3(self):
-        """Return the value of system register 3 (angle)."""
-        return self.angle
-
-    def getSystem4(self):
-        """Return the value of system register 4 (title_in_volume)."""
-        if self.location.title != None:
-            return self.location.title.globalTitleNr
-        else:
-            return 1
-
-    def getSystem5(self):
-        """Return the value of system register 5 (title_in_vts)."""
-        if self.location.title != None:
-            return self.location.title.titleNr
-        else:
-            return 1
-
-    def getSystem6(self):
-        """Return the value of system register 6 (program_chain)."""
-        if self.location.programChain != None:
-            return self.location.programChain.programChainNr
-        else:
-            return 0
-
-    def getSystem7(self):
-        """Return the value of system register 7 (chapter)."""
-        if self.location.chapter != None:
-            return self.location.chapter.chapterNr
-        else:
-            return 1
-
-    def getSystem8(self):
-        """Return the value of system register 8 (highlighted_button)."""
-        return self.location.button << 10
-
-    def getSystem9(self):
-        """Return the value of system register 9 (navigation_timer)."""
-        print >> sys.stderr, "Navigation timer checked, implement me!"
-        return 0
-
-    def getSystem10(self):
-        """Return the value of system register 10 (program_chain_for_timer)."""
-        print >> sys.stderr, "Navigation timer checked, implement me!"
-        return 0
-
-    def getSystem11(self):
-        """Return the value of system register 11 (karaoke_mode)."""
-        print >> sys.stderr, "Karaoke mode checked, implement me!"
-        return 0
-
-    def getSystem12(self):
-        """Return the value of system register 12 (parental_country)."""
-        return strToIso639(self.parentalCountry)
-
-    def getSystem13(self):
-        """Return the value of system register 13 (parental_level)."""
-        return self.parentalLevel
-
-    def getSystem14(self):
-        """Return the value of system register 14 (video_mode_pref)."""
-        return self.aspectRatio << 10 | self.videoMode << 8
-
-    def getSystem15(self):
-        """Return the value of system register 15 (audio_caps)."""
-        return 0x4000
-
-    def getSystem16(self):
-        """Return the value of system register 16 (audio_lang_pref)."""
-        if self.prefAudio != None:
-            return self.prefAudio
-        else:
-            return 0xffff  # Not specified
-
-    def getSystem17(self):
-        """Return the value of system register 17 (audio_ext_pref)."""
-        return 0
-
-    def getSystem18(self):
-        """Return the value of system register 18 (subpicture_lang_pref)."""
-        if self.prefSubpicture != None:
-            return self.prefSubpicture
-        else:
-            return 0xffff  # Not specified
-
-    def getSystem19(self):
-        """Return the value of system register 19 (subpicture_ext_pref)."""
-        return 0
-
-    def getSystem20(self):
-        """Return the value of system register 20 (region_code)."""
-        return self.regionCode
-
-    def getSystem21(self):
-        """Return the value of system register 21 (reserved)."""
-        return 0
-
-    def getSystem22(self):
-        """Return the value of system register 22 (reserved)."""
-        return 0
-
-    def getSystem23(self):
-        """Return the value of system register 23 (reserved_ext_playback)."""
-        return 0
-
-
-    def initializeRegisters(self):
-        self.generalRegisters = []
-        for i in range(16):
-            self.generalRegisters.append(GeneralRegister())
-
-        self.systemRegisters = []
-        for i in range(24):
-            self.systemRegisters.append( \
-                SystemRegister(getattr(self, "getSystem%d" % i)))
-
-    def getGeneralPurpose(self, regNr):
-        """Return the object corresponding to the specified general
-        purpose register."""
-        assert 0 <= regNr <= 15
-        return self.generalRegisters[regNr]
-
-    def getSystemParameter(self, regNr):
-        """Return the object corresponding to the specified system
-        parameter."""
-        assert 0 <= regNr <= 23
-        return self.systemRegisters[regNr]
