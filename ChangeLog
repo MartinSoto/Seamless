@@ -1,3 +1,16 @@
+2005-04-10  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py: Many dummy operations made active.
+	(PerformMachine.callFirstPlay, PerformMachine.callTitleMenu)
+	(PerformMachine.callManagerProgramChain, PerformMachine.callMenu):
+	Implemented.
+	(DiscPlayer.__init__): Add callOp parameter, and document
+	function.
+	(DiscPlayer.resume): If a resume happens without a matching call
+	operation just restart playback.
+	(ProgramChainPlayer.linkCell): Call linkTailProgramChain properly.
+	(VirtualMachine.__init__): Start playing the first program chain.
+
 2005-03-28  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (CellPlayer.setNav): nextVOBU ->

@@ -195,43 +195,43 @@ class PerformMachine(object):
         yield NoOp
 
     goto = makeMachineOperation('goto')
-    brk = makeMachineOperation('break')
-    exit = makeDummyOperation('exit')
+    brk = makeMachineOperation('brk')
+    exit = makeMachineOperation('exit')
 
     # Parental management
-    openSetParentalLevel = makeDummyOperation('openSetParentalLevel')
+    openSetParentalLevel = makeMachineOperation('openSetParentalLevel')
 
     # Links.
-    linkTopCell = makeDummyOperation('linkTopCell')
-    linkNextCell = makeDummyOperation('linkNextCell')
-    linkPrevCell = makeDummyOperation('linkPrevCell')
-    linkTopProgram = makeDummyOperation('linkTopProgram')
-    linkNextProgram = makeDummyOperation('linkNextProgram')
-    linkPrevProgram = makeDummyOperation('linkPrevProgram')
-    linkTopProgramChain = makeDummyOperation('linkTopProgramChain')
-    linkNextProgramChain = makeDummyOperation('linkNextProgramChain')
-    linkPrevProgramChain = makeDummyOperation('linkPrevProgramChain')
-    linkGoUpProgramChain = makeDummyOperation('linkGoUpProgramChain')
-    linkTailProgramChain = makeDummyOperation('linkTailProgramChain')
-    linkProgramChain = makeDummyOperation('linkProgramChain')
-    linkChapter = makeDummyOperation('linkChapter')
-    linkProgram = makeDummyOperation('linkProgram')
-    linkCell = makeDummyOperation('linkCell')
+    linkTopCell = makeMachineOperation('linkTopCell')
+    linkNextCell = makeMachineOperation('linkNextCell')
+    linkPrevCell = makeMachineOperation('linkPrevCell')
+    linkTopProgram = makeMachineOperation('linkTopProgram')
+    linkNextProgram = makeMachineOperation('linkNextProgram')
+    linkPrevProgram = makeMachineOperation('linkPrevProgram')
+    linkTopProgramChain = makeMachineOperation('linkTopProgramChain')
+    linkNextProgramChain = makeMachineOperation('linkNextProgramChain')
+    linkPrevProgramChain = makeMachineOperation('linkPrevProgramChain')
+    linkGoUpProgramChain = makeMachineOperation('linkGoUpProgramChain')
+    linkTailProgramChain = makeMachineOperation('linkTailProgramChain')
+    linkProgramChain = makeMachineOperation('linkProgramChain')
+    linkChapter = makeMachineOperation('linkChapter')
+    linkProgram = makeMachineOperation('linkProgram')
+    linkCell = makeMachineOperation('linkCell')
 
     # Select (highlight) a button
     selectButton = makeDummyOperation('selectButton')
     setSystemParam8 = makeDummyOperation('selectButton')
 
     # Jumps
-    jumpToTitle = makeDummyOperation('jumpToTitle')
-    jumpToTitleInSet = makeDummyOperation('jumpToTitleInSet')
-    jumpToChapterInSet = makeDummyOperation('jumpToChapterInSet')
+    jumpToTitle = makeMachineOperation('jumpToTitle')
+    jumpToTitleInSet = makeMachineOperation('jumpToTitleInSet')
+    jumpToChapterInSet = makeMachineOperation('jumpToChapterInSet')
 
-    jumpToFirstPlay = makeDummyOperation('jumpToFirstPlay')
-    jumpToTitleMenu = makeDummyOperation('jumpToTitleMenu')
-    jumpToMenu = makeDummyOperation('jumpToMenu')
+    jumpToFirstPlay = makeMachineOperation('jumpToFirstPlay')
+    jumpToTitleMenu = makeMachineOperation('jumpToTitleMenu')
+    jumpToMenu = makeMachineOperation('jumpToMenu')
     jumpToManagerProgramChain = \
-        makeDummyOperation('jumpToManagerProgramChain')
+        makeMachineOperation('jumpToManagerProgramChain')
 
     # Timed jump
     def setTimedJump(self, programChainNr, seconds):
@@ -252,10 +252,13 @@ class PerformMachine(object):
         program chain.
 
         The first play program chain is a special program chain in the
-        disk that is intended to be the first element played in that
+        disk that is intended to be the first element played in the
         disk when playback starts. If 'rtn' is not zero, it specifies
         the cell number to return to when the saved state is resumed."""
-        yield NoOp
+        yield Call(DiscPlayer(self, True).jumpToFirstPlay())
+
+        if rtn != 0:
+            yield Restart.playCell(rtn)
 
     def callTitleMenu(self, rtn=0):
         """Save the current location and jump to the title menu.
@@ -264,7 +267,10 @@ class PerformMachine(object):
         available titles in a disk. Not all disks offer a title
         menu. If 'rtn' is not zero, it specifies the cell number to
         return to when the saved state is resumed."""
-        yield NoOp
+        yield Call(DiscPlayer(self, True).jumpToTitleMenu())
+
+        if rtn != 0:
+            yield Restart.playCell(rtn)
 
     def callManagerProgramChain(self, programChainNr, rtn=0):
         """Save the current location and jump to the specified program
@@ -272,7 +278,11 @@ class PerformMachine(object):
 
         Program chains directly associated to the video manager are
         only for menus."""
-        yield NoOp
+        yield Call(DiscPlayer(self, True). \
+                   jumpToManagerProgramChain(programChainNr))
+
+        if rtn != 0:
+            yield Restart.playCell(rtn)
 
     def callMenu(self, menuType, rtn=0):
         """Save the current location and jump to the menu of the
@@ -282,9 +292,15 @@ class PerformMachine(object):
         dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
         dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
         dvdread.MENU_TYPE_CHAPTER."""
-        yield NoOp
+        title = self.location.getTitle()
+        yield Call(DiscPlayer(self, True). \
+                   jumpToMenu(title.videoTitleSet.titleSetNr,
+                              title.titleNr, menuType))
 
-    resume = makeDummyOperation('resume')
+        if rtn != 0:
+            yield Restart.playCell(rtn)
+
+    resume = makeMachineOperation('resume')
 
     # Selectable streams
     setAngle = makeDummyOperation('setAngle')
@@ -467,10 +483,17 @@ class PerformMachine(object):
 
 class DiscPlayer(object):
     __slots__ = ('perform',
+                 'callOp',
                  'videoManager')
 
-    def __init__(self, perform):
+    def __init__(self, perform, callOp=False):
+        """Create a disc player, based on the given perform machine.
+
+        'callOp' must be set to 'True' when the disc player is created
+        as part of a call operation. Otherwise the resume command will
+        continue playback by jumping to the first play program chain."""
         self.perform = perform
+        self.callOp = callOp
 
         self.videoManager = self.perform.info.videoManager
 
@@ -541,12 +564,19 @@ class DiscPlayer(object):
     @restartPoint
     def resume(self):
         """Resume playback at the previously saved location."""
-        pass
+        if self.callOp:
+            # We are handling a resume from an actual call
+            # operation. Just let the caller go on.
+            yield NoOp
+        else:
+            # A resume happened when no call operation was in
+            # effect. Try to keep playing.
+            yield Chain(self.jumpToFirstPlay())
 
     @restartPoint
     def exit(self):
         """End execution of the machine."""
-        # Doing nothing should do the trick.
+        # Returning without doing anything is enough to do the trick.
         yield NoOp
 
 
@@ -578,7 +608,7 @@ class TitlePlayer(object):
         the corresponding menu of the specified menu type.
 
         This operation is necessary to implement a particular DVD
-        virtual machine command that selects a menu in teh context of
+        virtual machine command that selects a menu in the context of
         a particular video title."""
         self.title = title
 
@@ -710,7 +740,7 @@ class ProgramChainPlayer(object):
 
         if cellNr == self.programChain.cellCount:
             # No more cells. Play the "tail".
-            yield Chain(self.linkTailProgramChain(self.programChain))
+            yield Chain(self.linkTailProgramChain())
         else:
             # Keep playing cells.
             yield Chain(self.linkCell(cellNr + 1))
@@ -1036,8 +1066,10 @@ class VirtualMachine(object):
         # The perform machine.
         self.perform = PerformMachine(info)
 
-        # Initialize the scheduler.
-        self.sched = itersched.Scheduler(ProgramChainPlayer(self.perform).playProgramChain(self.info.videoManager.getVideoTitleSet(1).getProgramChain(1)))
+        # Initialize the scheduler. The initial object should play the
+        # first play program chain.
+        self.sched = itersched.Scheduler(DiscPlayer(self.perform). \
+                                         jumpToFirstPlay())
 
         # The location is based on the current state of the scheduler.
         self.location = PlaybackLocation(self.sched)
