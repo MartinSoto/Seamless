@@ -1,4 +1,21 @@
+2005-04-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (ProgramChainPlayer.playProgramChain):
+	Add CLUT update.
+	(PerformMachine.finishCallOp): New method implement de common part
+	of call operations.
+	(PerformMachine.callMenu, PerformMachine.callManagerProgramChain) 
+	(PerformMachine.callTitleMenu, PerformMachine.callFirstPlay): Use
+	finishCallOp.
+
 2005-04-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.vobuHeader): Send
+	navigation events.
+	(PerformMachine.setAudio): Method implemented.
+
+	* src/machine/events.py (mpegTimeToGstTime): Moved from
+	machine.py.
 
 	* src/machine/machine.py (VirtualMachine.vobuHeader): Erased.
 	(PerformMachine.__slots__, PerformMachine.__init__): New attribute
@@ -16,6 +33,8 @@
 	(VirtualMachine.vobuRead): Properly handle pausing the pipeline.
 	(VirtualMachine): Get rid of synchronization in many methods (will
 	be readded in some form).
+	(VirtualMachine.__init__, VirtualMachine.wrapHeader): Renamed to
+	vobuHeader.
 
 2005-04-10  Martin Soto  <martinsoto@users.sourceforge.net>
 

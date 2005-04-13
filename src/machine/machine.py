@@ -24,19 +24,16 @@ import threading
 import time
 import traceback
 
+import gst
+
 import itersched
 from itersched import NoOp, Call, Chain, Restart, restartPoint
 
 import dvdread
 import decode
 import disassemble
+import events
 
-import gst
-
-
-def mpegTimeToGstTime(mpegTime):
-    """Convert MPEG time values to the GStreamer time format."""
-    return (long(mpegTime) * dvdread.MSECOND) / 90
 
 def strToIso639(strCode):
     """Encode an ISO639 country name to byte form."""
@@ -268,8 +265,7 @@ class PerformMachine(object):
         the cell number to return to when the saved state is resumed."""
         yield Call(DiscPlayer(self, True).jumpToFirstPlay())
 
-        if rtn != 0:
-            yield Restart.playCell(rtn)
+        yield Chain(self.finishCallOp(rtn))
 
     def callTitleMenu(self, rtn=0):
         """Save the current location and jump to the title menu.
@@ -280,24 +276,25 @@ class PerformMachine(object):
         return to when the saved state is resumed."""
         yield Call(DiscPlayer(self, True).jumpToTitleMenu())
 
-        if rtn != 0:
-            yield Restart.playCell(rtn)
+        yield Chain(self.finishCallOp(rtn))
 
     def callManagerProgramChain(self, programChainNr, rtn=0):
         """Save the current location and jump to the specified program
-        chain in the video manager.
+        chain in the video manager. If 'rtn' is not zero, it specifies
+        the cell number to return to when the saved state is resumed.
 
         Program chains directly associated to the video manager are
         only for menus."""
         yield Call(DiscPlayer(self, True). \
                    jumpToManagerProgramChain(programChainNr))
 
-        if rtn != 0:
-            yield Restart.playCell(rtn)
+        yield Chain(self.finishCallOp(rtn))
 
     def callMenu(self, menuType, rtn=0):
         """Save the current location and jump to the menu of the
-        specified type in the current title.
+        specified type in the current title. If 'rtn' is not zero, it
+        specifies the cell number to return to when the saved state is
+        resumed.
 
         The menu type is one of dvdread.MENU_TYPE_TITLE,
         dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
@@ -308,15 +305,89 @@ class PerformMachine(object):
                    jumpToMenu(title.videoTitleSet.titleSetNr,
                               title.titleNr, menuType))
 
+        yield Chain(self.finishCallOp(rtn))
+
+    def finishCallOp(self, rtn):
+        """Perform the final, common part of a call operation."""
+        # If a program chain is playing, update the color lookup
+        # table.
+        programChain = self.location.currentProgramChain()
+        if programChain != None:
+            yield Call(events.subpictureClutEvent(programChain))
+
         if rtn != 0:
             yield Restart.playCell(rtn)
 
     resume = makeMachineOperation('resume')
 
     # Selectable streams
-    setAngle = makeDummyOperation('setAngle')
-    setAudio = makeDummyOperation('setAudio')
-    setSubpicture = makeDummyOperation('setSubpicture')
+    def setAngle(self, angle):
+        """Set the current angle to the one specified."""
+        # FIXME: Implement this.
+        yield NoOp
+    
+    def setAudio(self, logical):
+        """Set the current logical audio stream to the one specified."""
+        programChain = self.location.currentProgramChain()
+        if programChain == None or self.audio == 15:
+            # We aren't playing a program chain, or the logical audio
+            # track is explicitly set to none.
+            physical = -1
+        elif isinstance(programChain.container, dvdread.LangUnit):
+            # We are in the menu domain. The physical audio is always
+            # 0.
+            physical = 0
+        else:
+            # Try to find a physical stream from the information in
+            # the program chain.
+            physical = programChain.getAudioPhysStream(self.audio + 1)
+            if physical == None:
+                # Just pick the first existing stream.
+                physical = -1
+                for logical in range(1, 9):
+                    newPhys = self.location.programChain. \
+                              getAudioPhysStream(logical)
+                    if newPhys != None:
+                        physical = newPhys
+                        break
+
+        print "*** Setting physical audio to", physical
+        yield Chain(events.audioEvent(physical))
+
+    def setSubpicture(self, logical):
+        """Set the current logical subpicture stream to the one
+        specified."""
+        programChain = self.location.currentProgramChain()
+        if programChain == None or \
+           self.subpicture & 0x40 == 0 or \
+           self.subpicture & 0x3f > 31:
+            # We aren't playing a program chain, or the logical
+            # subpicture is explicitly set to none.
+            physical = -1
+        elif isinstance(programChain.container, dvdread.LangUnit):
+            # We are in the menu domain. The physical subpicture is
+            # always 0.
+            physical = 0
+        else:
+            streams = self.location.programChain. \
+                      getSubpicturePhysStreams((self.subpicture \
+                                                & 0x1f) + 1)
+            if streams == None:
+                physical = -1
+            else:
+                if self.location.getAttributeContainer(). \
+                   videoAttributes.aspectRatio == dvdread.ASPECT_RATIO_4_3:
+                    physical = streams[dvdread.SUBPICTURE_PHYS_TYPE_4_3]
+                else:
+                    if self.aspectRatio == dvdread.ASPECT_RATIO_16_9:
+                        physical = streams[dvdread. \
+                                           SUBPICTURE_PHYS_TYPE_WIDESCREEN]
+                    else:
+                        physical = streams[dvdread. \
+                                           SUBPICTURE_PHYS_TYPE_LETTERBOX]
+
+        print "*** Setting physical subpicture to", physical
+        yield Chain(events.subpictureEvent(physical))
 
     # Karaoke control
     setKaraokeMode = makeDummyOperation('setKaraokeMode')
@@ -725,6 +796,9 @@ class ProgramChainPlayer(object):
         self.programChain = programChain
         self.cell = None
 
+        # Update the color lookup table.
+        yield Call(events.subpictureClutEvent(self.programChain))
+
         if cellNr == 1:
             # Play the 'pre' commands.
             yield Call(CommandBlockPlayer(self.perform). \
@@ -972,7 +1046,7 @@ class CellPlayer(object):
                 # We reached the end of the cell.
                 break
 
-        print "Still time: ", self.cell.stillTime
+        print "*** Still time: ", self.cell.stillTime
 
         if self.cell.stillTime > 0:
             # We have a still frame.
@@ -1054,7 +1128,7 @@ class VirtualMachine(object):
 
         # Connect our signals to the source object.
         src.connect('vobu-read', self.vobuRead)
-        src.connect('vobu-header', self.wrapHeader)
+        src.connect('vobu-header', self.vobuHeader)
 
         # The perform machine.
         self.perform = PerformMachine(info)
@@ -1075,7 +1149,9 @@ class VirtualMachine(object):
 
     def vobuRead(self, src):
         """Invoked by the source element after reading a complete
-        VOBU."""
+        VOBU.
+
+        Synchronization is managed internally by this method."""
 
         self.lock.acquire()
         
@@ -1116,16 +1192,19 @@ class VirtualMachine(object):
 
         self.lock.release()
 
-    def wrapHeader(self, src, buf):
-        """The signal handler for the source's vobu-header signal. It
-        is only responsible for wrapping the raw header in a NavPacket
-        object, and handling control to the vobuHeader entry point."""
+    @synchronized
+    def vobuHeader(self, src, buf):
+        """The signal handler for the source's vobu-header signal."""
         # This must be done inmediatly. Otherwise, the contents of the
         # buffer may change before we handle them.
         nav = dvdread.NavPacket(buf.get_data())
 
-        # Just store the navigation packet as part of the state.
+        # Store the navigation packet as part of the state.
         self.perform.currentNav = nav
+
+        # Send a nav event. This event cannot be queued and must be
+        # sent inmediatly after receiving the header.
+        self.src.emit('push-event', events.navEvent(nav))
 
     def flushSource(self):
         """Stop the source element. This operation works even in the

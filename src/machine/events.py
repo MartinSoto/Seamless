@@ -16,55 +16,71 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-def fillerEvent(machine):
-    machine.queueEvent(Event(EVENT_FILLER))
+import gst
 
-def stillFrameEvent(machine):
-    st = Structure('application/x-gst-dvd');
+
+def mpegTimeToGstTime(mpegTime):
+    """Convert MPEG time values to the GStreamer time format."""
+    return (long(mpegTime) * gst.MSECOND) / 90
+
+def navEvent(nav):
+    """Create and return a nav packet event for the specified nav
+    packet."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-nav-packet')
+    st.set_value('start_ptm', mpegTimeToGstTime(nav.startTime), 'uint64')
+    st.set_value('end_ptm', mpegTimeToGstTime(nav.endTime), 'uint64')
+    return gst.event_new_any(st)
+
+def stillFrameEvent():
+    """Create and yield a still frame event."""
+    st = gst.Structure('application/x-gst-dvd');
     st.set_value('event', 'dvd-spu-still-frame')
-    machine.queueEvent(event_new_any(st))
-    print >> sys.stderr, 'Still frame set'
+    yield gst.event_new_any(st)
 
-def audioEvent(machine):
-    st = Structure('application/x-gst-dvd');
+def audioEvent(physical):
+    """Create and yield a new audio event for the specified physical
+    stream."""
+    st = gst.Structure('application/x-gst-dvd');
     st.set_value('event', 'dvd-audio-stream-change')
-    st.set_value('physical', machine.audioPhys, 'int')
-    machine.queueEvent(event_new_any(st))
-    print >> sys.stderr, 'New audio:', machine.audioPhys
+    st.set_value('physical', physical, 'int')
+    yield gst.event_new_any(st)
 
-def subpictureEvent(machine):
-    st = Structure('application/x-gst-dvd');
+def subpictureEvent(physical):
+    """Create and yield a new subpicture event for the specified
+    physical stream."""
+    st = gst.Structure('application/x-gst-dvd');
     st.set_value('event', 'dvd-spu-stream-change')
-    st.set_value('physical', machine.subpicturePhys, 'int')
-    machine.queueEvent(event_new_any(st))
-    print >> sys.stderr, 'New subpicture:', machine.subpicturePhys
+    st.set_value('physical', physical, 'int')
+    yield gst.event_new_any(st)
 
-def subpictureCLUTEvent(machine):
-    st = Structure('application/x-gst-dvd');
+def subpictureClutEvent(programChain):
+    """Create and yield a new subpicture CLUT event based on the
+    specified program chain."""
+    st = gst.Structure('application/x-gst-dvd');
     st.set_value('event', 'dvd-spu-clut-change')
 
     # Each value is stored in a separate field.
     for i in range(16):
-        st.set_value('clut%02d' % i,
-                     machine.highlightProgramChain.getCLUTEntry(i + 1))
+        st.set_value('clut%02d' % i, programChain.getClutEntry(i + 1))
 
-    machine.queueEvent(event_new_any(st))
+    yield gst.event_new_any(st)
 
-def highlightEvent(machine):
-    if machine.highlightArea != None:
-        btnObj = machine.buttonNav.getButton(machine.location.button)
-        (sx, sy, ex, ey) = btnObj.area
+# def highlightEvent(machine):
+#     if machine.highlightArea != None:
+#         btnObj = machine.buttonNav.getButton(machine.location.button)
+#         (sx, sy, ex, ey) = btnObj.area
 
-        st = Structure('application/x-gst-dvd');
-        st.set_value('event', 'dvd-spu-highlight')
-        st.set_value('button', machine.location.button)
-        st.set_value('palette', btnObj.paletteSelected)
-        st.set_value('sx', sx)
-        st.set_value('sy', sy)
-        st.set_value('ex', ex)
-        st.set_value('ey', ey)
-    else:
-        st = Structure('application/x-gst-dvd')
-        st.set_value('event', 'dvd-spu-reset-highlight')
+#         st = Structure('application/x-gst-dvd');
+#         st.set_value('event', 'dvd-spu-highlight')
+#         st.set_value('button', machine.location.button)
+#         st.set_value('palette', btnObj.paletteSelected)
+#         st.set_value('sx', sx)
+#         st.set_value('sy', sy)
+#         st.set_value('ex', ex)
+#         st.set_value('ey', ey)
+#     else:
+#         st = Structure('application/x-gst-dvd')
+#         st.set_value('event', 'dvd-spu-reset-highlight')
 
-    machine.src.emit('queue-event', event_new_any(st));
+#     machine.src.emit('queue-event', event_new_any(st));
