@@ -1,3 +1,22 @@
+2005-04-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.vobuHeader): Erased.
+	(PerformMachine.__slots__, PerformMachine.__init__): New attribute
+	currentNav to make the current navigation packet accessible to the
+	whole set of execution objects.
+	(CellPlayer.selectButton, CellPlayer.setSystemParam8) 
+	(CellPlayer.setAngle, CellPlayer.setAudio) 
+	(CellPlayer.setSubpicture, CellPlayer.setKaraokeMode): Erased.
+	(CellPlayer.playVobu): Renamed to playFromVobu
+	(CellPlayer.setNav): Mixed with playFromVobu.
+	(MachineStill): New class.
+	(PerformMachine.callMenu, PerformMachine.getSystem4): Use
+	currentTitle instead of getTitle.
+	(CellPlayer.__slots__): Get rid of nav attribute.
+	(VirtualMachine.vobuRead): Properly handle pausing the pipeline.
+	(VirtualMachine): Get rid of synchronization in many methods (will
+	be readded in some form).
+
 2005-04-10  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py: Many dummy operations made active.

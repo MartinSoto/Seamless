@@ -18,10 +18,11 @@
 
 """Main implementation of the DVD virtual machine."""
 
-import threading
-import traceback
 import string
 import sys
+import threading
+import time
+import traceback
 
 import itersched
 from itersched import NoOp, Call, Chain, Restart, restartPoint
@@ -56,9 +57,14 @@ class MachineException(Exception):
 disasm = disassemble.CommandDisassembler()
 
 
-class EosEvent(object):
-    """A token representing an EOS event in the event queue."""
-    pass
+class MachineStill(object):
+    """A token to tell the machine's scheduling loop that we are
+    displaying a still frame."""
+
+    __slots__ = ()
+
+# The single MachineStillCls instance.
+machineStill = MachineStill()
 
 
 class Register(decode.Register):
@@ -136,7 +142,9 @@ class PerformMachine(object):
                  'videoMode',
 
                  'generalRegisters',
-                 'systemRegisters')
+                 'systemRegisters',
+
+                 'currentNav')
 
     def __init__(self, info, location=None):
         self.info = info
@@ -180,6 +188,9 @@ class PerformMachine(object):
         self.generalRegisters = None
         self.systemRegisters = None
         self.initializeRegisters()
+
+        # The current navigation packet.
+        self.currentNav = None
 
     def setLocation(self, location):
         self.location = location
@@ -292,7 +303,7 @@ class PerformMachine(object):
         dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
         dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
         dvdread.MENU_TYPE_CHAPTER."""
-        title = self.location.getTitle()
+        title = self.location.currentTitle()
         yield Call(DiscPlayer(self, True). \
                    jumpToMenu(title.videoTitleSet.titleSetNr,
                               title.titleNr, menuType))
@@ -333,7 +344,7 @@ class PerformMachine(object):
 
     def getSystem4(self):
         """Return the value of system register 4 (title_in_volume)."""
-        title = self.location.getTitle()
+        title = self.location.currentTitle()
         if title != None:
             return title.globalTitleNr
         else:
@@ -895,8 +906,7 @@ class CellPlayer(object):
                  'cell',	# Cell currently being played.
                  'domain',	# Playback domain this cell belongs to.
                  'titleNr',	# DVD title number the cell is in.
-                 'sectorNr',	# Last sector played.
-                 'nav')		# Last nav packet seen.
+                 'sectorNr')	# Last sector played.
 
     def currentCell(self):
         """Return the cell currently being played.
@@ -910,7 +920,6 @@ class CellPlayer(object):
         self.domain = None
         self.titleNr = None
         self.sectorNr = None
-        self.nav = None
 
     @restartPoint
     def playCell(self, cell):
@@ -934,67 +943,51 @@ class CellPlayer(object):
             assert False, 'Unexpected type for program chain container'        
 
         # Just play the first VOBU in the cell.
-        yield Chain(self.playVobu(cell.firstSector))
+        yield Chain(self.playFromVobu(cell.firstSector))
 
     @restartPoint
-    def playVobu(self, sectorNr):
+    def playFromVobu(self, sectorNr):
         """Play the VOBU at the specified sector number."""
         self.sectorNr = sectorNr
 
-        # Instruct the pipeline to play starting at the specified
-        # sector.
-        yield (self.domain, self.titleNr, sectorNr)
+        # Play until the end of the cell.
+        nav = None
+        while True:
+            yield (self.domain, self.titleNr, self.sectorNr)
 
-        # The values in the next nav packet should determine if more
-        # material is played in the cell. See the 'setNav' method in
-        # this class. If this point is reached we are at the end of
-        # the cell.
+            # After the yield, the whole VOBU will be read by the
+            # playback element and sent down the pipeline. During this
+            # process, a new nav packed (VOBU header) will be seen and
+            # stored in the perform object.
 
-    @restartPoint
-    def setNav(self, nav):
-        """Set the current navigation packet."""
-        self.nav = nav
+            # At this point, a new nav packet must be there. If this
+            # is not the case, we have a serious problem.
+            assert nav != self.perform.currentNav
 
-        # Play the next VOBU.
-        if nav.nextVobu != 0x3fffffff:
-            yield Chain(self.playVobu(self.sectorNr + nav.nextVobu))
+            nav = self.perform.currentNav
+            if nav.nextVobu != 0x3fffffff:
+                # Progress to the next VOBU.
+                self.sectorNr = self.sectorNr + nav.nextVobu
+            else:
+                # We reached the end of the cell.
+                break
 
+        print "Still time: ", self.cell.stillTime
 
-    #
-    # Command Execution
-    #
+        if self.cell.stillTime > 0:
+            # We have a still frame.
 
-    def selectButton(self, buttonNr):
-        """Select the specified button in the current menu."""
-        pass
-
-    def setSystemParam8(self, value):
-        """Select the button specified by the 6 most significant bits
-        of the 16 value 'value'."""
-        pass
-
-    def saveLocation(self, rtn=0):
-        """Save the current location in the resume location.
-
-        If 'rtn' is not zero, it specifies the cell number to return
-        to when the saved state is resumed."""
-        pass
-
-    def setAngle(self, angle):
-        """Set the current angle to the specified angle number."""
-        pass
-
-    def setAudio(self, audio):
-        """Set the current audio stream as specified."""
-        pass
-
-    def setSubpicture(self, subpicture):
-        """Set the current subpicture stream as specified."""
-        pass
-
-    def setKaraokeMode(self, mode):
-        """Set the karaoke mode."""
-        pass
+            if self.cell.stillTime == 0xff:
+                # Unlimited wait time. Loop "infinitely" until a
+                # restart operation takes this method out of the
+                # stack.
+                while True:
+                    yield machineStill
+            else:
+                # Wait the specified number of seconds.
+                endTime = time.time() + self.cell.stillTime
+                while time.time() < endTime:
+                    yield machineStill
 
 
 class PlaybackLocation(object):
@@ -1080,11 +1073,12 @@ class VirtualMachine(object):
     # Signal Handling
     #
 
-    @synchronized
     def vobuRead(self, src):
         """Invoked by the source element after reading a complete
         VOBU."""
 
+        self.lock.acquire()
+        
         try:
             # Get the next item.
             item = self.sched.next()
@@ -1101,12 +1095,26 @@ class VirtualMachine(object):
         if isinstance(item, gst.Event):
             # We have an event, put it in the pipeline.
             self.src.emit('push-event', item);
+        elif item == machineStill:
+            # We are displaying a still frame. Keep the pipeline busy,
+            # but be nice to the processor:
+
+            # We don't want to keep the lock while sleeping.
+            self.lock.release()
+
+            time.sleep(0.1)
+
+            self.src.emit('push-event', gst.Event(gst.EVENT_FILLER))
+
+            return
         else:
             # Otherwise, we have a new playback position in the disc.
             (domain, titleNr, sectorNr) = item
             src.set_property('domain', domain)
             src.set_property('title', titleNr)
             src.set_property('vobu-start', sectorNr)
+
+        self.lock.release()
 
     def wrapHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal. It
@@ -1115,12 +1123,9 @@ class VirtualMachine(object):
         # This must be done inmediatly. Otherwise, the contents of the
         # buffer may change before we handle them.
         nav = dvdread.NavPacket(buf.get_data())
-        self.vobuHeader(nav)
 
-    @entryPoint
-    def vobuHeader(self, nav):
-        """Handle a new VOBU header."""
-        yield Restart.setNav(nav)
+        # Just store the navigation packet as part of the state.
+        self.perform.currentNav = nav
 
     def flushSource(self):
         """Stop the source element. This operation works even in the
@@ -1160,11 +1165,9 @@ class VirtualMachine(object):
 
     def timeJump(self, seconds):
         pass
-    timeJump = synchronized(timeJump)
 
     def timeJumpRelative(self, seconds):
         pass
-    timeJumpRelative = synchronized(timeJumpRelative)
 
 
     #
@@ -1197,31 +1200,24 @@ class VirtualMachine(object):
 
     def up(self):
         pass
-    up = synchronized(up)
 
     def down(self):
         pass
-    down = synchronized(down)
 
     def left(self):
         pass
-    left = synchronized(left)
 
     def right(self):
         pass
-    right = synchronized(right)
 
     def confirm(self):
         pass
-    confirm = synchronized(confirm)
 
     def menu(self):
         pass
-    menu = synchronized(menu)
 
     def rtn(self):
         pass
-    rtn = synchronized(rtn)
 
     def force(self):
         pass
