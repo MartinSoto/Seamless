@@ -1,3 +1,21 @@
+2005-04-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (makeDummyOperation): Erased.
+	(PerformMachine.getAttributeContainer): Fixed access to objects in
+	dvdread module.
+	(PerformMachine.updateHighlight): New procedure.
+	(PerformMachine.getButtonObj): New procedure.
+	(entryInstant, VirtualMachine.runInstant): Add a decorator and
+	method to run entry points in "instant mode", i.e. they run in a
+	separate itersched and their results (onyl events) are immediately
+	sent down the pipeline.
+	(CellPlayer.playFromVobu, VirtualMachine.vobuHeader): vobuHeader
+	works now as an instant entry point. Highlight update moved from
+	the cell player.
+	(VirtualMachine.selectButtonInteractive): New method.
+	(VirtualMachine.up, VirtualMachine.down, VirtualMachine.left) 
+	(VirtualMachine.right): Implemented.
+
 2005-04-15  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (PerformMachine.updateAudio): 

@@ -105,18 +105,6 @@ def makeMachineOperation(method):
 
     return restartOp
 
-# FIXME: Erase this when all operations get implemented properly.
-def makeDummyOperation(method):
-    def printOp(self, *args, **keywords):
-        lArgs = [repr(i) for i in args]
-        lKw = ['%s=%s' % (name, str(value))
-               for name, value in keywords.items()]
-        print "Invoked: %s(%s)" % (method, string.join(lArgs + lKw, ', '))
-        yield NoOp
-
-    return printOp
-
-
 class PerformMachine(object):
     __slots__ = ('info',
                  'location',
@@ -346,7 +334,10 @@ class PerformMachine(object):
         yield Chain(self.updateSubpicture())
 
     # Karaoke control
-    setKaraokeMode = makeDummyOperation('setKaraokeMode')
+    def setKaraokeMode(self, mode):
+        """Set the karaoke mode to the specified one."""
+        # FIXME: Implement this.
+        yield NoOp
 
 
     #
@@ -388,12 +379,11 @@ class PerformMachine(object):
     @staticmethod
     def getAttributeContainer(programChain):
         """Find the container of the current stream attributes."""
-
-        if isinstance(programChain.container, LangUnit):
+        if isinstance(programChain.container, dvdread.LangUnit):
             return programChain.container.container
-        elif isinstance(programChain.container, VideoTitleSet):
+        elif isinstance(programChain.container, dvdread.VideoTitleSet):
             return programChain.container
-        elif isinstance(self.programChain.container, VideoManager):
+        elif isinstance(programChain.container, dvdread.VideoManager):
             return programChain.container
         else:
             assert 0, 'Unexpected type for program chain container'
@@ -433,6 +423,11 @@ class PerformMachine(object):
 
         print "*** Setting physical subpicture to", physical
         yield events.subpictureEvent(physical)
+
+    def updateHighlight(self):
+        """Send a highlight event corresponding to the current
+        highlighted area."""
+        yield events.highlightEvent(self.currentNav, self.currentButton)
 
 
     #
@@ -589,7 +584,7 @@ class PerformMachine(object):
 
 
     #
-    # Language Units
+    # State Retrieval
     #
 
     def getLangUnit(self, container):
@@ -604,6 +599,15 @@ class PerformMachine(object):
             unit = container.getLangUnit(1)
 
         return unit
+
+    def getButtonObj(self):
+        """Return the current dvdread.Button object."""
+        if self.currentNav == None or \
+           self.currentNav.highlightStatus == dvdread.HLSTATUS_NONE or \
+           not 1 <= self.currentButton <= self.currentNav.buttonCount:
+            return None
+        else:
+            return self.currentNav.getButton(self.currentButton)
 
 
 class DiscPlayer(object):
@@ -1074,10 +1078,6 @@ class CellPlayer(object):
         # Play until the end of the cell.
         nav = None
         while True:
-            # Update the highlight.
-            yield events.highlightEvent(self.perform.currentNav,
-                                        self.perform.currentButton)
-
             yield (self.domain, self.titleNr, self.sectorNr)
 
             # After the yield, the whole VOBU will be read by the
@@ -1153,9 +1153,14 @@ def synchronized(method):
     return wrapper
 
 
-def entryPoint(method):
+def entryInstant(method):
+    """Create a machine entry point that will be executed instantly
+    when invoked.
+
+    'method' will be wrapped to be run using the runInstant
+    method. The whole operation is synchronized."""
     def wrapper(self, *args, **keywords):
-        self.sched.call(method(self, *args, **keywords))
+        self.runInstant(method(self, *args, **keywords))
 
     return synchronized(wrapper)
 
@@ -1243,7 +1248,7 @@ class VirtualMachine(object):
 
         self.lock.release()
 
-    @synchronized
+    @entryInstant
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
         # This must be done inmediatly. Otherwise, the contents of the
@@ -1257,19 +1262,36 @@ class VirtualMachine(object):
         # sent inmediatly after receiving the header.
         self.src.emit('push-event', events.navEvent(nav))
 
+        # Update the highlight.
+        yield Call(self.perform.updateHighlight())
+
     def flushSource(self):
         """Stop the source element. This operation works even in the
-        middle of a VOBU playback and it's necessary for fast
+        middle of a VOBU playback and is necessary for fast
         interactive response."""
         self.src.set_property('block-count', 0)
 
 
     #
-    # Playback Control
+    # Interactive Operation Support
     #
 
-    def jump(self, subdiv):
-        pass
+    def runInstant(self, itr):
+        """Run the specified iterator in instantaneous mode.
+
+        The iterator will be run as the main iterator from a new
+        iterator scheduler (itersched). The results must exclusively
+        be events, that will be sent immediately down the pipeline."""
+        sched = itersched.Scheduler(itr)
+        for item in sched:
+            assert isinstance(item, gst.Event), \
+                   "Spurious object '%s'" % str(item)
+            self.src.emit('queue-event', item);
+
+
+    #
+    # Playback Control
+    #
 
     def stop(self):
         pass
@@ -1319,26 +1341,50 @@ class VirtualMachine(object):
     # Button Navigation
     #
 
-    def setButtonNav(self, buttonNav):
-        pass
-
-    def getButtonObj(self):
-        pass
-
     def selectButtonInteractive(self, buttonNr):
-        pass
+        """Select a button in interactive mode."""
+        yield Call(self.perform.selectButton(buttonNr))
+        yield Call(self.perform.updateHighlight())
 
+    @entryInstant
     def up(self):
-        pass
+        btnObj = self.perform.getButtonObj()
+        if btnObj == None:
+            return
 
+        nextBtn = btnObj.up
+        if nextBtn != 0:
+            yield Call(self.selectButtonInteractive(nextBtn))
+
+    @entryInstant
     def down(self):
-        pass
+        btnObj = self.perform.getButtonObj()
+        if btnObj == None:
+            return
 
+        nextBtn = btnObj.down
+        if nextBtn != 0:
+            yield Call(self.selectButtonInteractive(nextBtn))
+
+    @entryInstant
     def left(self):
-        pass
+        btnObj = self.perform.getButtonObj()
+        if btnObj == None:
+            return
 
+        nextBtn = btnObj.left
+        if nextBtn != 0:
+            yield Call(self.selectButtonInteractive(nextBtn))
+
+    @entryInstant
     def right(self):
-        pass
+        btnObj = self.perform.getButtonObj()
+        if btnObj == None:
+            return
+
+        nextBtn = btnObj.right
+        if nextBtn != 0:
+            yield Call(self.selectButtonInteractive(nextBtn))
 
     def confirm(self):
         pass
