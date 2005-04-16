@@ -145,6 +145,8 @@ class CommandDecoder(object):
         if linkType == 0x0:
             return
         elif linkType == 0x1:
+            yield Call(self.performButton(cmd))
+
             if cmd[7] == 0x01:
                 yield Call(self.machine.linkTopCell())
             elif cmd[7] == 0x02:
@@ -169,21 +171,19 @@ class CommandDecoder(object):
                 yield Call(self.machine.linkTailProgramChain())
             elif cmd[7] == 0x10:
                 yield Call(self.machine.resume())
-
-            yield Call(self.performButton(cmd))
         elif linkType == 0x4:
             yield Call(self.machine.linkProgramChain(cmd[6] * \
                                                      0x100 + cmd[7]))
         elif linkType == 0x5:
+            yield Call(self.performButton(cmd))
             yield Call(self.machine.linkChapter((cmd[6] & 0x3) * \
                                                 0x100 + cmd[7]))
-            yield Call(self.performButton(cmd))
         elif linkType == 0x6:
+            yield Call(self.performButton(cmd))
             yield Call(self.machine.linkProgram(cmd[7]))
-            yield Call(self.performButton(cmd))
         elif linkType == 0x7:
-            yield Call(self.machine.linkCell(cmd[7]))
             yield Call(self.performButton(cmd))
+            yield Call(self.machine.linkCell(cmd[7]))
         else:
             assert False, 'Unknown link operation'
 

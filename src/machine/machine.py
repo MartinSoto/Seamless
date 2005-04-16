@@ -124,11 +124,6 @@ class PerformMachine(object):
                  'audio',
                  'subpicture',
                  'angle',
-                 'audioPhys',
-                 'subpicturePhys',
-                 'buttonNav',
-                 'highlightArea',
-                 'highlightProgramChain',
                  'regionCode',
                  'prefMenuLang',
                  'prefAudio',
@@ -137,6 +132,8 @@ class PerformMachine(object):
                  'parentalLevel',
                  'aspectRatio',
                  'videoMode',
+
+                 'currentButton',
 
                  'generalRegisters',
                  'systemRegisters',
@@ -153,13 +150,6 @@ class PerformMachine(object):
         self.audio = 0		# This seems to be needed by some DVDs.
         self.subpicture = 0x3e	# None
         self.angle = 1
-
-        # Pipeline state.
-        self.audioPhys = -1
-        self.subpicturePhys = -1
-        self.buttonNav = None
-        self.highlightArea = None
-        self.highlightProgramChain = None
 
         # Machine options and state:
 
@@ -180,6 +170,9 @@ class PerformMachine(object):
 
         # Current video mode.
         self.videoMode = dvdread.VIDEO_MODE_NORMAL
+
+        # Current highlighted button.
+        self.currentButton = 0
 
         # Initialize all machine registers.
         self.generalRegisters = None
@@ -227,8 +220,23 @@ class PerformMachine(object):
     linkCell = makeMachineOperation('linkCell')
 
     # Select (highlight) a button
-    selectButton = makeDummyOperation('selectButton')
-    setSystemParam8 = makeDummyOperation('selectButton')
+    def selectButton(self, buttonNr):
+        """Select the specified button."""
+        if not 0 <= buttonNr <= 36:
+            raise MachineException, "Button number out of range"
+
+        print "*** Button %d selected" % buttonNr
+
+        self.currentButton = buttonNr
+
+        yield NoOp
+        
+    def setSystemParam8(self, value):
+        """Set system parameter 8 to the specified value.
+
+        This has the effect of selecting the button with number value
+        >> 10."""
+        yield Chain(self.selectButton(value >> 10))
 
     # Jumps
     jumpToTitle = makeMachineOperation('jumpToTitle')
@@ -313,7 +321,7 @@ class PerformMachine(object):
         # table.
         programChain = self.location.currentProgramChain()
         if programChain != None:
-            yield Call(events.subpictureClutEvent(programChain))
+            yield events.subpictureClutEvent(programChain)
 
         if rtn != 0:
             yield Restart.playCell(rtn)
@@ -328,6 +336,26 @@ class PerformMachine(object):
     
     def setAudio(self, logical):
         """Set the current logical audio stream to the one specified."""
+        self.audio = logical
+        yield Chain(self.updateAudio())
+        
+    def setSubpicture(self, logical):
+        """Set the current logical subpicture stream to the one
+        specified."""
+        self.subpicture = logical
+        yield Chain(self.updateSubpicture())
+
+    # Karaoke control
+    setKaraokeMode = makeDummyOperation('setKaraokeMode')
+
+
+    #
+    # Pipeline Management and Events
+    #
+
+    def updateAudio(self):
+        """Send an audio event corresponding to the current logical
+        audio stream."""
         programChain = self.location.currentProgramChain()
         if programChain == None or self.audio == 15:
             # We aren't playing a program chain, or the logical audio
@@ -340,42 +368,59 @@ class PerformMachine(object):
         else:
             # Try to find a physical stream from the information in
             # the program chain.
-            physical = programChain.getAudioPhysStream(self.audio + 1)
+            try:
+                physical = programChain.getAudioPhysStream(self.audio + 1)
+            except IndexError:
+                physical = None
+
             if physical == None:
                 # Just pick the first existing stream.
                 physical = -1
-                for logical in range(1, 9):
-                    newPhys = self.location.programChain. \
-                              getAudioPhysStream(logical)
+                for self.audio in range(1, 9):
+                    newPhys = programChain.getAudioPhysStream(self.audio)
                     if newPhys != None:
                         physical = newPhys
                         break
 
         print "*** Setting physical audio to", physical
-        yield Chain(events.audioEvent(physical))
+        yield events.audioEvent(physical)
 
-    def setSubpicture(self, logical):
-        """Set the current logical subpicture stream to the one
-        specified."""
+    @staticmethod
+    def getAttributeContainer(programChain):
+        """Find the container of the current stream attributes."""
+
+        if isinstance(programChain.container, LangUnit):
+            return programChain.container.container
+        elif isinstance(programChain.container, VideoTitleSet):
+            return programChain.container
+        elif isinstance(self.programChain.container, VideoManager):
+            return programChain.container
+        else:
+            assert 0, 'Unexpected type for program chain container'
+
+    def updateSubpicture(self):
+        """Send a subpicture event corresponding to the current
+        logical subpicture stream."""
         programChain = self.location.currentProgramChain()
-        if programChain == None or \
-           self.subpicture & 0x40 == 0 or \
-           self.subpicture & 0x3f > 31:
-            # We aren't playing a program chain, or the logical
-            # subpicture is explicitly set to none.
+        if programChain == None:
             physical = -1
         elif isinstance(programChain.container, dvdread.LangUnit):
             # We are in the menu domain. The physical subpicture is
             # always 0.
             physical = 0
+        elif self.subpicture & 0x40 == 0 or \
+             self.subpicture & 0x3f > 31:
+            # We aren't playing a program chain, or the logical
+            # subpicture is explicitly set to none.
+            physical = -1
         else:
-            streams = self.location.programChain. \
+            streams = programChain. \
                       getSubpicturePhysStreams((self.subpicture \
                                                 & 0x1f) + 1)
             if streams == None:
                 physical = -1
             else:
-                if self.location.getAttributeContainer(). \
+                if self.location.getAttributeContainer(programChain). \
                    videoAttributes.aspectRatio == dvdread.ASPECT_RATIO_4_3:
                     physical = streams[dvdread.SUBPICTURE_PHYS_TYPE_4_3]
                 else:
@@ -387,10 +432,7 @@ class PerformMachine(object):
                                            SUBPICTURE_PHYS_TYPE_LETTERBOX]
 
         print "*** Setting physical subpicture to", physical
-        yield Chain(events.subpictureEvent(physical))
-
-    # Karaoke control
-    setKaraokeMode = makeDummyOperation('setKaraokeMode')
+        yield events.subpictureEvent(physical)
 
 
     #
@@ -447,7 +489,7 @@ class PerformMachine(object):
 
     def getSystem8(self):
         """Return the value of system register 8 (highlighted_button)."""
-        return self.location.button << 10
+        return self.currentButton << 10
 
     def getSystem9(self):
         """Return the value of system register 9 (navigation_timer)."""
@@ -456,7 +498,8 @@ class PerformMachine(object):
         return 0
 
     def getSystem10(self):
-        """Return the value of system register 10 (program_chain_for_timer)."""
+        """Return the value of system register 10
+        (program_chain_for_timer)."""
         # FIXME: implement this.
         print >> sys.stderr, "Navigation timer checked, implement me!"
         return 0
@@ -797,7 +840,11 @@ class ProgramChainPlayer(object):
         self.cell = None
 
         # Update the color lookup table.
-        yield Call(events.subpictureClutEvent(self.programChain))
+        yield events.subpictureClutEvent(self.programChain)
+
+        # Update the audio and subpicture streams.
+        yield Call(self.perform.updateAudio())
+        yield Call(self.perform.updateSubpicture())
 
         if cellNr == 1:
             # Play the 'pre' commands.
@@ -1014,7 +1061,7 @@ class CellPlayer(object):
         elif isinstance(cell.programChain.container, dvdread.VideoManager):
             self.titleNr = 0
         else:
-            assert False, 'Unexpected type for program chain container'        
+            assert False, 'Unexpected type for program chain container'
 
         # Just play the first VOBU in the cell.
         yield Chain(self.playFromVobu(cell.firstSector))
@@ -1027,6 +1074,10 @@ class CellPlayer(object):
         # Play until the end of the cell.
         nav = None
         while True:
+            # Update the highlight.
+            yield events.highlightEvent(self.perform.currentNav,
+                                        self.perform.currentButton)
+
             yield (self.domain, self.titleNr, self.sectorNr)
 
             # After the yield, the whole VOBU will be read by the

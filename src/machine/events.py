@@ -18,6 +18,8 @@
 
 import gst
 
+import dvdread
+
 
 def mpegTimeToGstTime(mpegTime):
     """Convert MPEG time values to the GStreamer time format."""
@@ -33,29 +35,29 @@ def navEvent(nav):
     return gst.event_new_any(st)
 
 def stillFrameEvent():
-    """Create and yield a still frame event."""
+    """Create and return a still frame event."""
     st = gst.Structure('application/x-gst-dvd');
     st.set_value('event', 'dvd-spu-still-frame')
-    yield gst.event_new_any(st)
+    return gst.event_new_any(st)
 
 def audioEvent(physical):
-    """Create and yield a new audio event for the specified physical
+    """Create and return a new audio event for the specified physical
     stream."""
     st = gst.Structure('application/x-gst-dvd');
     st.set_value('event', 'dvd-audio-stream-change')
     st.set_value('physical', physical, 'int')
-    yield gst.event_new_any(st)
+    return gst.event_new_any(st)
 
 def subpictureEvent(physical):
-    """Create and yield a new subpicture event for the specified
+    """Create and return a new subpicture event for the specified
     physical stream."""
     st = gst.Structure('application/x-gst-dvd');
     st.set_value('event', 'dvd-spu-stream-change')
     st.set_value('physical', physical, 'int')
-    yield gst.event_new_any(st)
+    return gst.event_new_any(st)
 
 def subpictureClutEvent(programChain):
-    """Create and yield a new subpicture CLUT event based on the
+    """Create and return a new subpicture CLUT event based on the
     specified program chain."""
     st = gst.Structure('application/x-gst-dvd');
     st.set_value('event', 'dvd-spu-clut-change')
@@ -64,23 +66,30 @@ def subpictureClutEvent(programChain):
     for i in range(16):
         st.set_value('clut%02d' % i, programChain.getClutEntry(i + 1))
 
-    yield gst.event_new_any(st)
+    return gst.event_new_any(st)
 
-# def highlightEvent(machine):
-#     if machine.highlightArea != None:
-#         btnObj = machine.buttonNav.getButton(machine.location.button)
-#         (sx, sy, ex, ey) = btnObj.area
+def highlightEvent(nav, button):
+    """Create and return a new highlight event based on the specified
+    navigation packet and button number."""
+    if nav == None or \
+       nav.highlightStatus == dvdread.HLSTATUS_NONE or \
+       not 1 <= button <= nav.buttonCount:
+        print "+++ Deactivating highlight"
+        # No highlight button.
+        st = gst.Structure('application/x-gst-dvd')
+        st.set_value('event', 'dvd-spu-reset-highlight')
+    else:
+        btnObj = nav.getButton(button)
+        (sx, sy, ex, ey) = btnObj.area
+        print "+++ Activating highlight", btnObj.area
 
-#         st = Structure('application/x-gst-dvd');
-#         st.set_value('event', 'dvd-spu-highlight')
-#         st.set_value('button', machine.location.button)
-#         st.set_value('palette', btnObj.paletteSelected)
-#         st.set_value('sx', sx)
-#         st.set_value('sy', sy)
-#         st.set_value('ex', ex)
-#         st.set_value('ey', ey)
-#     else:
-#         st = Structure('application/x-gst-dvd')
-#         st.set_value('event', 'dvd-spu-reset-highlight')
+        st = gst.Structure('application/x-gst-dvd');
+        st.set_value('event', 'dvd-spu-highlight')
+        st.set_value('button', button)
+        st.set_value('palette', btnObj.paletteSelected)
+        st.set_value('sx', sx)
+        st.set_value('sy', sy)
+        st.set_value('ex', ex)
+        st.set_value('ey', ey)
 
-#     machine.src.emit('queue-event', event_new_any(st));
+    return gst.event_new_any(st)

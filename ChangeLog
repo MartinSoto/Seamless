@@ -1,3 +1,12 @@
+2005-04-15  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (PerformMachine.updateAudio): 
+	(PerformMachine.updateSubpicture): New methods.
+
+	* src/machine/decode.py (CommandDecoder.performLink): Issue the
+	performButton operations before the link operations. Otherwise the
+	button changes get lost.
+
 2005-04-14  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (ProgramChainPlayer.playProgramChain):
@@ -7,6 +16,9 @@
 	(PerformMachine.callMenu, PerformMachine.callManagerProgramChain) 
 	(PerformMachine.callTitleMenu, PerformMachine.callFirstPlay): Use
 	finishCallOp.
+	(PerformMachine.__init__): Erase pipeline state.
+	(PerformMachine.selectButton, PerformMachine.setSystemParam8):
+	Implemented.
 
 2005-04-13  Martin Soto  <martinsoto@users.sourceforge.net>
 
