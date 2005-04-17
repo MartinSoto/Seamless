@@ -179,6 +179,8 @@ class Scheduler(object):
         Returns an iterator that goes through the restartable object
         instances currently stacked in the scheduler. Last stacked
         instances are returned first."""
+        if isinstance(self.current, RestartableIterator):
+            yield self.current.instance
         for itr in reversed(self.stack):
             if isinstance(itr, RestartableIterator):
                 yield itr.instance

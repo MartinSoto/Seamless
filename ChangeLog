@@ -1,5 +1,25 @@
 2005-04-17  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (PerformMachine.wrapCallOperation):
+	Update the pipeline.
+	(PerformMachine.updateSubpicture): Invoke getAttributeContainer
+	correctly.
+	(VirtualMachine.defer): New method. The defer token is now hidden.
+	(VirtualMachine.flush): New method.
+	(VirtualMachine.prevProgram, VirtualMachine.nextProgram): React
+	properly when the beginning or the end of the program chain have
+	been reached.
+	(VirtualMachine.stop, VirtualMachine.prevProgram) 
+	(VirtualMachine.nextProgram, VirtualMachine.up) 
+	(VirtualMachine.down, VirtualMachine.left, VirtualMachine.right) 
+	(VirtualMachine.confirm, VirtualMachine.menu): Adapted to use the
+	new methods.
+
+	* src/machine/itersched.py (Scheduler.restartable): restartable
+	must also take the current into account.
+
+2005-04-17  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/machine.py (callOperation.wrapper) 
 	(PerformMachine.wrapCallOperation, PerformMachine.callFirstPlay) 
 	(PerformMachine.callTitleMenu) 

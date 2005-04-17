@@ -277,6 +277,10 @@ class PerformMachine(object):
         if programChain != None:
             yield events.subpictureClutEvent(programChain)
 
+        yield Call(self.updateAudio())
+        yield Call(self.updateSubpicture())
+        yield Call(self.updateHighlight())
+
         rtn = args[-1]
         if rtn != 0:
             yield Restart.playCell(rtn)
@@ -425,7 +429,7 @@ class PerformMachine(object):
             if streams == None:
                 physical = -1
             else:
-                if self.location.getAttributeContainer(programChain). \
+                if self.getAttributeContainer(programChain). \
                    videoAttributes.aspectRatio == dvdread.ASPECT_RATIO_4_3:
                     physical = streams[dvdread.SUBPICTURE_PHYS_TYPE_4_3]
                 else:
@@ -1198,18 +1202,6 @@ def synchronized(method):
     return wrapper
 
 
-class Defer(object):
-    """A deferred operation return value for entry points.
-
-    When the defer object is yielded by an entry point, it tells the
-    special entry point scheduling loop to stop and defer the
-    remaining execution to the next normal machine scheduling cycle."""
-
-    __slots__ = ()
-
-# The single Defer instance.
-defer = Defer()
-
 def entryPoint(method):
     """Create a machine entry point that will be executed instantly
     when invoked.
@@ -1260,18 +1252,23 @@ class VirtualMachine(object):
     # Interactive Operation Support
     #
 
+    class Defer(object):
+        __slots__ = ()
+
+    deferToken = Defer()
+
     def runEntryPoint(self, itr):
         """Run the specified iterator as entry point.
 
         The iterator will be run as the main iterator from a new
         iterator scheduler (itersched). The results can be either
         events, that will be sent immediately down the pipeline, or
-        the 'defer' token. If 'defer' is received, the execution is
-        suspended and the iterator is moved to the top of the standard
-        iterator scheduler."""
+        the 'defer' token. If the 'defer()' method is called, the
+        execution is suspended and the iterator is moved to the top of
+        the standard iterator scheduler."""
         sched = itersched.Scheduler(itr)
         for item in sched:
-            if isinstance(item, Defer):
+            if isinstance(item, self.Defer):
                 # Defer execution until next main loop iteration.
                 self.sched.call(sched)
                 return
@@ -1283,6 +1280,20 @@ class VirtualMachine(object):
     def stopSource(self):
         """Stop the source element instantly."""
         self.src.set_property('block-count', 0)
+
+    def defer(self):
+        """When called by an entry point, transfers execution of the
+        rest of the method to the main scheduler."""
+        self.stopSource()
+        yield self.deferToken
+
+    def flush(self):
+        """Flush the pipeline."""
+        yield events.flushEvent()
+
+        programChain = self.location.currentProgramChain()
+        if programChain != None:
+            yield events.subpictureClutEvent(programChain)
 
 
     #
@@ -1358,34 +1369,40 @@ class VirtualMachine(object):
 
     @entryPoint
     def stop(self):
-        self.stopSource()
-        yield defer
-        yield events.flushEvent()
+        yield Call(self.defer())
+        yield Call(self.flush())
         yield Restart.exit()
 
     @entryPoint
     def prevProgram(self):
-        programChain = self.location.currentProgramChain()
-        if programChain == None:
+        cell = self.location.currentCell()
+        if cell == None:
             return
 
-        self.stopSource()
-        yield defer
-        yield events.flushEvent()
+        yield Call(self.defer())
+        yield Call(self.flush())
 
-        yield Call(self.perform.linkPrevProgram())
+        newProgram = cell.programNr - 1
+        if newProgram == 0:
+            # Restart from the beginning.
+            newProgram = 1
+
+        yield Call(self.perform.linkProgram(newProgram))
 
     @entryPoint
     def nextProgram(self):
-        programChain = self.location.currentProgramChain()
-        if programChain == None:
+        cell = self.location.currentCell()
+        if cell == None:
             return
 
-        self.stopSource()
-        yield defer
-        yield events.flushEvent()
+        yield Call(self.defer())
+        yield Call(self.flush())
 
-        yield Call(self.perform.linkNextProgram())
+        newProgram = cell.programNr + 1
+        if newProgram > cell.programChain.programCount:
+            yield Call(self.perform.linkTailProgramChain())
+        else:
+            yield Call(self.perform.linkProgram(newProgram))
 
 
     #
@@ -1479,9 +1496,8 @@ class VirtualMachine(object):
         if btnObj == None:
             return
 
-        self.stopSource()
-        yield defer
-        yield events.flushEvent()
+        yield Call(self.defer())
+        yield Call(self.flush())
 
         yield Restart.buttonCommand(btnObj.command)
 
@@ -1492,9 +1508,8 @@ class VirtualMachine(object):
                isinstance(programChain.container, dvdread.LangUnit):
             return
 
-        self.stopSource()
-        yield defer
-        yield events.flushEvent()
+        yield Call(self.defer())
+        yield Call(self.flush())
 
         yield Call(self.perform.callMenu(dvdread.MENU_TYPE_ROOT, 0))
 
