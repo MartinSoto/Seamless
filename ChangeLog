@@ -1,3 +1,34 @@
+2005-04-17  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (callOperation.wrapper) 
+	(PerformMachine.wrapCallOperation, PerformMachine.callFirstPlay) 
+	(PerformMachine.callTitleMenu) 
+	(PerformMachine.callManagerProgramChain, PerformMachine.callMenu):
+	Refactor call operations to concentrate state saving and restoring
+	code in a single method. Nav packet must be saved and restored.
+	(DiscPlayer.exit): Propagate exit command when exit is trapped by
+	a called DiscPlayer.
+	(ProgramChainPlayer.buttonCommand): New method.
+	(CommandBlockPlayer.playButtonCmd): New method.
+	(Defer, entryPoint, VirtualMachine.runEntryPoint): New approach to
+	implementing entry points. The entry point is run in a separate
+	scheduler, but if it returns the 'Defer' object, execution is
+	moved to the main scheduler.
+	(VirtualMachine.stop, VirtualMachine.prevProgram) 
+	(VirtualMachine.nextProgram, VirtualMachine.up) 
+	(VirtualMachine.down, VirtualMachine.left, VirtualMachine.right) 
+	(VirtualMachine.confirm, VirtualMachine.menu): Now work properly
+	(next and prevProgram don't do proper bounds check.)
+
+	* src/machine/itersched.py (Scheduler.call, Scheduler.chain):
+	Allow for absorbing schedulers when they are called or chained by
+	other scheduler.
+
+	* src/machine/events.py (flushEvent): New procedure.
+
+	* src/machine/decode.py (CommandDecoder.perform3): rtn parameter
+	to call operations is now mandatory.
+
 2005-04-16  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (makeDummyOperation): Erased.

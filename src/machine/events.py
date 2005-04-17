@@ -93,3 +93,7 @@ def highlightEvent(nav, button):
         st.set_value('ey', ey)
 
     return gst.event_new_any(st)
+
+def flushEvent():
+    """Create and return a flush event."""
+    return gst.Event(gst.EVENT_FLUSH)

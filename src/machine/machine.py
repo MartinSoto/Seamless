@@ -105,6 +105,12 @@ def makeMachineOperation(method):
 
     return restartOp
 
+def callOperation(method):
+    def wrapper(self, *args):
+        yield Chain(self.wrapCallOperation(method, *args))
+
+    return wrapper
+
 class PerformMachine(object):
     __slots__ = ('info',
                  'location',
@@ -251,7 +257,32 @@ class PerformMachine(object):
         yield NoOp
 
     # Call and resume
-    def callFirstPlay(self, rtn=0):
+    def wrapCallOperation(self, method, *args):
+        """Wrap a call operation.
+
+        This method provides the entry and exit code that is shared by
+        all four call operations. This wrapper is activated with the
+        '@callOperation' decorator."""
+        # Save the necessary state.
+        nav = self.currentNav
+
+        yield Call(method(self, *args))
+
+        # Restore the state.
+        self.currentNav = nav
+
+        # If a program chain is playing, update the color lookup
+        # table.
+        programChain = self.location.currentProgramChain()
+        if programChain != None:
+            yield events.subpictureClutEvent(programChain)
+
+        rtn = args[-1]
+        if rtn != 0:
+            yield Restart.playCell(rtn)
+
+    @callOperation
+    def callFirstPlay(self, rtn):
         """Save the current location and jump to the first play
         program chain.
 
@@ -261,9 +292,8 @@ class PerformMachine(object):
         the cell number to return to when the saved state is resumed."""
         yield Call(DiscPlayer(self, True).jumpToFirstPlay())
 
-        yield Chain(self.finishCallOp(rtn))
-
-    def callTitleMenu(self, rtn=0):
+    @callOperation
+    def callTitleMenu(self, rtn):
         """Save the current location and jump to the title menu.
 
         The title menu is a menu allowing to select one of the
@@ -272,9 +302,8 @@ class PerformMachine(object):
         return to when the saved state is resumed."""
         yield Call(DiscPlayer(self, True).jumpToTitleMenu())
 
-        yield Chain(self.finishCallOp(rtn))
-
-    def callManagerProgramChain(self, programChainNr, rtn=0):
+    @callOperation
+    def callManagerProgramChain(self, programChainNr, rtn):
         """Save the current location and jump to the specified program
         chain in the video manager. If 'rtn' is not zero, it specifies
         the cell number to return to when the saved state is resumed.
@@ -284,9 +313,8 @@ class PerformMachine(object):
         yield Call(DiscPlayer(self, True). \
                    jumpToManagerProgramChain(programChainNr))
 
-        yield Chain(self.finishCallOp(rtn))
-
-    def callMenu(self, menuType, rtn=0):
+    @callOperation
+    def callMenu(self, menuType, rtn):
         """Save the current location and jump to the menu of the
         specified type in the current title. If 'rtn' is not zero, it
         specifies the cell number to return to when the saved state is
@@ -300,19 +328,6 @@ class PerformMachine(object):
         yield Call(DiscPlayer(self, True). \
                    jumpToMenu(title.videoTitleSet.titleSetNr,
                               title.titleNr, menuType))
-
-        yield Chain(self.finishCallOp(rtn))
-
-    def finishCallOp(self, rtn):
-        """Perform the final, common part of a call operation."""
-        # If a program chain is playing, update the color lookup
-        # table.
-        programChain = self.location.currentProgramChain()
-        if programChain != None:
-            yield events.subpictureClutEvent(programChain)
-
-        if rtn != 0:
-            yield Restart.playCell(rtn)
 
     resume = makeMachineOperation('resume')
 
@@ -679,7 +694,8 @@ class DiscPlayer(object):
         dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
         dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
         dvdread.MENU_TYPE_CHAPTER."""
-        # Get the title set and title. Title set 0 is the video manager.
+        # Get the title set and title. Title set 0 is the video
+        # manager.
         if titleSetNr == 0:
             titleSet = self.videoManager
         else:
@@ -705,8 +721,18 @@ class DiscPlayer(object):
     @restartPoint
     def exit(self):
         """End execution of the machine."""
-        # Returning without doing anything is enough to do the trick.
-        yield NoOp
+        if self.callOp:
+            # This object was created as the result of a call
+            # operation.
+
+            # This line propagates the exit operation down the
+            # stack. How exactly, is left as an exercise to the
+            # reader.
+            yield Chain(i for i in [Restart.exit()])
+        else:
+            # Returning without doing anything is enough to do the
+            # trick.
+            yield NoOp
 
 
 class TitlePlayer(object):
@@ -970,6 +996,14 @@ class ProgramChainPlayer(object):
         if next != None:
             yield Chain(self.playProgramChain(next))
 
+    @restartPoint
+    def buttonCommand(self, buttonCmd):
+        """Execute 'buttonCmd' as a button command in this program
+        chain."""
+        yield Call(CommandBlockPlayer(self.perform). \
+                   playButtonCmd(self.programChain.cellCommands,
+                                 buttonCmd))
+
 
 class CommandBlockPlayer(object):
     __slots__ = ('perform',
@@ -989,6 +1023,17 @@ class CommandBlockPlayer(object):
     def playBlock(self, commands, commandNr=1):
         self.commands = commands
         yield Chain(self.goto(commandNr))
+
+    @restartPoint
+    def playButtonCmd(self, cellCommands, buttonCmd):
+        """Play the specified button command.
+
+        The command will use the cell commands block as context."""
+        self.commands = cellCommands
+
+        print "Button command:"
+        print disassemble.disassemble(buttonCmd)
+        yield Call(self.decoder.performCommand(buttonCmd))
 
     @restartPoint
     def goto(self, commandNr):
@@ -1153,14 +1198,26 @@ def synchronized(method):
     return wrapper
 
 
-def entryInstant(method):
+class Defer(object):
+    """A deferred operation return value for entry points.
+
+    When the defer object is yielded by an entry point, it tells the
+    special entry point scheduling loop to stop and defer the
+    remaining execution to the next normal machine scheduling cycle."""
+
+    __slots__ = ()
+
+# The single Defer instance.
+defer = Defer()
+
+def entryPoint(method):
     """Create a machine entry point that will be executed instantly
     when invoked.
 
-    'method' will be wrapped to be run using the runInstant
+    'method' will be wrapped to be run using the runEntryPoint
     method. The whole operation is synchronized."""
     def wrapper(self, *args, **keywords):
-        self.runInstant(method(self, *args, **keywords))
+        self.runEntryPoint(method(self, *args, **keywords))
 
     return synchronized(wrapper)
 
@@ -1197,6 +1254,35 @@ class VirtualMachine(object):
         # The location is based on the current state of the scheduler.
         self.location = PlaybackLocation(self.sched)
         self.perform.setLocation(self.location)
+
+
+    #
+    # Interactive Operation Support
+    #
+
+    def runEntryPoint(self, itr):
+        """Run the specified iterator as entry point.
+
+        The iterator will be run as the main iterator from a new
+        iterator scheduler (itersched). The results can be either
+        events, that will be sent immediately down the pipeline, or
+        the 'defer' token. If 'defer' is received, the execution is
+        suspended and the iterator is moved to the top of the standard
+        iterator scheduler."""
+        sched = itersched.Scheduler(itr)
+        for item in sched:
+            if isinstance(item, Defer):
+                # Defer execution until next main loop iteration.
+                self.sched.call(sched)
+                return
+
+            assert isinstance(item, gst.Event), \
+                   "Spurious object '%s'" % str(item)
+            self.src.emit('queue-event', item)
+
+    def stopSource(self):
+        """Stop the source element instantly."""
+        self.src.set_property('block-count', 0)
 
 
     #
@@ -1240,7 +1326,7 @@ class VirtualMachine(object):
 
             return
         else:
-            # Otherwise, we have a new playback position in the disc.
+            # Otherwise, we have a new playback position.
             (domain, titleNr, sectorNr) = item
             src.set_property('domain', domain)
             src.set_property('title', titleNr)
@@ -1248,7 +1334,7 @@ class VirtualMachine(object):
 
         self.lock.release()
 
-    @entryInstant
+    @entryPoint
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
         # This must be done inmediatly. Otherwise, the contents of the
@@ -1265,42 +1351,41 @@ class VirtualMachine(object):
         # Update the highlight.
         yield Call(self.perform.updateHighlight())
 
-    def flushSource(self):
-        """Stop the source element. This operation works even in the
-        middle of a VOBU playback and is necessary for fast
-        interactive response."""
-        self.src.set_property('block-count', 0)
-
-
-    #
-    # Interactive Operation Support
-    #
-
-    def runInstant(self, itr):
-        """Run the specified iterator in instantaneous mode.
-
-        The iterator will be run as the main iterator from a new
-        iterator scheduler (itersched). The results must exclusively
-        be events, that will be sent immediately down the pipeline."""
-        sched = itersched.Scheduler(itr)
-        for item in sched:
-            assert isinstance(item, gst.Event), \
-                   "Spurious object '%s'" % str(item)
-            self.src.emit('queue-event', item);
-
 
     #
     # Playback Control
     #
 
+    @entryPoint
     def stop(self):
-        pass
+        self.stopSource()
+        yield defer
+        yield events.flushEvent()
+        yield Restart.exit()
 
+    @entryPoint
     def prevProgram(self):
-        pass
+        programChain = self.location.currentProgramChain()
+        if programChain == None:
+            return
 
+        self.stopSource()
+        yield defer
+        yield events.flushEvent()
+
+        yield Call(self.perform.linkPrevProgram())
+
+    @entryPoint
     def nextProgram(self):
-        pass
+        programChain = self.location.currentProgramChain()
+        if programChain == None:
+            return
+
+        self.stopSource()
+        yield defer
+        yield events.flushEvent()
+
+        yield Call(self.perform.linkNextProgram())
 
 
     #
@@ -1312,14 +1397,16 @@ class VirtualMachine(object):
     currentTime = property(getCurrentTime)
 
     def getCanTimeJump(self):
-        pass
+        return False
     canTimeJump = property(getCanTimeJump)
 
+    @entryPoint
     def timeJump(self, seconds):
-        pass
+        yield NoOp
 
+    @entryPoint
     def timeJumpRelative(self, seconds):
-        pass
+        yield NoOp
 
 
     #
@@ -1327,14 +1414,14 @@ class VirtualMachine(object):
     #
 
     def getAudioStream(self):
-        pass
+        return None
 
     def setAudioStream(self, logical):
         pass
     audioStream = property(getAudioStream, setAudioStream)
 
     def getAudioStreams(self):
-        pass
+        return None
 
 
     #
@@ -1346,7 +1433,7 @@ class VirtualMachine(object):
         yield Call(self.perform.selectButton(buttonNr))
         yield Call(self.perform.updateHighlight())
 
-    @entryInstant
+    @entryPoint
     def up(self):
         btnObj = self.perform.getButtonObj()
         if btnObj == None:
@@ -1356,7 +1443,7 @@ class VirtualMachine(object):
         if nextBtn != 0:
             yield Call(self.selectButtonInteractive(nextBtn))
 
-    @entryInstant
+    @entryPoint
     def down(self):
         btnObj = self.perform.getButtonObj()
         if btnObj == None:
@@ -1366,7 +1453,7 @@ class VirtualMachine(object):
         if nextBtn != 0:
             yield Call(self.selectButtonInteractive(nextBtn))
 
-    @entryInstant
+    @entryPoint
     def left(self):
         btnObj = self.perform.getButtonObj()
         if btnObj == None:
@@ -1376,7 +1463,7 @@ class VirtualMachine(object):
         if nextBtn != 0:
             yield Call(self.selectButtonInteractive(nextBtn))
 
-    @entryInstant
+    @entryPoint
     def right(self):
         btnObj = self.perform.getButtonObj()
         if btnObj == None:
@@ -1386,15 +1473,36 @@ class VirtualMachine(object):
         if nextBtn != 0:
             yield Call(self.selectButtonInteractive(nextBtn))
 
+    @entryPoint
     def confirm(self):
-        pass
+        btnObj = self.perform.getButtonObj()
+        if btnObj == None:
+            return
 
+        self.stopSource()
+        yield defer
+        yield events.flushEvent()
+
+        yield Restart.buttonCommand(btnObj.command)
+
+    @entryPoint
     def menu(self):
-        pass
+        programChain = self.location.currentProgramChain()
+        if programChain == None or \
+               isinstance(programChain.container, dvdread.LangUnit):
+            return
 
+        self.stopSource()
+        yield defer
+        yield events.flushEvent()
+
+        yield Call(self.perform.callMenu(dvdread.MENU_TYPE_ROOT, 0))
+
+    @entryPoint
     def rtn(self):
-        pass
+        yield NoOp
 
+    @entryPoint
     def force(self):
-        pass
+        yield NoOp
 

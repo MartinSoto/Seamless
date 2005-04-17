@@ -89,12 +89,14 @@ class MainUserInterface(object):
         return self.player
 
     def shutDown(self):
+        self.window.hide()
+
+        self.player.stop()
+
         # Stop control plugins.
         if self.options.lirc:
             self.lirc.close()
         self.xscreensaver.close()
-
-        self.player.stop()
 
         gtk.main_quit()
 

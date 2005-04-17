@@ -143,10 +143,20 @@ class Scheduler(object):
 
     def call(self, itr):
         self.stack.append(self.current)
-        self.current = itr
+        if isinstance(itr, Scheduler):
+            # Other schedulers get absorbed automatically.
+            self.stack.extend(itr.stack)
+            self.current = itr.current
+        else:
+            self.current = itr
 
     def chain(self, itr):
-        self.current = itr
+        if isinstance(itr, Scheduler):
+            # Other schedulers get absorbed automatically.
+            self.stack.extend(itr.stack)
+            self.current = itr.current
+        else:
+            self.current = itr
 
     def restart(self, methodName, *posArgs, **kwArgs):
         # Go down the stack searching for an instance having a method
