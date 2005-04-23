@@ -27,8 +27,7 @@ from itersched import NoOp, Call, Chain, Restart, restartPoint
 import dvdread
 import decode
 import disassemble
-import events
-import pipelineops as ops
+import pipelinecmds as cmds
 
 
 def strToIso639(strCode):
@@ -290,8 +289,6 @@ class VirtualMachine(object):
         if not 0 <= buttonNr <= 36:
             raise MachineException, "Button number out of range"
 
-        print "*** Button %d selected" % buttonNr
-
         self.currentButton = buttonNr
 
         yield NoOp
@@ -400,7 +397,7 @@ class VirtualMachine(object):
         # table.
         programChain = self.currentProgramChain()
         if programChain != None:
-            yield events.subpictureClutEvent(programChain.clut)
+            yield cmds.setSubpictureClut(programChain.clut)
 
         yield Call(self.updateAudio())
         yield Call(self.updateSubpicture())
@@ -571,8 +568,7 @@ class VirtualMachine(object):
                         physical = newPhys
                         break
 
-        print "*** Setting physical audio to", physical
-        yield events.audioEvent(physical)
+        yield cmds.setAudio(physical)
 
     @staticmethod
     def getAttributeContainer(programChain):
@@ -619,8 +615,7 @@ class VirtualMachine(object):
                         physical = streams[dvdread. \
                                            SUBPICTURE_PHYS_TYPE_LETTERBOX]
 
-        print "*** Setting physical subpicture to", physical
-        yield events.subpictureEvent(physical)
+        yield cmds.setSubpicture(physical)
 
     def updateHighlight(self):
         """Send a highlight event corresponding to the current
@@ -629,14 +624,11 @@ class VirtualMachine(object):
            self.currentNav.highlightStatus == dvdread.HLSTATUS_NONE or \
            not 1 <= self.currentButton <= self.currentNav.buttonCount:
             # No highlight button.
-            print "+++ Deactivating highlight"
-            yield events.highlightResetEvent()
+            yield cmds.resetHighlight()
         else:
             btnObj = self.currentNav.getButton(self.currentButton)
-            print "+++ Activating highlight", btnObj.area
-
-            yield events.highlightEvent(btnObj.area, self.currentButton,
-                                        btnObj.paletteSelected)
+            yield cmds.highlight(btnObj.area, self.currentButton,
+                                 btnObj.paletteSelected)
 
 
     #
@@ -989,7 +981,7 @@ class ProgramChainPlayer(object):
         self.cell = None
 
         # Update the color lookup table.
-        yield events.subpictureClutEvent(self.programChain.clut)
+        yield cmds.setSubpictureClut(self.programChain.clut)
 
         # Update the audio and subpicture streams.
         yield Call(self.machine.updateAudio())
@@ -1121,7 +1113,6 @@ class CommandBlockPlayer(object):
         The command will use the cell commands block as context."""
         self.commands = cellCommands
 
-        print "Button command:"
         print disassemble.disassemble(buttonCmd)
         yield Call(self.decoder.performCommand(buttonCmd))
 
@@ -1208,7 +1199,7 @@ class CellPlayer(object):
         # Play until the end of the cell.
         nav = None
         while True:
-            yield (self.domain, self.titleNr, self.sectorNr)
+            yield cmds.playVobu(self.domain, self.titleNr, self.sectorNr)
 
             # After the yield, the whole VOBU will be read by the
             # playback element and sent down the pipeline. During this
@@ -1227,8 +1218,6 @@ class CellPlayer(object):
                 # We reached the end of the cell.
                 break
 
-        print "*** Still time: ", self.cell.stillTime
-
         if self.cell.stillTime > 0:
             # We have a still frame.
 
@@ -1237,10 +1226,10 @@ class CellPlayer(object):
                 # restart operation takes this method out of the
                 # stack.
                 while True:
-                    yield ops.machineStill
+                    yield cmds.pause()
             else:
                 # Wait the specified number of seconds.
                 endTime = time.time() + self.cell.stillTime
                 while time.time() < endTime:
-                    yield ops.machineStill
+                    yield cmds.pause()
 

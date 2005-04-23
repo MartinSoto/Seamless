@@ -1,3 +1,26 @@
+2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/pipeline.py: 
+	* src/machine/events.py: 
+	Eliminate 'Event' at the end of most names.
+
+	* src/machine/pipeline.py (Pipeline.defer): Operation moved to use
+	command objects. The machines, as well as the entry points, are
+	expected to return only command objects that can be run on the
+	pipeline.
+
+	Added a whole set of pipeline control operations. The object keeps
+	track of the internal pipeline state and tries not to send
+	unnecessary events.
+
+	* src/machine/pipelinecmds.py: Renamed from pipelineops. Add
+	factory methods for all pipeline oprations.
+
+	* src/machine/machine.py (VirtualMachine.wrapCallOperation) 
+	(VirtualMachine.updateAudio, VirtualMachine.updateSubpicture) 
+	(VirtualMachine.updateHighlight, CellPlayer.playFromVobu): Use
+	the command objects from pipelinecmds.
+
 2005-04-23  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/pipeline.py (Pipeline.flush): 

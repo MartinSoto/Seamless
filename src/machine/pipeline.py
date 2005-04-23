@@ -27,7 +27,6 @@ import itersched
 
 import dvdread
 import events
-import pipelineops as ops
 
 
 def synchronized(method):
@@ -48,7 +47,14 @@ class Pipeline(object):
     __slots__ = ('src',
                  'machine',
                  'mainItr',
-                 'lock')
+                 'lock',
+
+                 'audio',
+                 'subpicture',
+                 'clut',
+                 'area',
+                 'button',
+                 'palette')
 
 
     def __init__(self, src, machine):
@@ -64,6 +70,27 @@ class Pipeline(object):
         src.connect('vobu-read', self.vobuRead)
         src.connect('vobu-header', self.vobuHeader)
 
+        # Initialize the pipeline state variables:
+        self.audio = None
+        self.subpicture = None
+        self.clut = None
+        self.area = None
+        self.button = None
+        self.palette = None
+
+    #
+    # Utility Methods
+    #
+
+    def queueEvent(self, event):
+        """Put 'event' in the source's queue."""
+        self.src.emit('queue-event', event)
+
+    def stopSource(self):
+        """Stop the source element instantly."""
+        self.src.set_property('block-count', 0)
+
+
 
     #
     # Source Signal Handling
@@ -75,39 +102,20 @@ class Pipeline(object):
         VOBU."""
 
         try:
-            # Get the next item.
-            item = self.mainItr.next()
+            # Get the next command object.
+            cmd = self.mainItr.next()
         except StopIteration:
             # Time to stop the pipeline.
             self.src.set_eos()
-            self.src.emit('push-event', events.eosEvent())
+            self.src.emit('push-event', events.eos())
             return
         except:
             # We had an exception in the playback code.
             traceback.print_exc()
             sys.exit(1)
 
-        if isinstance(item, gst.Event):
-            # We have an event, put it in the pipeline.
-            self.src.emit('push-event', item);
-        elif item == ops.machineStill:
-            # We are displaying a still frame. Keep the pipeline busy,
-            # but be nice to the processor:
-
-            # We don't want to keep the lock while sleeping.
-            self.lock.release()
-            time.sleep(0.1)
-            self.lock.acquire()
-
-            self.src.emit('push-event', events.fillerEvent())
-
-            return
-        else:
-            # Otherwise, we have a new playback position.
-            (domain, titleNr, sectorNr) = item
-            src.set_property('domain', domain)
-            src.set_property('title', titleNr)
-            src.set_property('vobu-start', sectorNr)
+        # Execute the command on the pipeline.
+        cmd(self)
 
     @synchronized
     def vobuHeader(self, src, buf):
@@ -117,8 +125,8 @@ class Pipeline(object):
         nav = dvdread.NavPacket(buf.get_data())
 
         # Send a nav event.
-        self.src.emit('push-event', events.navEvent(nav.startTime,
-                                                    nav.endTime))
+        self.src.emit('push-event', events.nav(nav.startTime,
+                                               nav.endTime))
 
         # Register the nav packet with the machine.
         self.machine.call(self.machine.setCurrentNav(nav))
@@ -128,57 +136,122 @@ class Pipeline(object):
     # Interactive Operation Support
     #
 
+    class Defer(object):
+        """A special token used internally to mark the end of the
+        immediate part of an entry point."""
+        __slots__ = ()
+
+    deferToken = Defer()
+    """A single instance of the 'Defer' class."""
+
     @synchronized
     def runEntryPoint(self, itr):
         """Run the specified iterator as entry point.
 
         The iterator will be run as the main iterator from a new
-        iterator scheduler (itersched). The results can be either
-        events, that will be sent immediately down the pipeline, or
-        the 'defer' token. If the 'defer()' method is called, the
-        execution is suspended and the iterator is moved to the top of
-        the standard iterator scheduler."""
+        iterator scheduler (itersched). The iterator results must be
+        pipeline commands, and will be executed immediately, unless
+        'defer()' is used. If the 'defer()' method is called using
+        itersched's 'Call' operation, the execution will be suspended
+        and the iterator will be moved to the top of the machine's
+        iterator scheduler to continue executing there."""
         sched = itersched.Scheduler(itr)
-        for item in sched:
-            if isinstance(item, ops.Defer):
+        for cmd in sched:
+            if isinstance(cmd, self.Defer):
                 # Defer execution until next main loop iteration.
                 self.machine.call(sched)
                 return
 
-            assert isinstance(item, gst.Event), \
-                   "Spurious object '%s'" % str(item)
-            self.src.emit('queue-event', item)
-
-    def stopSource(self):
-        """Stop the source element instantly."""
-        self.src.set_property('block-count', 0)
+            # Execute the command on the pipeline.
+            cmd(self)
 
     def defer(self):
-        """When called by an entry point, transfers execution of the
-        rest of the method to the main scheduler."""
+        """When called (using itersched's 'Call') by an entry point,
+        transfers execution of the rest of the method to the machine
+        scheduler."""
         self.stopSource()
-        yield ops.deferToken
-
-    def flush(self):
-        """Flush the pipeline."""
-        yield events.flushEvent()
-
-        # FIXME: Clean this up.
-        programChain = self.machine.currentProgramChain()
-        if programChain != None:
-            yield events.subpictureClutEvent(programChain.clut)
+        yield self.deferToken
 
 
     #
     # Pipeline Control
     #
 
+    def playVobu(self, domain, titleNr, sectorNr):
+        """Play the VOBU corresponding to 'domain', 'titleNr', and
+        'sectorNr'."""
+        self.src.set_property('domain', domain)
+        self.src.set_property('title', titleNr)
+        self.src.set_property('vobu-start', sectorNr)
+
     def setAudio(self, phys):
         """Set the physical audio stream to 'phys'."""
-        pass
+        if self.audio == phys:
+            return
+        self.audio = phys
+
+        self.queueEvent(events.audio(self.audio))
 
     def setSubpicture(self, phys):
         """Set the physical subpicture stream to 'phys'."""
-        pass
+        if self.subpicture == phys:
+            return
+        self.subpicture = phys
 
-    
+        self.queueEvent(events.subpicture(self.subpicture))
+
+    def setSubpictureClut(self, clut):
+        """Set the subpicture color lookup table to 'clut'.
+
+        'clut' is a 16-position array."""
+        if self.clut == clut:
+            return
+        self.clut = clut
+
+        self.queueEvent(events.subpictureClut(self.clut))
+
+    def highlight(self, area, button, palette):
+        """Highlight the specified area, corresponding to the
+        specified button number and using the specified palette."""
+        if (area, button, palette) == \
+           (self.area, self.button, self.palette):
+            return
+        (self.area, self.button, self.palette) = (area, button, palette)
+
+        self.queueEvent(events.highlight(self.area,
+                                         self.button,
+                                         self.palette))
+
+    def resetHighlight(self):
+        """Clear (reset) the highlighted area."""
+        # Asking for area is enough.
+        if self.area == None:
+            return
+        (self.area, self.button, self.palette) = (None, None, None)
+
+        self.queueEvent(events.highlightReset())
+
+    def stillFrame(self):
+        """Tell the pipeline that a still frame was sent."""
+        self.queueEvent(events.eos())
+
+    def flush(self):
+        """Flush the pipeline."""
+        self.queueEvent(events.flush())
+
+        # A flush erases the CLUT.
+        self.queueEvent(events.subpictureClut(self.clut))
+
+    def pause(self):
+        """Pause the pipeline for a short time (currently 0.1s)."""
+        # We don't want to keep the lock while sleeping.
+        self.lock.release()
+        time.sleep(0.1)
+        self.lock.acquire()
+
+        self.queueEvent(events.filler())
+
+    def eos(self):
+        """Signal the end of stream (EOS) to the pipeline."""
+        self.queueEvent(events.eos())
+

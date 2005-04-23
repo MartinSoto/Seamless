@@ -23,7 +23,7 @@ def mpegTimeToGstTime(mpegTime):
     """Convert MPEG time values to the GStreamer time format."""
     return (long(mpegTime) * gst.MSECOND) / 90
 
-def audioEvent(physical):
+def audio(physical):
     """Create and return a new audio event for the specified physical
     stream."""
     st = gst.Structure('application/x-gst-dvd');
@@ -31,19 +31,19 @@ def audioEvent(physical):
     st.set_value('physical', physical, 'int')
     return gst.event_new_any(st)
 
-def eosEvent():
+def eos():
     """Create and return an end of stream (EOS) event."""
     return gst.Event(gst.EVENT_EOS)
 
-def fillerEvent():
+def filler():
     """Create and return a filler event."""
     return gst.Event(gst.EVENT_FILLER)
 
-def flushEvent():
+def flush():
     """Create and return a flush event."""
     return gst.Event(gst.EVENT_FLUSH)
 
-def highlightEvent(area, button, palette):
+def highlight(area, button, palette):
     """Create and return a new highlight event based on the specified
     highlight area, button number, and color palette."""
     (sx, sy, ex, ey) = area
@@ -59,14 +59,14 @@ def highlightEvent(area, button, palette):
 
     return gst.event_new_any(st)
 
-def highlightResetEvent():
+def highlightReset():
     """Create and return a new highlight reset event."""
     st = gst.Structure('application/x-gst-dvd')
     st.set_value('event', 'dvd-spu-reset-highlight')
 
     return gst.event_new_any(st)
 
-def navEvent(startTime, endTime):
+def nav(startTime, endTime):
     """Create and return a nav packet event for the specified start
     and end times."""
     st = gst.Structure('application/x-gst-dvd')
@@ -75,13 +75,13 @@ def navEvent(startTime, endTime):
     st.set_value('end_ptm', mpegTimeToGstTime(endTime), 'uint64')
     return gst.event_new_any(st)
 
-def stillFrameEvent():
+def stillFrame():
     """Create and return a still frame event."""
     st = gst.Structure('application/x-gst-dvd');
     st.set_value('event', 'dvd-spu-still-frame')
     return gst.event_new_any(st)
 
-def subpictureClutEvent(clut):
+def subpictureClut(clut):
     """Create and return a new subpicture CLUT event based on the
     specified color lookup table (an 16 position array)."""
     st = gst.Structure('application/x-gst-dvd');
@@ -93,7 +93,7 @@ def subpictureClutEvent(clut):
 
     return gst.event_new_any(st)
 
-def subpictureEvent(physical):
+def subpicture(physical):
     """Create and return a new subpicture event for the specified
     physical stream."""
     st = gst.Structure('application/x-gst-dvd');

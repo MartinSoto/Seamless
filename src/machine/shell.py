@@ -18,6 +18,7 @@
 
 import machine
 import pipeline
+import pipelinecmds as cmds
 
 from itersched import NoOp, Call
 
@@ -56,7 +57,7 @@ class MachineShell(object):
     @entryPoint
     def stop(self):
         yield Call(self.pipeline.defer())
-        yield Call(self.pipeline.flush())
+        yield cmds.flush()
         yield Call(self.machine.exit())
 
     @entryPoint
@@ -66,7 +67,7 @@ class MachineShell(object):
             return
 
         yield Call(self.pipeline.defer())
-        yield Call(self.pipeline.flush())
+        yield cmds.flush()
 
         newProgram = cell.programNr - 1
         if newProgram == 0:
@@ -82,7 +83,7 @@ class MachineShell(object):
             return
 
         yield Call(self.pipeline.defer())
-        yield Call(self.pipeline.flush())
+        yield cmds.flush()
 
         newProgram = cell.programNr + 1
         if newProgram > cell.programChain.programCount:
@@ -183,7 +184,7 @@ class MachineShell(object):
             return
 
         yield Call(self.pipeline.defer())
-        yield Call(self.pipeline.flush())
+        yield cmds.flush()
 
         yield Call(self.machine.buttonCommand(btnObj.command))
 
@@ -195,7 +196,7 @@ class MachineShell(object):
             return
 
         yield Call(self.pipeline.defer())
-        yield Call(self.pipeline.flush())
+        yield cmds.flush()
 
         yield Call(self.machine.callMenu(dvdread.MENU_TYPE_ROOT, 0))
 
