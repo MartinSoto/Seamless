@@ -367,6 +367,9 @@ cdef class ProgramChain:
 
     cdef object cells		# Array of cells
 
+    cdef object clutArray	# A 16-position array with the color
+                                # lookup table.
+
     def __new__(self):
         self.pointer = NULL
         self.chain = NULL
@@ -390,6 +393,8 @@ cdef class ProgramChain:
             cell = Cell(self, i, startSeconds)
             self.cells.append(cell)
             startSeconds = startSeconds + cell.playbackTime.seconds
+
+        self.clutArray = None
 
     def __richcmp__(ProgramChain self, ProgramChain other, op):
         res = (self.chain == other.chain)
@@ -526,12 +531,15 @@ cdef class ProgramChain:
         else:
             return None
 
-    def getClutEntry(self, int entryNr):
-        if not 1 <= entryNr <= 16:
-            raise IndexError, "CLUT entry number out of range"
+    property clut:
+        def __get__(self):
+            if self.clutArray == None:
+                self.clutArray = []
+                for i in range(16):
+                    # FIXME: This may have endianness issues.
+                    self.clutArray.append(self.chain.palette[i])
 
-        # FIXME: This may have endianness issues.
-        return self.chain.palette[entryNr - 1]
+            return self.clutArray
 
     property preCommands:
         def __get__(self):

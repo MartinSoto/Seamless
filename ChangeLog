@@ -1,5 +1,34 @@
 2005-04-23  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/pipeline.py (Pipeline.flush): 
+	* src/machine/machine.py (VirtualMachine.wrapCallOperation) 
+	(ProgramChainPlayer.playProgramChain): Update the calls to
+	events.subpictureClutEvent.
+
+	* src/dvdread/_dvdread.pyx (ProgramChain.clut): Change the way to
+	access the color lookup table: Now there's a clut property whose
+	value is a 16 position python array.
+
+	* src/machine/pipeline.py (Pipeline.vobuHeader): Call
+	events.navEvent properly.
+
+	* src/machine/events.py (navEvent): Receive start and end times
+	instead of nav packet.
+
+	* src/machine/pipeline.py (Pipeline.vobuRead):
+	(Pipeline.vobuRead): Use events.fillerEvent() and
+	events.eosEvent().
+
+	* src/machine/machine.py (VirtualMachine.updateHighlight): Move
+	code from events, that decides which type of event to send.
+
+	* src/machine/events.py (eosEvent, fillerEvent): New functions.
+	(highlightEvent, highlightResetEvent): Use separate functions for
+	highlight and highlight reset events. Simplify functions to just
+	create the events.
+
+2005-04-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/pipelineops.py: 
 	* src/machine/pipeline.py: 
 	* src/machine/shell.py: 

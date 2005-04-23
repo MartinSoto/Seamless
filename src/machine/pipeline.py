@@ -80,7 +80,7 @@ class Pipeline(object):
         except StopIteration:
             # Time to stop the pipeline.
             self.src.set_eos()
-            self.src.emit('push-event', gst.Event(gst.EVENT_EOS));
+            self.src.emit('push-event', events.eosEvent())
             return
         except:
             # We had an exception in the playback code.
@@ -99,7 +99,7 @@ class Pipeline(object):
             time.sleep(0.1)
             self.lock.acquire()
 
-            self.src.emit('push-event', gst.Event(gst.EVENT_FILLER))
+            self.src.emit('push-event', events.fillerEvent())
 
             return
         else:
@@ -117,7 +117,8 @@ class Pipeline(object):
         nav = dvdread.NavPacket(buf.get_data())
 
         # Send a nav event.
-        self.src.emit('push-event', events.navEvent(nav))
+        self.src.emit('push-event', events.navEvent(nav.startTime,
+                                                    nav.endTime))
 
         # Register the nav packet with the machine.
         self.machine.call(self.machine.setCurrentNav(nav))
@@ -165,4 +166,19 @@ class Pipeline(object):
         # FIXME: Clean this up.
         programChain = self.machine.currentProgramChain()
         if programChain != None:
-            yield events.subpictureClutEvent(programChain)
+            yield events.subpictureClutEvent(programChain.clut)
+
+
+    #
+    # Pipeline Control
+    #
+
+    def setAudio(self, phys):
+        """Set the physical audio stream to 'phys'."""
+        pass
+
+    def setSubpicture(self, phys):
+        """Set the physical subpicture stream to 'phys'."""
+        pass
+
+    

@@ -400,7 +400,7 @@ class VirtualMachine(object):
         # table.
         programChain = self.currentProgramChain()
         if programChain != None:
-            yield events.subpictureClutEvent(programChain)
+            yield events.subpictureClutEvent(programChain.clut)
 
         yield Call(self.updateAudio())
         yield Call(self.updateSubpicture())
@@ -625,7 +625,18 @@ class VirtualMachine(object):
     def updateHighlight(self):
         """Send a highlight event corresponding to the current
         highlighted area."""
-        yield events.highlightEvent(self.currentNav, self.currentButton)
+        if self.currentNav == None or \
+           self.currentNav.highlightStatus == dvdread.HLSTATUS_NONE or \
+           not 1 <= self.currentButton <= self.currentNav.buttonCount:
+            # No highlight button.
+            print "+++ Deactivating highlight"
+            yield events.highlightResetEvent()
+        else:
+            btnObj = self.currentNav.getButton(self.currentButton)
+            print "+++ Activating highlight", btnObj.area
+
+            yield events.highlightEvent(btnObj.area, self.currentButton,
+                                        btnObj.paletteSelected)
 
 
     #
@@ -978,7 +989,7 @@ class ProgramChainPlayer(object):
         self.cell = None
 
         # Update the color lookup table.
-        yield events.subpictureClutEvent(self.programChain)
+        yield events.subpictureClutEvent(self.programChain.clut)
 
         # Update the audio and subpicture streams.
         yield Call(self.machine.updateAudio())
