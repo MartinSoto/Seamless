@@ -120,7 +120,7 @@ class Scheduler(object):
     __slots__ = ('current', 'stack')
 
     def __init__(self, rootIter):
-        self.current = rootIter
+        self.current = iter(rootIter)
         self.stack = []
 
     def next(self):
@@ -148,7 +148,7 @@ class Scheduler(object):
             self.stack.extend(itr.stack)
             self.current = itr.current
         else:
-            self.current = itr
+            self.current = iter(itr)
 
     def chain(self, itr):
         if isinstance(itr, Scheduler):
@@ -156,7 +156,7 @@ class Scheduler(object):
             self.stack.extend(itr.stack)
             self.current = itr.current
         else:
-            self.current = itr
+            self.current = iter(itr)
 
     def restart(self, methodName, *posArgs, **kwArgs):
         # Go down the stack searching for an instance having a method

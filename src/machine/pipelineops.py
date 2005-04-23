@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -16,4 +16,23 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-from shell import *
+"""Generate function (command) objects that operate on a pipeline."""
+
+def still():
+    def op(pipeline):
+        pipeline.still()
+
+    return op
+
+class Still(object):
+    __slots__ = ()
+
+# The single MachineStillCls instance.
+machineStill = Still()
+
+
+class Defer(object):
+    __slots__ = ()
+
+deferToken = Defer()
+

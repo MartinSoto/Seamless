@@ -18,13 +18,8 @@
 
 """Main implementation of the DVD virtual machine."""
 
-import string
 import sys
-import threading
 import time
-import traceback
-
-import gst
 
 import itersched
 from itersched import NoOp, Call, Chain, Restart, restartPoint
@@ -33,6 +28,7 @@ import dvdread
 import decode
 import disassemble
 import events
+import pipelineops as ops
 
 
 def strToIso639(strCode):
@@ -52,16 +48,6 @@ class MachineException(Exception):
 
 # A command disassembler for debugging.
 disasm = disassemble.CommandDisassembler()
-
-
-class MachineStill(object):
-    """A token to tell the machine's scheduling loop that we are
-    displaying a still frame."""
-
-    __slots__ = ()
-
-# The single MachineStillCls instance.
-machineStill = MachineStill()
 
 
 class Register(decode.Register):
@@ -99,21 +85,16 @@ class SystemRegister(Register):
               'Attempt to directly assign a system register'
 
 
-def makeMachineOperation(method):
-    def restartOp(self, *args, **keywords):
-        yield getattr(Restart, method)(*args, **keywords)
-
-    return restartOp
-
 def callOperation(method):
     def wrapper(self, *args):
         yield Chain(self.wrapCallOperation(method, *args))
 
     return wrapper
 
-class PerformMachine(object):
+class VirtualMachine(object):
     __slots__ = ('info',
-                 'location',
+
+                 'sched',
 
                  'audio',
                  'subpicture',
@@ -134,9 +115,8 @@ class PerformMachine(object):
 
                  'currentNav')
 
-    def __init__(self, info, location=None):
+    def __init__(self, info):
         self.info = info
-        self.location = location
 
         # Current logical audio and subpicture streams and current
         # angle. The values follow the conventions of system registers
@@ -176,12 +156,23 @@ class PerformMachine(object):
         # The current navigation packet.
         self.currentNav = None
 
-    def setLocation(self, location):
-        self.location = location
+        # Initialize the scheduler. Playback starts by playing the
+        # first play program chain.
+        self.sched = itersched.Scheduler(DiscPlayer(self). \
+                                         jumpToFirstPlay())
 
+    def __iter__(self):
+        return self.sched
+
+    def call(self, itr):
+        """Put 'itr' on top of this object's iterator scheduler.
+
+        If 'itr' is a scheduler, it will be absorved by this object's
+        scheduler."""
+        self.sched.call(itr)
 
     #
-    # Machine Operations
+    # Standard DVD Machine Operations
     #
 
     # Basic operations.
@@ -189,31 +180,111 @@ class PerformMachine(object):
         """No operation."""
         yield NoOp
 
-    goto = makeMachineOperation('goto')
-    brk = makeMachineOperation('brk')
-    exit = makeMachineOperation('exit')
+    def goto(self, commandNr):
+        """Go to command 'commandNr' in the current command block."""
+        yield Restart.goto(commandNr)
+
+    def brk(self):
+        """Terminate executing (break from) the current command block."""
+        yield Restart.brk()
+
+    def exit(self):
+        """End execution of the machine."""
+        yield Restart.exit()
+
 
     # Parental management
-    openSetParentalLevel = makeMachineOperation('openSetParentalLevel')
+    def openSetParentalLevel(self, commandNr):
+        """Try to set parental level.
+
+        If successful, jump to the specified command."""
+        yield Restart.openSetParentalLevel(commandNr)
+
 
     # Links.
-    linkTopCell = makeMachineOperation('linkTopCell')
-    linkNextCell = makeMachineOperation('linkNextCell')
-    linkPrevCell = makeMachineOperation('linkPrevCell')
-    linkTopProgram = makeMachineOperation('linkTopProgram')
-    linkNextProgram = makeMachineOperation('linkNextProgram')
-    linkPrevProgram = makeMachineOperation('linkPrevProgram')
-    linkTopProgramChain = makeMachineOperation('linkTopProgramChain')
-    linkNextProgramChain = makeMachineOperation('linkNextProgramChain')
-    linkPrevProgramChain = makeMachineOperation('linkPrevProgramChain')
-    linkGoUpProgramChain = makeMachineOperation('linkGoUpProgramChain')
-    linkTailProgramChain = makeMachineOperation('linkTailProgramChain')
-    linkProgramChain = makeMachineOperation('linkProgramChain')
-    linkChapter = makeMachineOperation('linkChapter')
-    linkProgram = makeMachineOperation('linkProgram')
-    linkCell = makeMachineOperation('linkCell')
+    def linkCell(self, cellNr):
+        """Jump to the specified cell in the current program chain."""
+        yield Restart.linkCell(cellNr)
 
-    # Select (highlight) a button
+    def linkTopCell(self):
+        """Jump to the beginning of the current cell."""
+        yield Restart.linkTopCell()
+
+    def linkNextCell(self):
+        """Jump to the beginning of the next cell."""
+        yield Restart.linkNextCell()
+
+    def linkPrevCell(self):
+        """Jump to the beginning of the previous cell."""
+        yield Restart.linkPrevCell()
+
+    def linkProgram(self, programNr):
+        """Jump to the specified program in the current program
+        chain.
+
+        Programs are a logical subdivision of program chains. A
+        program is characterized by its start cell number."""
+        yield Restart.linkProgram(programNr)
+
+    def linkTopProgram(self):
+        """Jump to the beginning of the current program.
+
+        Programs are a logical subdivision of program chains. A
+        program is characterized by its start cell number."""
+        yield Restart.linkTopProgram()
+
+    def linkNextProgram(self):
+        """Jump to the beginning of the next program.
+
+        Programs are a logical subdivision of program chains. A
+        program is characterized by its start cell number."""
+        yield Restart.linkNextProgram()
+
+    def linkPrevProgram(self):
+        """Jump to the beginning of the previous program.
+
+        Programs are a logical subdivision of program chains. A
+        program is characterized by its start cell number."""
+        yield Restart.linkPrevProgram()
+
+    def linkProgramChain(self, programChainNr):
+        """Jump to the program chain identified by 'programChainNr' in
+        the current title."""
+        yield Restart.linkProgramChain(programChainNr)
+
+    def linkTopProgramChain(self):
+        """Jump to the beginning of the current program chain."""
+        yield Restart.linkTopProgramChain()
+
+    def linkNextProgramChain(self):
+        """Jump to the beginning of the next program chain."""
+        yield Restart.linkNextProgramChain()
+
+    def linkPrevProgramChain(self):
+        """Jump to the beginning of the previous program chain."""
+        yield Restart.linkPrevProgramChain()
+
+    def linkGoUpProgramChain(self):
+        """Jump to the 'up' program chain.
+
+        The 'up' program chain is explicitly referenced from a given
+        program chain."""
+        yield Restart.linkGoUpProgramChain()
+
+    def linkTailProgramChain(self):
+        """Jump to the end command block of the current program chain."""
+        yield Restart.linkTailProgramChain()
+
+    def linkChapter(self, chapterNr):
+        """Jump to the specified chapter in the current video title.
+
+        Chapters are a logical subdivision of video title sets. Each
+        chapter is characterized by the program chain and program
+        where it starts."""
+        yield Restart.linkChapter(chapterNr)
+
+
+    # Button handling.
     def selectButton(self, buttonNr):
         """Select the specified button."""
         if not 0 <= buttonNr <= 36:
@@ -232,16 +303,70 @@ class PerformMachine(object):
         >> 10."""
         yield Chain(self.selectButton(value >> 10))
 
-    # Jumps
-    jumpToTitle = makeMachineOperation('jumpToTitle')
-    jumpToTitleInSet = makeMachineOperation('jumpToTitleInSet')
-    jumpToChapterInSet = makeMachineOperation('jumpToChapterInSet')
+    def buttonCommand(self, buttonCmd):
+        """Execute 'buttonCmd' as a button command in this program
+        chain."""
+        yield Restart.buttonCommand(buttonCmd)
 
-    jumpToFirstPlay = makeMachineOperation('jumpToFirstPlay')
-    jumpToTitleMenu = makeMachineOperation('jumpToTitleMenu')
-    jumpToMenu = makeMachineOperation('jumpToMenu')
-    jumpToManagerProgramChain = \
-        makeMachineOperation('jumpToManagerProgramChain')
+    # Jumps
+    def jumpToTitle(self, titleNr):
+        """Jump to the first chapter of the specified title.
+
+        The title number is provided with respect to the video
+        manager, i.e. is global to the whole disk."""
+        yield Restart.jumpToTitle(titleNr)
+
+    def jumpToTitleInSet(self, titleNr):
+        """Jump to the first chapter of the specified title.
+
+        The title number is given with respect to the current video
+        title set (i.e., the title set the current title belongs to.)"""
+        yield Restart.jumpToTitleInSet(titleNr)
+
+    def jumpToChapterInSet(self, titleNr, chapterNr):
+        """Jump to the specified chapter in the specified title.
+
+        The title number is provided with respect to the current video
+        title set (i.e., the title set the current title belongs to.)"""
+        yield Restart.jumpToChapterInSet(titleNr, chapterNr)
+
+    def jumpToFirstPlay(self):
+        """Jump to the first play program chain.
+
+        The first play program chain is a special program chain in the
+        disk that is intended to be the first element played in that
+        disk when playback starts."""
+        yield Restart.jumpToFirstPlay()
+
+    def jumpToTitleMenu(self):
+        """Jump to the title menu.
+
+        The title menu is a menu allowing to select one of the
+        available titles in a disk. Not all disks offer a title menu."""
+        yield Restart.jumpToTitleMenu()
+
+    def jumpToMenu(self, titleSetNr, titleNr, menuType):
+        """Jump to menu 'menuType' in title 'titleNr' of video title
+        set 'titleSetNr'.
+
+        Specifying 0 as 'titleSetNr' chooses the video manager,
+        i.e. the title number will be used to select a title from the
+        video manager.
+
+        The menu type is one of dvdread.MENU_TYPE_TITLE,
+        dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
+        dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
+        dvdread.MENU_TYPE_CHAPTER."""
+        yield Restart.jumpToMenu(titleSetNr, titleNr, menuType)
+
+    def jumpToManagerProgramChain(self, programChainNr):
+        """Jump to the specified program chain in the video
+        manager.
+
+        Program chains directly associated to the video manager are
+        only for the menus."""
+        yield Restart.jumpToManagerProgramChain(programChainNr)
+
 
     # Timed jump
     def setTimedJump(self, programChainNr, seconds):
@@ -273,7 +398,7 @@ class PerformMachine(object):
 
         # If a program chain is playing, update the color lookup
         # table.
-        programChain = self.location.currentProgramChain()
+        programChain = self.currentProgramChain()
         if programChain != None:
             yield events.subpictureClutEvent(programChain)
 
@@ -328,12 +453,15 @@ class PerformMachine(object):
         dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
         dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
         dvdread.MENU_TYPE_CHAPTER."""
-        title = self.location.currentTitle()
+        title = self.currentTitle()
         yield Call(DiscPlayer(self, True). \
                    jumpToMenu(title.videoTitleSet.titleSetNr,
                               title.titleNr, menuType))
 
-    resume = makeMachineOperation('resume')
+    def resume(self):
+        """Resume playback at the previously saved location."""
+        yield Restart.resume()
+
 
     # Selectable streams
     def setAngle(self, angle):
@@ -360,13 +488,64 @@ class PerformMachine(object):
 
 
     #
+    # State Retrieval
+    #
+
+    def getValue(self, methodName):
+        for inst in self.sched.restartable():
+            if hasattr(inst, methodName):
+                return getattr(inst, methodName)()
+        return None
+
+    def currentTitle(self):
+        return self.getValue('currentTitle')
+
+    def currentProgramChain(self):
+        return self.getValue('currentProgramChain')
+
+    def currentCell(self):
+        return self.getValue('currentCell')
+
+
+    def getLangUnit(self, container):
+        """Find the appropriate language unit for a container.
+
+        Given a container (video manager or title set) this method
+        returns an appropriate language unit. If there's a language
+        unit for the preferred menu language set in this object, it is
+        returned. Otherwise, the first one available is returned."""
+        unit = container.getLangUnit(self.prefMenuLang)
+        if unit == None:
+            unit = container.getLangUnit(1)
+
+        return unit
+
+    def getButtonObj(self):
+        """Return the current dvdread.Button object."""
+        if self.currentNav == None or \
+           self.currentNav.highlightStatus == dvdread.HLSTATUS_NONE or \
+           not 1 <= self.currentButton <= self.currentNav.buttonCount:
+            return None
+        else:
+            return self.currentNav.getButton(self.currentButton)
+
+
+    #
     # Pipeline Management and Events
     #
+
+    def setCurrentNav(self, nav):
+        self.currentNav = nav
+
+        # Update the highlight.
+        yield Call(self.updateHighlight())
+
+        # FIXME: Handle nav packet immediate actions.
 
     def updateAudio(self):
         """Send an audio event corresponding to the current logical
         audio stream."""
-        programChain = self.location.currentProgramChain()
+        programChain = self.currentProgramChain()
         if programChain == None or self.audio == 15:
             # We aren't playing a program chain, or the logical audio
             # track is explicitly set to none.
@@ -410,7 +589,7 @@ class PerformMachine(object):
     def updateSubpicture(self):
         """Send a subpicture event corresponding to the current
         logical subpicture stream."""
-        programChain = self.location.currentProgramChain()
+        programChain = self.currentProgramChain()
         if programChain == None:
             physical = -1
         elif isinstance(programChain.container, dvdread.LangUnit):
@@ -471,7 +650,7 @@ class PerformMachine(object):
 
     def getSystem4(self):
         """Return the value of system register 4 (title_in_volume)."""
-        title = self.location.currentTitle()
+        title = self.currentTitle()
         if title != None:
             return title.globalTitleNr
         else:
@@ -479,7 +658,7 @@ class PerformMachine(object):
 
     def getSystem5(self):
         """Return the value of system register 5 (title_in_vts)."""
-        title = self.location.currentTitle()
+        title = self.currentTitle()
         if title != None:
             return title.titleNr
         else:
@@ -487,7 +666,7 @@ class PerformMachine(object):
 
     def getSystem6(self):
         """Return the value of system register 6 (program_chain)."""
-        programChain = self.location.currentProgramChain()
+        programChain = self.currentProgramChain()
         if programChain != None:
             return programChain.programChainNr
         else:
@@ -495,7 +674,7 @@ class PerformMachine(object):
 
     def getSystem7(self):
         """Return the value of system register 7 (chapter)."""
-        cell = self.location.currentCell()
+        cell = self.currentCell()
         if cell != None:
             return cell.programNr
         else:
@@ -602,102 +781,46 @@ class PerformMachine(object):
         return self.systemRegisters[regNr]
 
 
-    #
-    # State Retrieval
-    #
-
-    def getLangUnit(self, container):
-        """Find the appropriate language unit for a container.
-
-        Given a container (video manager or title set) this method
-        returns an appropriate language unit. If there's a language
-        unit for the preferred menu language set in this object, it is
-        returned. Otherwise, the first one available is returned."""
-        unit = container.getLangUnit(self.prefMenuLang)
-        if unit == None:
-            unit = container.getLangUnit(1)
-
-        return unit
-
-    def getButtonObj(self):
-        """Return the current dvdread.Button object."""
-        if self.currentNav == None or \
-           self.currentNav.highlightStatus == dvdread.HLSTATUS_NONE or \
-           not 1 <= self.currentButton <= self.currentNav.buttonCount:
-            return None
-        else:
-            return self.currentNav.getButton(self.currentButton)
-
-
 class DiscPlayer(object):
-    __slots__ = ('perform',
+    __slots__ = ('machine',
                  'callOp',
                  'videoManager')
 
-    def __init__(self, perform, callOp=False):
-        """Create a disc player, based on the given perform machine.
+    def __init__(self, machine, callOp=False):
+        """Create a disc player, based on the given machine.
 
         'callOp' must be set to 'True' when the disc player is created
         as part of a call operation. Otherwise the resume command will
         continue playback by jumping to the first play program chain."""
-        self.perform = perform
+        self.machine = machine
         self.callOp = callOp
 
-        self.videoManager = self.perform.info.videoManager
+        self.videoManager = self.machine.info.videoManager
 
     @restartPoint
     def jumpToFirstPlay(self):
-        """Jump to the first play program chain.
-
-        The first play program chain is a special program chain in the
-        disk that is intended to be the first element played in that
-        disk when playback starts."""
-        yield Call(ProgramChainPlayer(self.perform). \
+        yield Call(ProgramChainPlayer(self.machine). \
                    playProgramChain(self.videoManager.firstPlay))
 
     @restartPoint
     def jumpToTitle(self, titleNr):
-        """Jump to the first chapter of the specified title.
-
-        The title number is provided with respect to the video
-        manager, i.e. is global to the whole disk."""
         title = self.videoManager.getVideoTitle(titleNr)
-        yield Call(TitlePlayer(self.perform).playTitle(title))
+        yield Call(TitlePlayer(self.machine).playTitle(title))
 
     @restartPoint
     def jumpToTitleMenu(self):
-        """Jump to the title menu.
-
-        The title menu is a menu allowing to select one of the
-        available titles in a disk. Not all disks offer a title menu."""
-        langUnit = self.perform.getLangUnit(self.videoManager)
-        yield Call(LangUnitPlayer(self.perform). \
+        langUnit = self.machine.getLangUnit(self.videoManager)
+        yield Call(LangUnitPlayer(self.machine). \
                    playMenuInUnit(langUnit, dvdread.MENU_TYPE_TITLE))
 
     @restartPoint
     def jumpToManagerProgramChain(self, programChainNr):
-        """Jump to the specified program chain in the video
-        manager.
-
-        Program chains directly associated to the video manager are
-        only for the menus."""
-        langUnit = self.perform.getLangUnit(self.videoManager)
-        yield Call(LangUnitPlayer(self.perform). \
+        langUnit = self.machine.getLangUnit(self.videoManager)
+        yield Call(LangUnitPlayer(self.machine). \
                    playProgramChainInUnit(langUnit, programChainNr))
 
     @restartPoint
     def jumpToMenu(self, titleSetNr, titleNr, menuType):
-        """Jump to menu 'menuType' in title 'titleNr' of video title
-        set 'titleSetNr'.
-
-        Specifying 0 as 'titleSetNr' chooses the video manager,
-        i.e. the title number will be used to select a title from the
-        video manager.
-
-        The menu type is one of dvdread.MENU_TYPE_TITLE,
-        dvdread.MENU_TYPE_ROOT, dvdread.MENU_TYPE_SUBPICTURE,
-        dvdread.MENU_TYPE_AUDIO, dvdread.MENU_TYPE_ANGLE, and
-        dvdread.MENU_TYPE_CHAPTER."""
         # Get the title set and title. Title set 0 is the video
         # manager.
         if titleSetNr == 0:
@@ -707,12 +830,11 @@ class DiscPlayer(object):
 
         title = titleSet.getVideoTitle(titleNr)
 
-        yield Call(TitlePlayer(self.perform). \
+        yield Call(TitlePlayer(self.machine). \
                    playMenuInTitle(title, menuType))
 
     @restartPoint
     def resume(self):
-        """Resume playback at the previously saved location."""
         if self.callOp:
             # We are handling a resume from an actual call
             # operation. Just let the caller go on.
@@ -724,7 +846,6 @@ class DiscPlayer(object):
 
     @restartPoint
     def exit(self):
-        """End execution of the machine."""
         if self.callOp:
             # This object was created as the result of a call
             # operation.
@@ -740,11 +861,11 @@ class DiscPlayer(object):
 
 
 class TitlePlayer(object):
-    __slots__ = ('perform',
+    __slots__ = ('machine',
                  'title')
 
-    def __init__(self, perform):
-        self.perform = perform
+    def __init__(self, machine):
+        self.machine = machine
 
         self.title = None
 
@@ -771,54 +892,39 @@ class TitlePlayer(object):
         a particular video title."""
         self.title = title
 
-        langUnit = self.perform.getLangUnit(self.title.videoTitleSet)
-        yield Call(LangUnitPlayer(self.perform). \
+        langUnit = self.machine.getLangUnit(self.title.videoTitleSet)
+        yield Call(LangUnitPlayer(self.machine). \
                    playMenuInUnit(langUnit, menuType))
 
     @restartPoint
     def linkChapter(self, chapterNr):
-        """Jump to the specified chapter in the current video title.
-
-        Chapters are a logical subdivision of video title sets. Each
-        chapter is characterized by the program chain and program
-        where it starts."""
         chapter = self.title.getChapter(chapterNr)
-        yield Call(ProgramChainPlayer(self.perform). \
+        yield Call(ProgramChainPlayer(self.machine). \
                    playProgramChain(chapter.cell.programChain,
                                     chapter.cell.cellNr))
 
     @restartPoint
     def jumpToTitleInSet(self, titleNr):
-        """Jump to the first chapter of the specified title.
-
-        The title number is given with respect to the current video
-        title set (i.e., the title set the current title belongs to.)"""
         yield Chain(self.jumpToChapterInSet(titleNr, 1))
 
     @restartPoint
     def jumpToChapterInSet(self, titleNr, chapterNr):
-        """Jump to the specified chapter in the specified title.
-
-        The title number is provided with respect to the current video
-        title set (i.e., the title set the current title belongs to.)"""
         title = self.title.videoTitleSet.getVideoTitle(titleNr)
         yield Chain(self.playTitle(title, chapterNr))
 
     @restartPoint
     def linkProgramChain(self, programChainNr):
-        """Jump to the program chain identified by 'programChainNr' in
-        the current title."""
         programChain = self.title.getProgramChain(programChainNr)
-        yield Call(ProgramChainPlayer(self.perform). \
+        yield Call(ProgramChainPlayer(self.machine). \
                    playProgramChain(programChain))
 
 
 class LangUnitPlayer(object):
-    __slots__ = ('perform',
+    __slots__ = ('machine',
                  'unit')
 
-    def __init__(self, perform):
-        self.perform = perform
+    def __init__(self, machine):
+        self.machine = machine
 
         self.unit = None
 
@@ -828,7 +934,7 @@ class LangUnitPlayer(object):
         language unit."""
         self.unit = unit
 
-        yield Call(ProgramChainPlayer(self.perform). \
+        yield Call(ProgramChainPlayer(self.machine). \
                    playProgramChain(self.unit.getMenuProgramChain(menuType)))
 
     @restartPoint
@@ -841,20 +947,18 @@ class LangUnitPlayer(object):
 
     @restartPoint
     def linkProgramChain(self, programChainNr):
-        """Jump to the program chain identified by 'programChainNr' in
-        the current language unit."""
         programChain = self.unit.getProgramChain(programChainNr)
-        yield Call(ProgramChainPlayer(self.perform). \
+        yield Call(ProgramChainPlayer(self.machine). \
                    playProgramChain(programChain))
 
 
 class ProgramChainPlayer(object):
-    __slots__ = ('perform',
+    __slots__ = ('machine',
                  'programChain',
                  'cell')
 
-    def __init__(self, perform):
-        self.perform = perform
+    def __init__(self, machine):
+        self.machine = machine
         self.programChain = None
         self.cell = None
 
@@ -877,12 +981,12 @@ class ProgramChainPlayer(object):
         yield events.subpictureClutEvent(self.programChain)
 
         # Update the audio and subpicture streams.
-        yield Call(self.perform.updateAudio())
-        yield Call(self.perform.updateSubpicture())
+        yield Call(self.machine.updateAudio())
+        yield Call(self.machine.updateSubpicture())
 
         if cellNr == 1:
             # Play the 'pre' commands.
-            yield Call(CommandBlockPlayer(self.perform). \
+            yield Call(CommandBlockPlayer(self.machine). \
                        playBlock(self.programChain.preCommands))
 
         # Go to the specified cell.
@@ -890,17 +994,16 @@ class ProgramChainPlayer(object):
 
     @restartPoint
     def linkCell(self, cellNr):
-        """Jump to the specified cell in the current program chain."""
         assert 1 <= cellNr <= self.programChain.cellCount
 
         self.cell = self.programChain.getCell(cellNr)
 
         # Play the cell.
-        yield Call(CellPlayer(self.perform).playCell(self.cell))
+        yield Call(CellPlayer(self.machine).playCell(self.cell))
 
         # Play the corresponding cell commands.
         if self.cell.commandNr != 0:
-            yield Call(CommandBlockPlayer(self.perform). \
+            yield Call(CommandBlockPlayer(self.machine). \
                        playBlock(self.programChain.cellCommands,
                                  self.cell.commandNr))
 
@@ -913,86 +1016,58 @@ class ProgramChainPlayer(object):
 
     @restartPoint
     def linkTopCell(self):
-        """Jump to the beginning of the current cell."""
         yield Chain(self.linkCell(self.cell.cellNr))
 
     @restartPoint
     def linkNextCell(self):
-        """Jump to the beginning of the next cell."""
         yield Chain(self.linkCell(self.cell.cellNr + 1))
 
     @restartPoint
     def linkPrevCell(self):
-        """Jump to the beginning of the previous cell."""
         yield Chain(self.linkCell(self.cell.cellNr - 1))
 
     @restartPoint
     def linkProgram(self, programNr):
-        """Jump to the specified program in the current program
-        chain.
-
-        Programs are a logical subdivision of program chains. A
-        program is characterized by its start cell number."""
         yield Chain(self.linkCell(self.programChain. \
                                   getProgramCell(programNr).cellNr))
 
     @restartPoint
     def linkTopProgram(self):
-        """Jump to the beginning of the current program.
-
-        Programs are a logical subdivision of program chains. A
-        program is characterized by its start cell number."""
         programNr = self.cell.programNr
         yield Chain(self.linkProgram(programNr))
 
     @restartPoint
     def linkNextProgram(self):
-        """Jump to the beginning of the next program.
-
-        Programs are a logical subdivision of program chains. A
-        program is characterized by its start cell number."""
         programNr = self.cell.programNr
         yield Chain(self.linkProgram(programNr + 1))
 
     @restartPoint
     def linkPrevProgram(self):
-        """Jump to the beginning of the previous program.
-
-        Programs are a logical subdivision of program chains. A
-        program is characterized by its start cell number."""
         programNr = self.cell.programNr
         yield Chain(self.linkProgram(programNr - 1))
 
     @restartPoint
     def linkTopProgramChain(self):
-        """Jump to the beginning of the current program chain."""
         yield Chain(self.playProgramChain(self.programChain))
 
     @restartPoint
     def linkNextProgramChain(self):
-        """Jump to the beginning of the next program chain."""
         yield Chain(self.playProgramChain(self.programChain.nextProgramChain))
 
     @restartPoint
     def linkPrevProgramChain(self):
-        """Jump to the beginning of the previous program chain."""
         yield Chain(self.playProgramChain(self.programChain.prevProgramChain))
 
     @restartPoint
     def linkGoUpProgramChain(self):
-        """Jump to the 'up' program chain.
-
-        The 'up' program chain is explicitly referenced from a given
-        program chain."""
         yield Chain(self.playProgramChain(self.programChain.goUpProgramChain))
 
     @restartPoint
     def linkTailProgramChain(self):
-        """Jump to the end command block of the current program chain."""
         self.cell = None
 
         # Play the "post" commands.
-        yield Call(CommandBlockPlayer(self.perform). \
+        yield Call(CommandBlockPlayer(self.machine). \
                    playBlock(self.programChain.postCommands))
 
         # If there's a next program chain, link to it.
@@ -1004,21 +1079,21 @@ class ProgramChainPlayer(object):
     def buttonCommand(self, buttonCmd):
         """Execute 'buttonCmd' as a button command in this program
         chain."""
-        yield Call(CommandBlockPlayer(self.perform). \
+        yield Call(CommandBlockPlayer(self.machine). \
                    playButtonCmd(self.programChain.cellCommands,
                                  buttonCmd))
 
 
 class CommandBlockPlayer(object):
-    __slots__ = ('perform',
+    __slots__ = ('machine',
                  'decoder',
                  'commands',
                  'commandNr')
 
-    def __init__(self, perform):
-        self.perform = perform
+    def __init__(self, machine):
+        self.machine = machine
 
-        self.decoder = decode.CommandDecoder(perform)
+        self.decoder = decode.CommandDecoder(machine)
 
         self.commands = None
         self.commandNr = 0
@@ -1041,7 +1116,6 @@ class CommandBlockPlayer(object):
 
     @restartPoint
     def goto(self, commandNr):
-        """Go to command 'commandNr' in the current command block."""
         assert commandNr > 0
 
         self.commandNr = commandNr
@@ -1057,15 +1131,11 @@ class CommandBlockPlayer(object):
 
     @restartPoint
     def brk(self):
-        """Terminate executing (break from) the current command block."""
         # Just doing nothing should do the trick :-)
         yield NoOp
 
     @restartPoint
     def openSetParentalLevel(self, commandNr):
-        """Try to set parental level.
-
-        If successful, jump to the specified command."""
         # FIXME: implement this.
         print "Attempt to set parental level, implement me!"
 
@@ -1076,7 +1146,7 @@ class CommandBlockPlayer(object):
 class CellPlayer(object):
     """A player for DVD cells."""
 
-    __slots__ = ('perform',
+    __slots__ = ('machine',
                  'cell',	# Cell currently being played.
                  'domain',	# Playback domain this cell belongs to.
                  'titleNr',	# DVD title number the cell is in.
@@ -1088,8 +1158,8 @@ class CellPlayer(object):
         'None' is returned if no cell is currently being played."""
         return self.cell
 
-    def __init__(self, perform):
-        self.perform = perform
+    def __init__(self, machine):
+        self.machine = machine
         self.cell = None
         self.domain = None
         self.titleNr = None
@@ -1132,13 +1202,13 @@ class CellPlayer(object):
             # After the yield, the whole VOBU will be read by the
             # playback element and sent down the pipeline. During this
             # process, a new nav packed (VOBU header) will be seen and
-            # stored in the perform object.
+            # stored in the machine object.
 
             # At this point, a new nav packet must be there. If this
             # is not the case, we have a serious problem.
-            assert nav != self.perform.currentNav
+            assert nav != self.machine.currentNav
 
-            nav = self.perform.currentNav
+            nav = self.machine.currentNav
             if nav.nextVobu != 0x3fffffff:
                 # Progress to the next VOBU.
                 self.sectorNr = self.sectorNr + nav.nextVobu
@@ -1156,368 +1226,10 @@ class CellPlayer(object):
                 # restart operation takes this method out of the
                 # stack.
                 while True:
-                    yield machineStill
+                    yield ops.machineStill
             else:
                 # Wait the specified number of seconds.
                 endTime = time.time() + self.cell.stillTime
                 while time.time() < endTime:
-                    yield machineStill
-
-
-class PlaybackLocation(object):
-    """A class encapsulating operations necessary to determine the
-    location in the dvd structure that is currently being played back."""
-    
-    __slots__ = ('sched',)
-
-    def __init__(self, sched):
-        self.sched = sched
-
-    def getValue(self, methodName):
-        for inst in self.sched.restartable():
-            if hasattr(inst, methodName):
-                return getattr(inst, methodName)()
-        return None
-
-    def currentTitle(self):
-        return self.getValue('currentTitle')
-
-    def currentProgramChain(self):
-        return self.getValue('currentProgramChain')
-
-    def currentCell(self):
-        return self.getValue('currentCell')
-
-
-def synchronized(method):
-    """Wrapper for syncronized methods."""
-
-    def wrapper(self, *args, **keywords):
-        self.lock.acquire()
-        try:
-            method(self, *args, **keywords)
-        finally:
-            self.lock.release()
-
-    return wrapper
-
-
-def entryPoint(method):
-    """Create a machine entry point that will be executed instantly
-    when invoked.
-
-    'method' will be wrapped to be run using the runEntryPoint
-    method. The whole operation is synchronized."""
-    def wrapper(self, *args, **keywords):
-        self.runEntryPoint(method(self, *args, **keywords))
-
-    return synchronized(wrapper)
-
-
-class VirtualMachine(object):
-    """A DVD playback virtual machine implementation."""
-
-    __slots__ = ('info',
-                 'src',
-                 'lock',
-                 'perform',
-                 'sched',
-                 'location')
-
-    def __init__(self, info, src):
-        self.info = info
-        self.src = src
-
-        # The synchronized method lock.
-        self.lock = threading.RLock()
-
-        # Connect our signals to the source object.
-        src.connect('vobu-read', self.vobuRead)
-        src.connect('vobu-header', self.vobuHeader)
-
-        # The perform machine.
-        self.perform = PerformMachine(info)
-
-        # Initialize the scheduler. The initial object should play the
-        # first play program chain.
-        self.sched = itersched.Scheduler(DiscPlayer(self.perform). \
-                                         jumpToFirstPlay())
-
-        # The location is based on the current state of the scheduler.
-        self.location = PlaybackLocation(self.sched)
-        self.perform.setLocation(self.location)
-
-
-    #
-    # Interactive Operation Support
-    #
-
-    class Defer(object):
-        __slots__ = ()
-
-    deferToken = Defer()
-
-    def runEntryPoint(self, itr):
-        """Run the specified iterator as entry point.
-
-        The iterator will be run as the main iterator from a new
-        iterator scheduler (itersched). The results can be either
-        events, that will be sent immediately down the pipeline, or
-        the 'defer' token. If the 'defer()' method is called, the
-        execution is suspended and the iterator is moved to the top of
-        the standard iterator scheduler."""
-        sched = itersched.Scheduler(itr)
-        for item in sched:
-            if isinstance(item, self.Defer):
-                # Defer execution until next main loop iteration.
-                self.sched.call(sched)
-                return
-
-            assert isinstance(item, gst.Event), \
-                   "Spurious object '%s'" % str(item)
-            self.src.emit('queue-event', item)
-
-    def stopSource(self):
-        """Stop the source element instantly."""
-        self.src.set_property('block-count', 0)
-
-    def defer(self):
-        """When called by an entry point, transfers execution of the
-        rest of the method to the main scheduler."""
-        self.stopSource()
-        yield self.deferToken
-
-    def flush(self):
-        """Flush the pipeline."""
-        yield events.flushEvent()
-
-        programChain = self.location.currentProgramChain()
-        if programChain != None:
-            yield events.subpictureClutEvent(programChain)
-
-
-    #
-    # Signal Handling
-    #
-
-    def vobuRead(self, src):
-        """Invoked by the source element after reading a complete
-        VOBU.
-
-        Synchronization is managed internally by this method."""
-
-        self.lock.acquire()
-        
-        try:
-            # Get the next item.
-            item = self.sched.next()
-        except StopIteration:
-            # Time to stop the pipeline.
-            self.src.set_eos()
-            self.src.emit('push-event', gst.Event(gst.EVENT_EOS));
-            return
-        except:
-            # We had an exception in the playback code.
-            traceback.print_exc()
-            sys.exit(1)
-
-        if isinstance(item, gst.Event):
-            # We have an event, put it in the pipeline.
-            self.src.emit('push-event', item);
-        elif item == machineStill:
-            # We are displaying a still frame. Keep the pipeline busy,
-            # but be nice to the processor:
-
-            # We don't want to keep the lock while sleeping.
-            self.lock.release()
-
-            time.sleep(0.1)
-
-            self.src.emit('push-event', gst.Event(gst.EVENT_FILLER))
-
-            return
-        else:
-            # Otherwise, we have a new playback position.
-            (domain, titleNr, sectorNr) = item
-            src.set_property('domain', domain)
-            src.set_property('title', titleNr)
-            src.set_property('vobu-start', sectorNr)
-
-        self.lock.release()
-
-    @entryPoint
-    def vobuHeader(self, src, buf):
-        """The signal handler for the source's vobu-header signal."""
-        # This must be done inmediatly. Otherwise, the contents of the
-        # buffer may change before we handle them.
-        nav = dvdread.NavPacket(buf.get_data())
-
-        # Store the navigation packet as part of the state.
-        self.perform.currentNav = nav
-
-        # Send a nav event. This event cannot be queued and must be
-        # sent inmediatly after receiving the header.
-        self.src.emit('push-event', events.navEvent(nav))
-
-        # Update the highlight.
-        yield Call(self.perform.updateHighlight())
-
-
-    #
-    # Playback Control
-    #
-
-    @entryPoint
-    def stop(self):
-        yield Call(self.defer())
-        yield Call(self.flush())
-        yield Restart.exit()
-
-    @entryPoint
-    def prevProgram(self):
-        cell = self.location.currentCell()
-        if cell == None:
-            return
-
-        yield Call(self.defer())
-        yield Call(self.flush())
-
-        newProgram = cell.programNr - 1
-        if newProgram == 0:
-            # Restart from the beginning.
-            newProgram = 1
-
-        yield Call(self.perform.linkProgram(newProgram))
-
-    @entryPoint
-    def nextProgram(self):
-        cell = self.location.currentCell()
-        if cell == None:
-            return
-
-        yield Call(self.defer())
-        yield Call(self.flush())
-
-        newProgram = cell.programNr + 1
-        if newProgram > cell.programChain.programCount:
-            yield Call(self.perform.linkTailProgramChain())
-        else:
-            yield Call(self.perform.linkProgram(newProgram))
-
-
-    #
-    # Time Based Navigation
-    #
-
-    def getCurrentTime(self):
-        pass
-    currentTime = property(getCurrentTime)
-
-    def getCanTimeJump(self):
-        return False
-    canTimeJump = property(getCanTimeJump)
-
-    @entryPoint
-    def timeJump(self, seconds):
-        yield NoOp
-
-    @entryPoint
-    def timeJumpRelative(self, seconds):
-        yield NoOp
-
-
-    #
-    # Stream Control
-    #
-
-    def getAudioStream(self):
-        return None
-
-    def setAudioStream(self, logical):
-        pass
-    audioStream = property(getAudioStream, setAudioStream)
-
-    def getAudioStreams(self):
-        return None
-
-
-    #
-    # Button Navigation
-    #
-
-    def selectButtonInteractive(self, buttonNr):
-        """Select a button in interactive mode."""
-        yield Call(self.perform.selectButton(buttonNr))
-        yield Call(self.perform.updateHighlight())
-
-    @entryPoint
-    def up(self):
-        btnObj = self.perform.getButtonObj()
-        if btnObj == None:
-            return
-
-        nextBtn = btnObj.up
-        if nextBtn != 0:
-            yield Call(self.selectButtonInteractive(nextBtn))
-
-    @entryPoint
-    def down(self):
-        btnObj = self.perform.getButtonObj()
-        if btnObj == None:
-            return
-
-        nextBtn = btnObj.down
-        if nextBtn != 0:
-            yield Call(self.selectButtonInteractive(nextBtn))
-
-    @entryPoint
-    def left(self):
-        btnObj = self.perform.getButtonObj()
-        if btnObj == None:
-            return
-
-        nextBtn = btnObj.left
-        if nextBtn != 0:
-            yield Call(self.selectButtonInteractive(nextBtn))
-
-    @entryPoint
-    def right(self):
-        btnObj = self.perform.getButtonObj()
-        if btnObj == None:
-            return
-
-        nextBtn = btnObj.right
-        if nextBtn != 0:
-            yield Call(self.selectButtonInteractive(nextBtn))
-
-    @entryPoint
-    def confirm(self):
-        btnObj = self.perform.getButtonObj()
-        if btnObj == None:
-            return
-
-        yield Call(self.defer())
-        yield Call(self.flush())
-
-        yield Restart.buttonCommand(btnObj.command)
-
-    @entryPoint
-    def menu(self):
-        programChain = self.location.currentProgramChain()
-        if programChain == None or \
-               isinstance(programChain.container, dvdread.LangUnit):
-            return
-
-        yield Call(self.defer())
-        yield Call(self.flush())
-
-        yield Call(self.perform.callMenu(dvdread.MENU_TYPE_ROOT, 0))
-
-    @entryPoint
-    def rtn(self):
-        yield NoOp
-
-    @entryPoint
-    def force(self):
-        yield NoOp
+                    yield ops.machineStill
 

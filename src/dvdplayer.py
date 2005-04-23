@@ -129,9 +129,9 @@ class DVDPlayer(gst.Thread):
         
 
         # Wrap the source element in the virtual machine.
-        self.machine = machine.VirtualMachine(self.info,
-                                              self.dvdSrc. \
-                                              get_by_name('dvdblocksrc'))
+        self.shell = machine.MachineShell(self.info,
+                                          self.dvdSrc. \
+                                          get_by_name('dvdblocksrc'))
 
         #self.videoIdent.connect('handoff', self.identHandoff)
         #self.audioIdent.connect('handoff', self.identHandoff)
@@ -151,13 +151,13 @@ class DVDPlayer(gst.Thread):
 
     def __getattr__(self, name):
         # Make this object a proxy for the virtual machine.
-        return getattr(self.machine, name)
+        return getattr(self.shell, name)
 
     def start(self):
         self.set_state(gst.STATE_PLAYING)
 
     def stop(self):
-        self.machine.stop()
+        self.shell.stop()
 
         # Wait for the pipeline to actually stop. If waiting time is
         # too long, just give up and hope for the best.
@@ -169,22 +169,22 @@ class DVDPlayer(gst.Thread):
         self.set_state(gst.STATE_NULL)
 
     def backward10(self):
-        self.machine.timeJumpRelative(-10)
+        self.shell.timeJumpRelative(-10)
 
     def forward10(self):
-        self.machine.timeJumpRelative(10)
+        self.shell.timeJumpRelative(10)
 
 
     def nextAudioStream(self):
         streamNumbers = map(lambda x: x[0],
-                            self.machine.getAudioStreams())
+                            self.shell.getAudioStreams())
         if len(streamNumbers) == 0:
             return
 
         try:
-            pos = streamNumbers.index(self.machine.audioStream)
+            pos = streamNumbers.index(self.shell.audioStream)
         except:
             return
 
-        self.machine.audioStream = streamNumbers[(pos + 1) % \
-                                                 len(streamNumbers)]
+        self.shell.audioStream = streamNumbers[(pos + 1) % \
+                                               len(streamNumbers)]

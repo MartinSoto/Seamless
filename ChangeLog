@@ -1,3 +1,22 @@
+2005-04-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/pipelineops.py: 
+	* src/machine/pipeline.py: 
+	* src/machine/shell.py: 
+	* src/machine/machine.py: 
+	Large reorganization. Break up the big machine module into a
+	machine module, only concerned with generating an abstract
+	sequence of instructions for the pipeline, a pipeline module, that
+	is responsible for the interaction with the GStreamer pipeline,
+	and a shell module, that provides the facade for interactive
+	operations.
+
+	* src/dvdplayer.py (DVDPlayer.__init__): Now use a MachineShell.
+	(DVDPlayer): Rename machine to shell.
+
+	* src/machine/itersched.py (Scheduler.__init__, Scheduler.call) 
+	(Scheduler.chain): Call 'iter' on the passed objects.
+
 2005-04-17  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (PerformMachine.wrapCallOperation):
