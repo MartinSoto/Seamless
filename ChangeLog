@@ -1,5 +1,13 @@
 2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (VirtualMachine.buttonCommand): Implement
+	correctly: don not use a restart operation.
+	(VirtualMachine.wrapCallOperation): Use linkCell to jump to the
+	return cell.
+	(ProgramChainPlayer.buttonCommand): Deleted.
+
+2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/itersched.py (ExecutionError, Scheduler.next): Add
 	support for carrying the traceback produced beyond the scheduler.
 	(Scheduler.restart): Reimplement to avoid destroying the stack if

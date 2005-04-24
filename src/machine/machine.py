@@ -365,9 +365,14 @@ class VirtualMachine(object):
         yield Chain(self.selectButton(value >> 10))
 
     def buttonCommand(self, buttonCmd):
-        """Execute 'buttonCmd' as a button command in this program
-        chain."""
-        yield Restart.buttonCommand(buttonCmd)
+        """Execute 'buttonCmd' as a button command."""
+        programChain = self.currentProgramChain()
+        if programChain == None:
+            return
+
+        yield Call(CommandBlockPlayer(self). \
+                   playButtonCmd(programChain.cellCommands,
+                                 buttonCmd))
 
     # Jumps
     def jumpToTitle(self, titleNr):
@@ -470,7 +475,7 @@ class VirtualMachine(object):
 
         rtn = args[-1]
         if rtn != 0:
-            yield Restart.playCell(rtn)
+            yield Restart.linkCell(rtn)
 
     @callOperation
     def callFirstPlay(self, rtn):
@@ -1136,14 +1141,6 @@ class ProgramChainPlayer(object):
         if next != None:
             yield Chain(self.playProgramChain(next))
 
-    @restartPoint
-    def buttonCommand(self, buttonCmd):
-        """Execute 'buttonCmd' as a button command in this program
-        chain."""
-        yield Call(CommandBlockPlayer(self.machine). \
-                   playButtonCmd(self.programChain.cellCommands,
-                                 buttonCmd))
-
 
 class CommandBlockPlayer(object):
     __slots__ = ('machine',
@@ -1171,6 +1168,7 @@ class CommandBlockPlayer(object):
         The command will use the cell commands block as context."""
         self.commands = cellCommands
 
+        print 'Button command:'
         print disassemble.disassemble(buttonCmd)
         yield Call(self.decoder.performCommand(buttonCmd))
 
@@ -1290,4 +1288,3 @@ class CellPlayer(object):
                 endTime = time.time() + self.cell.stillTime
                 while time.time() < endTime:
                     yield cmds.pause()
-
