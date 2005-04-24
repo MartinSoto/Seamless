@@ -135,7 +135,14 @@ class MachineShell(object):
     def selectButtonInteractive(self, buttonNr):
         """Select a button in interactive mode."""
         yield Call(self.machine.selectButton(buttonNr))
-        yield Call(self.machine.updateHighlight())
+
+        btnObj = self.machine.getButtonObj()
+        if btnObj != None and btnObj.autoAction:
+            # Automatically execute the button's action.
+            yield Call(self.pipeline.defer())
+            yield cmds.flush()
+
+            yield Call(self.machine.buttonCommand(btnObj.command))
 
     @entryPoint
     def up(self):

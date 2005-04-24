@@ -112,7 +112,8 @@ class VirtualMachine(object):
                  'generalRegisters',
                  'systemRegisters',
 
-                 'currentNav')
+                 'currentNav',
+                 'buttonNav')
 
     def __init__(self, info):
         self.info = info
@@ -152,8 +153,9 @@ class VirtualMachine(object):
         self.systemRegisters = None
         self.initializeRegisters()
 
-        # The current navigation packet.
+        # The navigation packets.
         self.currentNav = None
+        self.buttonNav = None
 
         # Initialize the scheduler. Playback starts by playing the
         # first play program chain.
@@ -166,9 +168,71 @@ class VirtualMachine(object):
     def call(self, itr):
         """Put 'itr' on top of this object's iterator scheduler.
 
-        If 'itr' is a scheduler, it will be absorved by this object's
+        If 'itr' is a scheduler, it will be absorbed by this object's
         scheduler."""
         self.sched.call(itr)
+
+
+    #
+    # Navigation Packets
+    #
+
+    def setCurrentNav(self, nav):
+        """Set the current navigation packet.
+
+        This navigation packet is used strictly for navigation, i.e.,
+        to determine the next position in the disc that has to be
+        played. For menu highlights see the 'setButtonNav' method."""
+        self.currentNav = nav
+
+        yield NoOp
+
+    def setButtonNav(self, buttonNav):
+        """Set the current navigation packet used for menu buttons.
+
+        This navigation packet is used to lookup menu button highlight
+        positions and to determine button actions. For disc
+        navigation, see the 'setCurrentNav' method.
+
+        The reason to keep this packet separated from the current
+        navigation packet is that a playback engine will normally have
+        a buffer inserted between the stage that reads material from
+        the disc, and the stage that displays it. The engine may want
+        to use the button information in packet only when it has
+        reached the display stage."""
+        oldButtonNav = self.buttonNav
+        
+        self.buttonNav = buttonNav
+
+        # Check for forced activate.
+        if 1 <= self.buttonNav.forcedActivate <= self.buttonNav.buttonCount:
+            yield Call(self.selectButton(self.buttonNav.forcedActivate))
+            yield Call(self.buttonCommand(self.getButtonObj().command))
+            return
+
+        # Check for forced select. It must be acknowledged once in a
+        # single menu.
+        if 1 <= self.buttonNav.forcedSelect <= self.buttonNav.buttonCount and \
+           (oldButtonNav == None or \
+            oldButtonNav.forcedSelect != self.buttonNav.forcedSelect):
+            yield Call(self.selectButton(self.buttonNav.forcedSelect))
+            return
+
+        # Some (probably broken) DVDs enter menus without having a
+        # selected button.
+        if self.buttonNav.highlightStatus != dvdread.HLSTATUS_NONE and \
+           not 1 <= self.currentButton <= self.buttonNav.buttonCount:
+            # Select an arbitrary button.
+            yield Call(self.selectButton(1))
+            return
+
+        # Update if necessary.
+        if (oldButtonNav != None and \
+            oldButtonNav.highlightStatus != dvdread.HLSTATUS_NONE and \
+            buttonNav.highlightStatus == dvdread.HLSTATUS_NONE) or \
+            buttonNav.highlightStatus == dvdread.HLSTATUS_NEW_INFO:
+            yield Call(self.updateHighlight())
+
 
     #
     # Standard DVD Machine Operations
@@ -291,7 +355,7 @@ class VirtualMachine(object):
 
         self.currentButton = buttonNr
 
-        yield NoOp
+        yield Call(self.updateHighlight())
         
     def setSystemParam8(self, value):
         """Set system parameter 8 to the specified value.
@@ -386,12 +450,13 @@ class VirtualMachine(object):
         all four call operations. This wrapper is activated with the
         '@callOperation' decorator."""
         # Save the necessary state.
-        nav = self.currentNav
+        currentNav, buttonNav = self.currentNav, self.buttonNav
 
+        # Perform the actual call operation.
         yield Call(method(self, *args))
 
         # Restore the state.
-        self.currentNav = nav
+        self.currentNav, self.buttonNav = currentNav, buttonNav
 
         # If a program chain is playing, update the color lookup
         # table.
@@ -519,25 +584,17 @@ class VirtualMachine(object):
 
     def getButtonObj(self):
         """Return the current dvdread.Button object."""
-        if self.currentNav == None or \
-           self.currentNav.highlightStatus == dvdread.HLSTATUS_NONE or \
-           not 1 <= self.currentButton <= self.currentNav.buttonCount:
+        if self.buttonNav == None or \
+           self.buttonNav.highlightStatus == dvdread.HLSTATUS_NONE or \
+           not 1 <= self.currentButton <= self.buttonNav.buttonCount:
             return None
         else:
-            return self.currentNav.getButton(self.currentButton)
+            return self.buttonNav.getButton(self.currentButton)
 
 
     #
     # Pipeline Management and Events
     #
-
-    def setCurrentNav(self, nav):
-        self.currentNav = nav
-
-        # Update the highlight.
-        yield Call(self.updateHighlight())
-
-        # FIXME: Handle nav packet immediate actions.
 
     def updateAudio(self):
         """Send an audio event corresponding to the current logical
@@ -620,13 +677,13 @@ class VirtualMachine(object):
     def updateHighlight(self):
         """Send a highlight event corresponding to the current
         highlighted area."""
-        if self.currentNav == None or \
-           self.currentNav.highlightStatus == dvdread.HLSTATUS_NONE or \
-           not 1 <= self.currentButton <= self.currentNav.buttonCount:
+        if self.buttonNav == None or \
+           self.buttonNav.highlightStatus == dvdread.HLSTATUS_NONE or \
+           not 1 <= self.currentButton <= self.buttonNav.buttonCount:
             # No highlight button.
             yield cmds.resetHighlight()
         else:
-            btnObj = self.currentNav.getButton(self.currentButton)
+            btnObj = self.buttonNav.getButton(self.currentButton)
             yield cmds.highlight(btnObj.area, self.currentButton,
                                  btnObj.paletteSelected)
 
@@ -887,7 +944,7 @@ class TitlePlayer(object):
 
     @restartPoint
     def playMenuInTitle(self, title, menuType):
-        """Make the given video title current, and jump inmediatly to
+        """Make the given video title current, and jump immediatly to
         the corresponding menu of the specified menu type.
 
         This operation is necessary to implement a particular DVD
@@ -917,7 +974,8 @@ class TitlePlayer(object):
 
     @restartPoint
     def linkProgramChain(self, programChainNr):
-        programChain = self.title.getProgramChain(programChainNr)
+        programChain = self.title.videoTitleSet. \
+                       getProgramChain(programChainNr)
         yield Call(ProgramChainPlayer(self.machine). \
                    playProgramChain(programChain))
 

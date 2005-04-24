@@ -24,6 +24,7 @@ import sys
 import gst
 
 import itersched
+from itersched import Call
 
 import dvdread
 import events
@@ -117,6 +118,15 @@ class Pipeline(object):
         # Execute the command on the pipeline.
         cmd(self)
 
+    def updateNav(self, nav):
+        """Update the machine to use the specified navigation packet."""
+        # Register the nav packet with the machine.
+        yield Call(self.machine.setCurrentNav(nav))
+
+        # FIXME: This should be done later in the game, namely, when
+        # the packet actually reaches the subtitle element.
+        yield Call(self.machine.setButtonNav(nav))
+        
     @synchronized
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
@@ -128,8 +138,7 @@ class Pipeline(object):
         self.src.emit('push-event', events.nav(nav.startTime,
                                                nav.endTime))
 
-        # Register the nav packet with the machine.
-        self.machine.call(self.machine.setCurrentNav(nav))
+        self.machine.call(self.updateNav(nav))
 
 
     #
@@ -239,8 +248,13 @@ class Pipeline(object):
         """Flush the pipeline."""
         self.queueEvent(events.flush())
 
-        # A flush erases the CLUT.
+        # A flush erases the CLUT. Restore it.
         self.queueEvent(events.subpictureClut(self.clut))
+
+        # Reset the highlight state.
+        self.area = None
+        self.button = None
+        self.palette = None
 
     def pause(self):
         """Pause the pipeline for a short time (currently 0.1s)."""

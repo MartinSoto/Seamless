@@ -1,5 +1,35 @@
 2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (VirtualMachine.setCurrentNav): Do not
+	update the highlight here.
+	(VirtualMachine.setButtonNav): New method to set the button nav
+	packet and update the state as necessary.
+	(TitlePlayer.linkProgramChain): Fix the method used to find the
+	program chain.
+
+	* src/machine/pipeline.py (Pipeline.vobuHeader): Update the
+	button nav packet as well.
+	(Pipeline.updateNav): New method.
+
+	* src/machine/machine.py (VirtualMachine.__slots__): New attribute
+	buttonNav.
+	(VirtualMachine.setButtonNav): New method.
+	(VirtualMachine.wrapCallOperation): Save buttonNav as well while
+	performing a call.
+	(VirtualMachine.getButtonObj, VirtualMachine.updateHighlight): Use
+	buttonNav instead of currentNav.
+
+	* src/machine/shell.py (MachineShell.selectButtonInteractive): Add
+	autoAction support.
+
+	* src/machine/pipeline.py (Pipeline.flush): Reset the highlight
+	state after a flush.
+
+	* src/machine/machine.py (VirtualMachine.selectButton): Update the
+	highlight from select button.
+
+2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/itersched.py (ExecutionError): New exception class
 	to allow for reporting errors with tracebacks.
 	(Scheduler.next): Trap exceptions and encapsulate them in
