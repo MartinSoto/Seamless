@@ -1,5 +1,14 @@
 2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/itersched.py (ExecutionError): New exception class
+	to allow for reporting errors with tracebacks.
+	(Scheduler.next): Trap exceptions and encapsulate them in
+	ExecutionError objects, including a current traceback.
+	(Scheduler.traceback): New method.
+	(__all__): Export ExecutionError.
+
+2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/pipeline.py: 
 	* src/machine/events.py: 
 	Eliminate 'Event' at the end of most names.

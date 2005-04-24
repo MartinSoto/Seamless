@@ -22,6 +22,20 @@ class IterSchedError(Exception):
 class NoIterError(IterSchedError):
     pass
 
+class ExecutionError(IterSchedError):
+    __slots__ = ('original', 'traceback')
+
+    def __init__(self, original, traceback):
+        IterSchedError.__init__(self)
+
+        self.original = original
+        self.traceback = traceback
+
+    def __str__(self):
+        return "\n%s%s: %s" % \
+               (self.traceback, self.original.__class__.__name__,
+                str(self.original))
+
 
 def checkItr(itr):
     assert hasattr(itr, 'next') and hasattr(itr, '__iter__'), \
@@ -137,6 +151,12 @@ class Scheduler(object):
                     self.current = self.stack.pop()
                 else:
                     raise StopIteration
+            except Exception, e:
+                import StringIO
+
+                s = StringIO.StringIO()
+                self.traceback(s)
+                raise ExecutionError(e, s.getvalue())
 
     def __iter__(self):
         return self
@@ -185,5 +205,27 @@ class Scheduler(object):
             if isinstance(itr, RestartableIterator):
                 yield itr.instance
 
-__all__ = ('IterSchedError', 'NoIterError', 'NoOp', 'Call', 'Chain',
+    def traceback(self, out):
+        """Print a traceback of the scheduler to the file 'out'."""
+        # If anyone knows of a nicer way to get to the generator type,
+        # please let me know.
+        genType = (i for i in []).__class__
+
+        print >> out, "Itersched traceback (most recent call last)"
+        for item in self.stack + [self.current]:
+            if isinstance(item, RestartableIterator):
+                itr = item.iter
+            else:
+                itr = item
+
+            if isinstance(itr, genType):
+                print >> out, '  File "%s", line %d, in %s' % \
+                      (itr.gi_frame.f_code.co_filename,
+                       itr.gi_frame.f_lineno,
+                       itr.gi_frame.f_code.co_name)
+            else:
+                print >> out, "  Object %s", str(itr)
+
+__all__ = ('IterSchedError', 'NoIterError', 'ExecutionError',
+           'NoOp', 'Call', 'Chain',
            'Restart', 'restartPoint', 'Scheduler')
