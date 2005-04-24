@@ -16,6 +16,8 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
+import itertools
+
 class IterSchedError(Exception):
     pass
 
@@ -23,18 +25,20 @@ class NoIterError(IterSchedError):
     pass
 
 class ExecutionError(IterSchedError):
-    __slots__ = ('original', 'traceback')
+    __slots__ = ('original',
+                 'traceback',
+                 'schedTrace')
 
-    def __init__(self, original, traceback):
+    def __init__(self, original, traceback, schedTrace):
         IterSchedError.__init__(self)
 
         self.original = original
         self.traceback = traceback
+        self.schedTrace = schedTrace
 
     def __str__(self):
-        return "\n%s%s: %s" % \
-               (self.traceback, self.original.__class__.__name__,
-                str(self.original))
+        return "\n%sOriginal traceback:\n%s" % \
+               (self.schedTrace, self.traceback)
 
 
 def checkItr(itr):
@@ -153,10 +157,12 @@ class Scheduler(object):
                     raise StopIteration
             except Exception, e:
                 import StringIO
+                import traceback
 
                 s = StringIO.StringIO()
                 self.traceback(s)
-                raise ExecutionError(e, s.getvalue())
+                raise ExecutionError(e, traceback.format_exc(),
+                                     s.getvalue())
 
     def __iter__(self):
         return self
@@ -181,17 +187,24 @@ class Scheduler(object):
     def restart(self, methodName, *posArgs, **kwArgs):
         # Go down the stack searching for an instance having a method
         # with the specified name.
-        while not isinstance(self.current, RestartableIterator) or \
-                  not hasattr(self.current.instance, methodName):
-            try:
-                self.current = self.stack.pop()
-            except IndexError:
-                raise IterSchedError, \
-                      "Restart of method '%s' failed" % methodName
+        self.stack.append(self.current)
+        for i in range(len(self.stack) - 1, -1, -1):
+            if isinstance(self.stack[i], RestartableIterator) and \
+               hasattr(self.stack[i].instance, methodName):
+                # Perform the actual restart.
+                self.current = getattr(self.stack[i].instance,
+                                       methodName)(*posArgs, **kwArgs)
 
-        # Perform the actual restart.
-        self.current = getattr(self.current.instance,
-                               methodName)(*posArgs, **kwArgs)
+                # Cut the stack to the appropriate size.
+                self.stack = self.stack[:i]
+
+                return
+
+        # If this line is reached, we didn't find the element to
+        # restart.
+        current = self.stack.pop()
+        raise IterSchedError, \
+              "Restart of method '%s' failed" % methodName
 
     def restartable(self):
         """Iterate over the restartable instances in the scheduler.
