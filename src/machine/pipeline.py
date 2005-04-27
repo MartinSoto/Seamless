@@ -28,6 +28,7 @@ from itersched import Call
 
 import dvdread
 import events
+import pipelinecmds
 
 
 def synchronized(method):
@@ -55,7 +56,10 @@ class Pipeline(object):
                  'clut',
                  'area',
                  'button',
-                 'palette')
+                 'palette',
+
+                 'pendingCmds',
+                 'immediate')
 
 
     def __init__(self, src, machine):
@@ -79,44 +83,69 @@ class Pipeline(object):
         self.button = None
         self.palette = None
 
+        self.pendingCmds = []
+        self.immediate = False
+
+
     #
     # Utility Methods
     #
 
     def queueEvent(self, event):
         """Put 'event' in the source's queue."""
-        self.src.emit('queue-event', event)
+        if self.immediate:
+            self.src.emit('push-event', event)
+        else:
+            self.src.emit('queue-event', event)
 
     def stopSource(self):
         """Stop the source element instantly."""
         self.src.set_property('block-count', 0)
 
 
-
     #
     # Source Signal Handling
     #
+
+    def collectCmds(self):
+        events = []
+        for cmd in self.mainItr:
+            events.append(cmd)
+            if cmd.__name__ == 'playVobuX' or cmd.__name__ == 'pauseX' or \
+               cmd.__name__ == 'endEntryX':
+                return events
+
+        return events
 
     @synchronized
     def vobuRead(self, src):
         """Invoked by the source element after reading a complete
         VOBU."""
 
+        self.immediate = True
+
         try:
-            # Get the next command object.
-            cmd = self.mainItr.next()
-        except StopIteration:
-            # Time to stop the pipeline.
-            self.src.set_eos()
-            self.src.emit('push-event', events.eos())
-            return
+            if self.pendingCmds == []:
+                cmds = self.collectCmds()
+            else:
+                cmds = self.pendingCmds
+                self.pendingCmds = []
+
+            if cmds == []:
+                # Time to stop the pipeline.
+                self.src.set_eos()
+                self.src.emit('push-event', events.eos())
+                return
+
+            for cmd in cmds:
+                # Execute the command on the pipeline.
+                cmd(self)
         except:
             # We had an exception in the playback code.
             traceback.print_exc()
             sys.exit(1)
 
-        # Execute the command on the pipeline.
-        cmd(self)
+        self.immediate = False
 
     def updateNav(self, nav):
         """Update the machine to use the specified navigation packet."""
@@ -130,7 +159,7 @@ class Pipeline(object):
     @synchronized
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
-        # This must be done inmediatly. Otherwise, the contents of the
+        # This must be done immediatly. Otherwise, the contents of the
         # buffer may change before we handle them.
         nav = dvdread.NavPacket(buf.get_data())
 
@@ -145,41 +174,26 @@ class Pipeline(object):
     # Interactive Operation Support
     #
 
-    class Defer(object):
-        """A special token used internally to mark the end of the
-        immediate part of an entry point."""
-        __slots__ = ()
-
-    deferToken = Defer()
-    """A single instance of the 'Defer' class."""
-
     @synchronized
     def runEntryPoint(self, itr):
-        """Run the specified iterator as entry point.
+        def endEntryX(pipeline):
+            pass
 
-        The iterator will be run as the main iterator from a new
-        iterator scheduler (itersched). The iterator results must be
-        pipeline commands, and will be executed immediately, unless
-        'defer()' is used. If the 'defer()' method is called using
-        itersched's 'Call' operation, the execution will be suspended
-        and the iterator will be moved to the top of the machine's
-        iterator scheduler to continue executing there."""
-        sched = itersched.Scheduler(itr)
-        for cmd in sched:
-            if isinstance(cmd, self.Defer):
-                # Defer execution until next main loop iteration.
-                self.machine.call(sched)
-                return
+        def op():
+            yield Call(itr)
+            yield endEntryX
 
-            # Execute the command on the pipeline.
-            cmd(self)
+        self.machine.call(op())
 
-    def defer(self):
-        """When called (using itersched's 'Call') by an entry point,
-        transfers execution of the rest of the method to the machine
-        scheduler."""
-        self.stopSource()
-        yield self.deferToken
+        cmds = self.collectCmds()
+
+        if cmds != [] and cmds[-1].__name__ == 'endEntryX':
+            for cmd in cmds:
+                cmd(self)
+        else:
+            self.stopSource()
+            cmds[0:0] = [Pipeline.flush]
+            self.pendingCmds = cmds
 
 
     #

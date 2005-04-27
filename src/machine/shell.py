@@ -56,8 +56,6 @@ class MachineShell(object):
 
     @entryPoint
     def stop(self):
-        yield Call(self.pipeline.defer())
-        yield cmds.flush()
         yield Call(self.machine.exit())
 
     @entryPoint
@@ -65,9 +63,6 @@ class MachineShell(object):
         cell = self.machine.currentCell()
         if cell == None:
             return
-
-        yield Call(self.pipeline.defer())
-        yield cmds.flush()
 
         newProgram = cell.programNr - 1
         if newProgram == 0:
@@ -81,9 +76,6 @@ class MachineShell(object):
         cell = self.machine.currentCell()
         if cell == None:
             return
-
-        yield Call(self.pipeline.defer())
-        yield cmds.flush()
 
         newProgram = cell.programNr + 1
         if newProgram > cell.programChain.programCount:
@@ -139,9 +131,6 @@ class MachineShell(object):
         btnObj = self.machine.getButtonObj()
         if btnObj != None and btnObj.autoAction:
             # Automatically execute the button's action.
-            yield Call(self.pipeline.defer())
-            yield cmds.flush()
-
             yield Call(self.machine.buttonCommand(btnObj.command))
 
     @entryPoint
@@ -190,9 +179,6 @@ class MachineShell(object):
         if btnObj == None:
             return
 
-        yield Call(self.pipeline.defer())
-        yield cmds.flush()
-
         yield Call(self.machine.buttonCommand(btnObj.command))
 
     @entryPoint
@@ -201,9 +187,6 @@ class MachineShell(object):
         if programChain == None or \
                isinstance(programChain.container, dvdread.LangUnit):
             return
-
-        yield Call(self.pipeline.defer())
-        yield cmds.flush()
 
         yield Call(self.machine.callMenu(dvdread.MENU_TYPE_ROOT, 0))
 

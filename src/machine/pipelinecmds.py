@@ -23,66 +23,60 @@ pipeline."""
 def playVobu(domain, titleNr, sectorNr):
     """Play the VOBU corresponding to 'domain', 'titleNr', and
     'sectorNr'."""
-    def op(pipeline):
+    def playVobuX(pipeline):
         pipeline.playVobu(domain, titleNr, sectorNr)
 
-    return op
+    return playVobuX
 
 def setAudio(phys):
     """Set the physical audio stream to 'phys'."""
-    def op(pipeline):
+    def setAudioX(pipeline):
         pipeline.setAudio(phys)
 
-    return op
+    return setAudioX
 
 def setSubpicture(phys):
     """Set the physical subpicture stream to 'phys'."""
-    def op(pipeline):
+    def setSubpictureX(pipeline):
         pipeline.setSubpicture(phys)
 
-    return op
+    return setSubpictureX
 
 def setSubpictureClut(clut):
     """Set the subpicture color lookup table to 'clut'.
 
     'clut' is a 16-position array."""
-    def op(pipeline):
+    def setSubpictureClutX(pipeline):
         pipeline.setSubpictureClut(clut)
 
-    return op
+    return setSubpictureClutX
 
 def highlight(area, button, palette):
     """Highlight the specified area, corresponding to the
     specified button number and using the specified palette."""
-    def op(pipeline):
+    def highlightX(pipeline):
         pipeline.highlight(area, button, palette)
 
-    return op
+    return highlightX
 
 def resetHighlight():
     """Clear (reset) the highlighted area."""
-    def op(pipeline):
+    def resetHighlightX(pipeline):
         pipeline.resetHighlight()
 
-    return op
+    return resetHighlightX
 
 def stillFrame():
     """Tell the pipeline that a still frame was sent."""
-    def op(pipeline):
+    def stillFrameX(pipeline):
         pipeline.stillFrame()
 
-    return op
-
-def flush():
-    """Flush the pipeline."""
-    def op(pipeline):
-        pipeline.flush()
-
-    return op
+    return stillFrameX
 
 def pause():
     """Pause the pipeline for a short time (currently 0.1s)."""
-    def op(pipeline):
+    def pauseX(pipeline):
         pipeline.pause()
 
-    return op
+    return pauseX
+
