@@ -1,3 +1,27 @@
+2005-05-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/shell.py: Use the new interactiveOp
+	decorator. Eliminate all traces of manual pipeline flushing.
+
+	* src/machine/pipelinecmds.py: Reimplement using actual classes
+	with callable objects.
+
+	* src/machine/pipeline.py (interactiveOp): New decorator for
+	interactive operations. Replaces the old shell.entryPoint.
+	(Pipeline): Add documentation all around.
+	(Pipeline.__slots__, Pipeline.__init__): New attributes
+	pendingCmds and immmeadiate to manage automatic flushing.
+	(Pipeline.queueEvent): Soport an immediate and a queued mode for
+	sending events.
+	(Pipeline.collectCmds): New method to collect commands from the
+	machine before executing them.
+	(Pipeline.vobuRead): Adapt implementation to use collectCmds.
+	(Pipeline.Defer, Pipeline.deferToken, Pipeline.defer): Delete.
+	(Pipeline.runInteractive): Renamed from runEntryPoint and adapted
+	to use collectCmds.
+
+	* src/machine/machine.py (call): Renamed to callIterator.
+
 2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (VirtualMachine.buttonCommand): Implement

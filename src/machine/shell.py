@@ -18,23 +18,12 @@
 
 import machine
 import pipeline
-import pipelinecmds as cmds
+from pipeline import interactiveOp
 
 from itersched import NoOp, Call
 
 import dvdread
 
-
-def entryPoint(method):
-    """Create a machine entry point that will be executed instantly
-    when invoked.
-
-    'method' will be wrapped to be run using the 'runEntryPoint'
-    method in the pipeline object."""
-    def wrapper(self, *args, **keywords):
-        self.pipeline.runEntryPoint(method(self, *args, **keywords))
-
-    return wrapper
 
 class MachineShell(object):
     """External interface to interactively control the DVD virtual
@@ -54,11 +43,11 @@ class MachineShell(object):
         self.machine = machine.VirtualMachine(info)
         self.pipeline = pipeline.Pipeline(src, self.machine)
 
-    @entryPoint
+    @interactiveOp
     def stop(self):
         yield Call(self.machine.exit())
 
-    @entryPoint
+    @interactiveOp
     def prevProgram(self):
         cell = self.machine.currentCell()
         if cell == None:
@@ -71,7 +60,7 @@ class MachineShell(object):
 
         yield Call(self.machine.linkProgram(newProgram))
 
-    @entryPoint
+    @interactiveOp
     def nextProgram(self):
         cell = self.machine.currentCell()
         if cell == None:
@@ -96,11 +85,11 @@ class MachineShell(object):
         return False
     canTimeJump = property(getCanTimeJump)
 
-    @entryPoint
+    @interactiveOp
     def timeJump(self, seconds):
         yield NoOp
 
-    @entryPoint
+    @interactiveOp
     def timeJumpRelative(self, seconds):
         yield NoOp
 
@@ -133,7 +122,7 @@ class MachineShell(object):
             # Automatically execute the button's action.
             yield Call(self.machine.buttonCommand(btnObj.command))
 
-    @entryPoint
+    @interactiveOp
     def up(self):
         btnObj = self.machine.getButtonObj()
         if btnObj == None:
@@ -143,7 +132,7 @@ class MachineShell(object):
         if nextBtn != 0:
             yield Call(self.selectButtonInteractive(nextBtn))
 
-    @entryPoint
+    @interactiveOp
     def down(self):
         btnObj = self.machine.getButtonObj()
         if btnObj == None:
@@ -153,7 +142,7 @@ class MachineShell(object):
         if nextBtn != 0:
             yield Call(self.selectButtonInteractive(nextBtn))
 
-    @entryPoint
+    @interactiveOp
     def left(self):
         btnObj = self.machine.getButtonObj()
         if btnObj == None:
@@ -163,7 +152,7 @@ class MachineShell(object):
         if nextBtn != 0:
             yield Call(self.selectButtonInteractive(nextBtn))
 
-    @entryPoint
+    @interactiveOp
     def right(self):
         btnObj = self.machine.getButtonObj()
         if btnObj == None:
@@ -173,7 +162,7 @@ class MachineShell(object):
         if nextBtn != 0:
             yield Call(self.selectButtonInteractive(nextBtn))
 
-    @entryPoint
+    @interactiveOp
     def confirm(self):
         btnObj = self.machine.getButtonObj()
         if btnObj == None:
@@ -181,7 +170,7 @@ class MachineShell(object):
 
         yield Call(self.machine.buttonCommand(btnObj.command))
 
-    @entryPoint
+    @interactiveOp
     def menu(self):
         programChain = self.machine.currentProgramChain()
         if programChain == None or \
@@ -190,11 +179,11 @@ class MachineShell(object):
 
         yield Call(self.machine.callMenu(dvdread.MENU_TYPE_ROOT, 0))
 
-    @entryPoint
+    @interactiveOp
     def rtn(self):
         yield NoOp
 
-    @entryPoint
+    @interactiveOp
     def force(self):
         yield NoOp
 

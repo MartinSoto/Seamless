@@ -165,7 +165,7 @@ class VirtualMachine(object):
     def __iter__(self):
         return self.sched
 
-    def call(self, itr):
+    def callIterator(self, itr):
         """Put 'itr' on top of this object's iterator scheduler.
 
         If 'itr' is a scheduler, it will be absorbed by this object's
@@ -467,7 +467,7 @@ class VirtualMachine(object):
         # table.
         programChain = self.currentProgramChain()
         if programChain != None:
-            yield cmds.setSubpictureClut(programChain.clut)
+            yield cmds.SetSubpictureClut(programChain.clut)
 
         yield Call(self.updateAudio())
         yield Call(self.updateSubpicture())
@@ -630,7 +630,7 @@ class VirtualMachine(object):
                         physical = newPhys
                         break
 
-        yield cmds.setAudio(physical)
+        yield cmds.SetAudio(physical)
 
     @staticmethod
     def getAttributeContainer(programChain):
@@ -677,7 +677,7 @@ class VirtualMachine(object):
                         physical = streams[dvdread. \
                                            SUBPICTURE_PHYS_TYPE_LETTERBOX]
 
-        yield cmds.setSubpicture(physical)
+        yield cmds.SetSubpicture(physical)
 
     def updateHighlight(self):
         """Send a highlight event corresponding to the current
@@ -686,10 +686,10 @@ class VirtualMachine(object):
            self.buttonNav.highlightStatus == dvdread.HLSTATUS_NONE or \
            not 1 <= self.currentButton <= self.buttonNav.buttonCount:
             # No highlight button.
-            yield cmds.resetHighlight()
+            yield cmds.ResetHighlight()
         else:
             btnObj = self.buttonNav.getButton(self.currentButton)
-            yield cmds.highlight(btnObj.area, self.currentButton,
+            yield cmds.Highlight(btnObj.area, self.currentButton,
                                  btnObj.paletteSelected)
 
 
@@ -1044,7 +1044,7 @@ class ProgramChainPlayer(object):
         self.cell = None
 
         # Update the color lookup table.
-        yield cmds.setSubpictureClut(self.programChain.clut)
+        yield cmds.SetSubpictureClut(self.programChain.clut)
 
         # Update the audio and subpicture streams.
         yield Call(self.machine.updateAudio())
@@ -1255,7 +1255,7 @@ class CellPlayer(object):
         # Play until the end of the cell.
         nav = None
         while True:
-            yield cmds.playVobu(self.domain, self.titleNr, self.sectorNr)
+            yield cmds.PlayVobu(self.domain, self.titleNr, self.sectorNr)
 
             # After the yield, the whole VOBU will be read by the
             # playback element and sent down the pipeline. During this
@@ -1282,9 +1282,9 @@ class CellPlayer(object):
                 # restart operation takes this method out of the
                 # stack.
                 while True:
-                    yield cmds.pause()
+                    yield cmds.Pause()
             else:
                 # Wait the specified number of seconds.
                 endTime = time.time() + self.cell.stillTime
                 while time.time() < endTime:
-                    yield cmds.pause()
+                    yield cmds.Pause()

@@ -16,67 +16,84 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-"""A number of factory methods that create command objects used to
-represent the operations that the virtual machine can do on a
-pipeline."""
+"""Command objects to control the playback pipeline.
 
-def playVobu(domain, titleNr, sectorNr):
-    """Play the VOBU corresponding to 'domain', 'titleNr', and
-    'sectorNr'."""
-    def playVobuX(pipeline):
-        pipeline.playVobu(domain, titleNr, sectorNr)
+Any virtual machine implementation must return intances of the classes
+in this module."""
 
-    return playVobuX
+class PipelineCmd(object):
+    """A generic command object.
 
-def setAudio(phys):
-    """Set the physical audio stream to 'phys'."""
-    def setAudioX(pipeline):
-        pipeline.setAudio(phys)
+    Objects of this class, when invoked with a pipeline object as
+    parameter, call the method named by attribute `methodName` passing
+    it the paremeters received by the object constructor."""
+    __slots__ = ('args',
+                 'keywords')
 
-    return setAudioX
+    def __init__(self, *args, **keywords):
+        self.args = args
+        self.keywords = keywords
 
-def setSubpicture(phys):
-    """Set the physical subpicture stream to 'phys'."""
-    def setSubpictureX(pipeline):
-        pipeline.setSubpicture(phys)
+    methodName = None
 
-    return setSubpictureX
+    def __call__(self, pipeline):
+        getattr(pipeline, self.methodName)(*self.args, **self.keywords)
 
-def setSubpictureClut(clut):
-    """Set the subpicture color lookup table to 'clut'.
 
-    'clut' is a 16-position array."""
-    def setSubpictureClutX(pipeline):
-        pipeline.setSubpictureClut(clut)
+class PlayVobu(PipelineCmd):
+    """When constructed with parameter list `(domain, titleNr,
+    sectorNr)`, play the VOBU corresponding to domain `domain`, title
+    number `titleNr`, and sector number `sectorNr`."""
+    __slots__ = ()
+    methodName = 'playVobu'
 
-    return setSubpictureClutX
 
-def highlight(area, button, palette):
-    """Highlight the specified area, corresponding to the
-    specified button number and using the specified palette."""
-    def highlightX(pipeline):
-        pipeline.highlight(area, button, palette)
+class SetAudio(PipelineCmd):
+    """When constructed with parameter list `(phys)`, set the physical
+    audio stream to 'phys'."""
+    __slots__ = ()
+    methodName = 'setAudio'
 
-    return highlightX
 
-def resetHighlight():
-    """Clear (reset) the highlighted area."""
-    def resetHighlightX(pipeline):
-        pipeline.resetHighlight()
+class SetSubpicture(PipelineCmd):
+    """When constructed with parameter list `(phys)`, set the physical
+    subpicture stream to 'phys'."""
+    __slots__ = ()
+    methodName = 'setSubpicture'
 
-    return resetHighlightX
 
-def stillFrame():
-    """Tell the pipeline that a still frame was sent."""
-    def stillFrameX(pipeline):
-        pipeline.stillFrame()
+class SetSubpictureClut(PipelineCmd):
+    """When constructed with parameter list `(clut)`, set the
+    subpicture color lookup table to 'clut''clut' is a 16-position
+    array."""
+    __slots__ = ()
+    methodName = 'setSubpictureClut'
 
-    return stillFrameX
 
-def pause():
-    """Pause the pipeline for a short time (currently 0.1s)."""
-    def pauseX(pipeline):
-        pipeline.pause()
+class Highlight(PipelineCmd):
+    """When constructed with parameter list `(area, button, palette)`,
+    highlight the specified area, corresponding to the specified
+    button number and using the specified palette."""
+    __slots__ = ()
+    methodName = 'highlight'
 
-    return pauseX
 
+class ResetHighlight(PipelineCmd):
+    """When constructed without parameters, clear (reset) the highlighted
+    area."""
+    __slots__ = ()
+    methodName = 'resetHighlight'
+
+
+class StillFrame(PipelineCmd):
+    """When constructed without parameters, tell the pipeline that a
+    still frame was sent."""
+    __slots__ = ()
+    methodName = 'stillFrame'
+
+
+class Pause(PipelineCmd):
+    """When constructed without parameters, pause the pipeline for a
+    short time."""
+    __slots__ = ()
+    methodName = 'pause'
