@@ -555,6 +555,33 @@ class VirtualMachine(object):
 
 
     #
+    # Additional Playback Operations
+    #
+
+    def canPositionSeek(self):
+        """Return `True` if and only if a position based seek
+        operation is possible at the current time."""
+        value = self.getValue('hasTimeMap')
+        if value == None:
+            return False
+        else:
+            return value
+
+    def seekToPosition(self, timePosition):
+        """Seek to the specified time position.
+
+        A time position is specified as playback time in seconds from
+        the beginning of the current program chain. In most cases, and
+        depending on the quality of the time map provided by the disc,
+        an error of 5 to 10 seconds can be expected while doing a time
+        based jump.
+
+        This operation will fail if no time map is available in the
+        current program chain."""
+        yield Restart.seekToPosition(timePosition)
+
+
+    #
     # State Retrieval
     #
 
@@ -572,6 +599,16 @@ class VirtualMachine(object):
 
     def currentCell(self):
         return self.getValue('currentCell')
+
+    def getCurrentTime(self):
+        """Return the current playback time with respect to the start
+        of the program chain."""
+        cell = self.currentCell()
+        if cell == None or self.buttonNav == None:
+            return None
+
+        return cell.startSeconds + \
+               self.buttonNav.cellElapsedTime.seconds
 
 
     def getLangUnit(self, container):
@@ -1035,6 +1072,18 @@ class ProgramChainPlayer(object):
         played."""
         return self.programChain
 
+    def hasTimeMap(self):
+        """Return `True` if and only if the current program chain
+        provides a time map.
+
+        A time map associates time positions (specified as playback
+        time from the beginning of the program chain) with VOBUs in
+        the program chain. It can be used to jump to a particular time
+        position. Normally, time maps have low accuracy. An error of 5
+        to 10 seconds is to be expected while locating a position."""
+        return self.programChain != None and \
+               self.programChain.hasTimeMap
+
     @restartPoint
     def playProgramChain(self, programChain, cellNr=1):
         """Play the specified program chain.
@@ -1059,13 +1108,18 @@ class ProgramChainPlayer(object):
         yield Chain(self.linkCell(cellNr))
 
     @restartPoint
-    def linkCell(self, cellNr):
+    def linkCell(self, cellNr, sectorNr=None):
+        """Link to the specified cell.
+
+        If a sector number is specified, link to that sector in the
+        cell."""
         assert 1 <= cellNr <= self.programChain.cellCount
 
         self.cell = self.programChain.getCell(cellNr)
 
         # Play the cell.
-        yield Call(CellPlayer(self.machine).playCell(self.cell))
+        yield Call(CellPlayer(self.machine).playCell(self.cell,
+                                                     sectorNr))
 
         # Play the corresponding cell commands.
         if self.cell.commandNr != 0:
@@ -1140,6 +1194,14 @@ class ProgramChainPlayer(object):
         next = self.programChain.nextProgramChain
         if next != None:
             yield Chain(self.playProgramChain(next))
+
+    @restartPoint
+    def seekToPosition(self, timePosition):
+        assert self.hasTimeMap()
+
+        sectorNr = self.programChain.getSectorFromTime(timePosition)
+        cell = self.programChain.getCellFromSector(sectorNr)
+        yield Chain(self.linkCell(cell.cellNr, sectorNr=sectorNr))
 
 
 class CommandBlockPlayer(object):
@@ -1224,8 +1286,11 @@ class CellPlayer(object):
         self.sectorNr = None
 
     @restartPoint
-    def playCell(self, cell):
-        """Play the specified cell."""
+    def playCell(self, cell, sectorNr=None):
+        """Play the specified cell.
+
+        If a sector number is specified, playback of the cell will
+        start there."""
         self.cell = cell
 
         # Find the playback domain for the cell.
@@ -1244,8 +1309,12 @@ class CellPlayer(object):
         else:
             assert False, 'Unexpected type for program chain container'
 
-        # Just play the first VOBU in the cell.
-        yield Chain(self.playFromVobu(cell.firstSector))
+        if sectorNr == None:
+            # Just play the first VOBU in the cell.
+            yield Chain(self.playFromVobu(cell.firstSector))
+        else:
+            yield Chain(self.playFromVobu(sectorNr))
+            
 
     @restartPoint
     def playFromVobu(self, sectorNr):

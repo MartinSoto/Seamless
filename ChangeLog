@@ -1,3 +1,23 @@
+2005-05-02  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/dvdplayer.py (DVDPlayer.backward10, DVDPlayer.forward10):
+	Fixed to use seekToPositionRelative.
+
+	* src/machine/shell.py (MachineShell.getCurrentTime) 
+	(MachineShell.canPositionSeek, MachineShell.seekToPosition) 
+	(MachineShell.seekToPositionRelative): Implemented.
+
+	* src/machine/machine.py (CellPlayer.playCell): Add a sectorNr
+	parameter.
+	(ProgramChainPlayer.linkCell, ProgramChainPlayer.seekToPosition)
+	(VirtualMachine.getCurrentTime, VirtualMachine.canPositionSeek)
+	(VirtualMachine.seekToPosition): New methods.
+
+2005-05-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (ProgramChainPlayer.hasTimeMap): New
+	method.
+
 2005-05-01  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/pipeline.py (Pipeline.sendEvent): Renamed from

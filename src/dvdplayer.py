@@ -169,10 +169,12 @@ class DVDPlayer(gst.Thread):
         self.set_state(gst.STATE_NULL)
 
     def backward10(self):
-        self.shell.timeJumpRelative(-10)
+        if self.shell.canPositionSeek():
+            self.shell.seekToPositionRelative(-10)
 
     def forward10(self):
-        self.shell.timeJumpRelative(10)
+        if self.shell.canPositionSeek():
+            self.shell.seekToPositionRelative(10)
 
 
     def nextAudioStream(self):

@@ -78,20 +78,20 @@ class MachineShell(object):
     #
 
     def getCurrentTime(self):
-        pass
-    currentTime = property(getCurrentTime)
+        return self.machine.getCurrentTime()
 
-    def getCanTimeJump(self):
-        return False
-    canTimeJump = property(getCanTimeJump)
+    def canPositionSeek(self):
+        return self.machine.canPositionSeek()
 
     @interactiveOp
-    def timeJump(self, seconds):
-        yield NoOp
+    def seekToPosition(self, timePostion):
+        yield Call(self.machine.seekToPosition(timePosition))
 
     @interactiveOp
-    def timeJumpRelative(self, seconds):
-        yield NoOp
+    def seekToPositionRelative(self, seconds):
+        currentTime = self.machine.getCurrentTime()
+        yield Call(self.machine. \
+                   seekToPosition(currentTime + seconds))
 
 
     #
