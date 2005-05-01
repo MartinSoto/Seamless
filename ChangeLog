@@ -1,5 +1,11 @@
 2005-05-01  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/pipeline.py (Pipeline.sendEvent): Renamed from
+	queueEvent.
+	(Pipeline.vobuRead): Eliminate unnecessary code.
+
+2005-05-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/shell.py: Use the new interactiveOp
 	decorator. Eliminate all traces of manual pipeline flushing.
 

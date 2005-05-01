@@ -134,8 +134,8 @@ class Pipeline(object):
     # Utility Methods
     #
 
-    def queueEvent(self, event):
-        """Put 'event' in the source's queue."""
+    def sendEvent(self, event):
+        """Send `event` down the pipeline."""
         if self.immediate:
             self.src.emit('push-event', event)
         else:
@@ -185,12 +185,6 @@ class Pipeline(object):
             for cmd in cmds:
                 # Execute the command on the pipeline.
                 cmd(self)
-
-                # The command can temporarily release the lock, thus
-                # allowing for an interactive operation to be
-                # started. Take this into account.
-                if self.pendingCmds != []:
-                    return
         except:
             # We had an exception in the playback code.
             traceback.print_exc()
@@ -291,7 +285,7 @@ class Pipeline(object):
             return
         self.audio = phys
 
-        self.queueEvent(events.audio(self.audio))
+        self.sendEvent(events.audio(self.audio))
 
     def setSubpicture(self, phys):
         """Set the physical subpicture stream to 'phys'."""
@@ -299,7 +293,7 @@ class Pipeline(object):
             return
         self.subpicture = phys
 
-        self.queueEvent(events.subpicture(self.subpicture))
+        self.sendEvent(events.subpicture(self.subpicture))
 
     def setSubpictureClut(self, clut):
         """Set the subpicture color lookup table to 'clut'.
@@ -309,7 +303,7 @@ class Pipeline(object):
             return
         self.clut = clut
 
-        self.queueEvent(events.subpictureClut(self.clut))
+        self.sendEvent(events.subpictureClut(self.clut))
 
     def highlight(self, area, button, palette):
         """Highlight the specified area, corresponding to the
@@ -319,7 +313,7 @@ class Pipeline(object):
             return
         (self.area, self.button, self.palette) = (area, button, palette)
 
-        self.queueEvent(events.highlight(self.area,
+        self.sendEvent(events.highlight(self.area,
                                          self.button,
                                          self.palette))
 
@@ -330,18 +324,18 @@ class Pipeline(object):
             return
         (self.area, self.button, self.palette) = (None, None, None)
 
-        self.queueEvent(events.highlightReset())
+        self.sendEvent(events.highlightReset())
 
     def stillFrame(self):
         """Tell the pipeline that a still frame was sent."""
-        self.queueEvent(events.eos())
+        self.sendEvent(events.eos())
 
     def flush(self):
         """Flush the pipeline."""
-        self.queueEvent(events.flush())
+        self.sendEvent(events.flush())
 
         # A flush erases the CLUT. Restore it.
-        self.queueEvent(events.subpictureClut(self.clut))
+        self.sendEvent(events.subpictureClut(self.clut))
 
         # Reset the highlight state.
         self.area = None
@@ -349,15 +343,17 @@ class Pipeline(object):
         self.palette = None
 
     def pause(self):
-        """Pause the pipeline for a short time (currently 0.1s)."""
+        """Pause the pipeline for a short time (currently 0.1s).
+
+        Warning: This method temporarily releases the object's lock"""
+        self.sendEvent(events.filler())
+
         # We don't want to keep the lock while sleeping.
         self.lock.release()
         time.sleep(0.1)
         self.lock.acquire()
 
-        self.queueEvent(events.filler())
-
     def eos(self):
         """Signal the end of stream (EOS) to the pipeline."""
-        self.queueEvent(events.eos())
+        self.sendEvent(events.eos())
 
