@@ -1,5 +1,18 @@
 -*- Text -*-
 
+- Correct improper highlight handling in DVDs with letterboxed +
+  widescreen support.
+
+- Support angles.
+
+- Implement support for other sound types.
+
+- Implement the cell time as still time thing. Monsters Inc seems to
+  use that in the warnings before the film.
+
+- Honor prohibited operations when it makes sense, or ignore them
+  smartly.
+
 - Find out why sounds interrupts shortly when moving in menus and
   using alsasink.
 
@@ -12,17 +25,7 @@
 
 - Implement free changing of sutitles
 
-- Support angles.
-
-- Implement support for other sound types.
-
-- Implement the cell time as still time thing. Monsters Inc seems to
-  use that in the warnings before the film.
-
 - Add __richcmp__ to dvdread wrappers as necessary.
-
-- Put pipeline handling in a separate class, wrapping the source
-  element.
 
 - Implement backwards playing.
 
@@ -32,13 +35,12 @@
 
 - Create a Pyrex wrapper for lirc.
 
-- Honor prohibited operations when it makes sense, or ignore them
-  smartly.
-
 - Implement auto NTSC/PAL mode.
 
 - LIRC component fails miserably when no LIRC kernel modules are
   available.
+
+- Really implement letterboxed mode.
 
 
 Particular DVDs

@@ -141,6 +141,9 @@ class VirtualMachine(object):
 
         # Preferred display aspect ratio
         self.aspectRatio = dvdread.ASPECT_RATIO_16_9
+        # The current pipeline implementation doesn't really support
+        # the letterboxed mode.
+        #self.aspectRatio = dvdread.ASPECT_RATIO_4_3
 
         # Current video mode.
         self.videoMode = dvdread.VIDEO_MODE_NORMAL
@@ -685,34 +688,42 @@ class VirtualMachine(object):
         """Send a subpicture event corresponding to the current
         logical subpicture stream."""
         programChain = self.currentProgramChain()
+
+        # Determine the logical stream.
         if programChain == None:
-            physical = -1
+            logical = 0
         elif isinstance(programChain.container, dvdread.LangUnit):
-            # We are in the menu domain. The physical subpicture is
-            # always 0.
-            physical = 0
+            # We are in the menu domain. The logical subpicture is
+            # always 1.
+            logical = 1
         elif self.subpicture & 0x40 == 0 or \
              self.subpicture & 0x3f > 31:
             # We aren't playing a program chain, or the logical
             # subpicture is explicitly set to none.
+            logical = 0
+        else:
+            logical = (self.subpicture & 0x1f) + 1
+
+        # Retrieve the physical streams tuple, if possible.
+        if logical > 0:
+            streams = programChain.getSubpicturePhysStreams(logical)
+        else:
+            streams = None
+
+        # Determine the physical stream.
+        if streams == None:
             physical = -1
         else:
-            streams = programChain. \
-                      getSubpicturePhysStreams((self.subpicture \
-                                                & 0x1f) + 1)
-            if streams == None:
-                physical = -1
+            if self.getAttributeContainer(programChain). \
+               videoAttributes.aspectRatio == dvdread.ASPECT_RATIO_4_3:
+                physical = streams[dvdread.SUBPICTURE_PHYS_TYPE_4_3]
             else:
-                if self.getAttributeContainer(programChain). \
-                   videoAttributes.aspectRatio == dvdread.ASPECT_RATIO_4_3:
-                    physical = streams[dvdread.SUBPICTURE_PHYS_TYPE_4_3]
+                if self.aspectRatio == dvdread.ASPECT_RATIO_16_9:
+                    physical = streams[dvdread. \
+                                       SUBPICTURE_PHYS_TYPE_WIDESCREEN]
                 else:
-                    if self.aspectRatio == dvdread.ASPECT_RATIO_16_9:
-                        physical = streams[dvdread. \
-                                           SUBPICTURE_PHYS_TYPE_WIDESCREEN]
-                    else:
-                        physical = streams[dvdread. \
-                                           SUBPICTURE_PHYS_TYPE_LETTERBOX]
+                    physical = streams[dvdread. \
+                                       SUBPICTURE_PHYS_TYPE_LETTERBOX]
 
         yield cmds.SetSubpicture(physical)
 

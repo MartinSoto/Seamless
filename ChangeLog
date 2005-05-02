@@ -1,3 +1,9 @@
+2005-05-03  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.updateSubpicture):
+	Restructure implementation. Fixes selection of the physical stream
+	while in a menu.
+
 2005-05-02  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/dvdplayer.py (DVDPlayer.backward10, DVDPlayer.forward10):
