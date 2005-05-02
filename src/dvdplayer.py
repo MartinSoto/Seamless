@@ -23,13 +23,11 @@ import gobject
 import gst
 import gst.interfaces
 
-# FIXME: get rid of this
-from gst import *
-
 # Load private GStreamer plugins.
 import loadplugins
 
-from machine import *
+import dvdread
+import machine
 import wrapclock
 
 
@@ -43,15 +41,15 @@ def ghostify(bin, elemName, padName, ghostName=None):
     bin.add_ghost_pad(bin.get_by_name(elemName).get_pad(padName), ghostName)
 
 
-class DVDPlayer(Thread):
+class DVDPlayer(gst.Thread):
     """
     """
 
     def __init__(self, options, name="player"):
-        Thread.__init__(self, name)
+        gst.Thread.__init__(self, name)
 
         # Create an info object for the DVD.
-        self.info = DVDInfo(options.location)
+        self.info = dvdread.DVDInfo(options.location)
 
         # Build the pipeline.
 
@@ -61,7 +59,7 @@ class DVDPlayer(Thread):
         else:
             videoDecoder = ''
 
-        self.dvdSrc = parse_launch("""
+        self.dvdSrc = gst.parse_launch("""
         (
           dvdblocksrc name=dvdblocksrc location=%s !
             seamless-dvddemux name=dvddemux .current_video !
@@ -79,7 +77,7 @@ class DVDPlayer(Thread):
         self.add(self.dvdSrc)
 
         # The video playback thread.
-        self.videoSink = parse_launch("""
+        self.videoSink = gst.parse_launch("""
         {
           seamless-mpeg2subt name=mpeg2subt !
             identity name=videoident !
@@ -101,7 +99,7 @@ class DVDPlayer(Thread):
             sinkName = 'audioident'
             audioDecoder = ''
 
-        self.audioSink = parse_launch("""
+        self.audioSink = gst.parse_launch("""
         {
           %s
             identity name=audioident !
@@ -131,8 +129,9 @@ class DVDPlayer(Thread):
         
 
         # Wrap the source element in the virtual machine.
-        self.machine = VirtualMachine(self.info,
-                                      self.dvdSrc.get_by_name('dvdblocksrc'))
+        self.shell = machine.MachineShell(self.info,
+                                          self.dvdSrc. \
+                                          get_by_name('dvdblocksrc'))
 
         #self.videoIdent.connect('handoff', self.identHandoff)
         #self.audioIdent.connect('handoff', self.identHandoff)
@@ -152,13 +151,13 @@ class DVDPlayer(Thread):
 
     def __getattr__(self, name):
         # Make this object a proxy for the virtual machine.
-        return getattr(self.machine, name)
+        return getattr(self.shell, name)
 
     def start(self):
-        self.set_state(STATE_PLAYING)
+        self.set_state(gst.STATE_PLAYING)
 
     def stop(self):
-        self.machine.stop()
+        self.shell.stop()
 
         # Wait for the pipeline to actually stop. If waiting time is
         # too long, just give up and hope for the best.
@@ -167,25 +166,27 @@ class DVDPlayer(Thread):
             time.sleep(0.1)
             maxIter -= 1
 
-        self.set_state(STATE_NULL)
+        self.set_state(gst.STATE_NULL)
 
     def backward10(self):
-        self.machine.timeJumpRelative(-10)
+        if self.shell.canPositionSeek():
+            self.shell.seekToPositionRelative(-10)
 
     def forward10(self):
-        self.machine.timeJumpRelative(10)
+        if self.shell.canPositionSeek():
+            self.shell.seekToPositionRelative(10)
 
 
     def nextAudioStream(self):
         streamNumbers = map(lambda x: x[0],
-                            self.machine.getAudioStreams())
+                            self.shell.getAudioStreams())
         if len(streamNumbers) == 0:
             return
 
         try:
-            pos = streamNumbers.index(self.machine.audioStream)
+            pos = streamNumbers.index(self.shell.audioStream)
         except:
             return
 
-        self.machine.audioStream = streamNumbers[(pos + 1) % \
-                                                 len(streamNumbers)]
+        self.shell.audioStream = streamNumbers[(pos + 1) % \
+                                               len(streamNumbers)]

@@ -1,7 +1,492 @@
+2005-05-02  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/dvdplayer.py (DVDPlayer.backward10, DVDPlayer.forward10):
+	Fixed to use seekToPositionRelative.
+
+	* src/machine/shell.py (MachineShell.getCurrentTime) 
+	(MachineShell.canPositionSeek, MachineShell.seekToPosition) 
+	(MachineShell.seekToPositionRelative): Implemented.
+
+	* src/machine/machine.py (CellPlayer.playCell): Add a sectorNr
+	parameter.
+	(ProgramChainPlayer.linkCell, ProgramChainPlayer.seekToPosition)
+	(VirtualMachine.getCurrentTime, VirtualMachine.canPositionSeek)
+	(VirtualMachine.seekToPosition): New methods.
+
+2005-05-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (ProgramChainPlayer.hasTimeMap): New
+	method.
+
+2005-05-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/pipeline.py (Pipeline.sendEvent): Renamed from
+	queueEvent.
+	(Pipeline.vobuRead): Eliminate unnecessary code.
+
+2005-05-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/shell.py: Use the new interactiveOp
+	decorator. Eliminate all traces of manual pipeline flushing.
+
+	* src/machine/pipelinecmds.py: Reimplement using actual classes
+	with callable objects.
+
+	* src/machine/pipeline.py (interactiveOp): New decorator for
+	interactive operations. Replaces the old shell.entryPoint.
+	(Pipeline): Add documentation all around.
+	(Pipeline.__slots__, Pipeline.__init__): New attributes
+	pendingCmds and immmeadiate to manage automatic flushing.
+	(Pipeline.queueEvent): Soport an immediate and a queued mode for
+	sending events.
+	(Pipeline.collectCmds): New method to collect commands from the
+	machine before executing them.
+	(Pipeline.vobuRead): Adapt implementation to use collectCmds.
+	(Pipeline.Defer, Pipeline.deferToken, Pipeline.defer): Delete.
+	(Pipeline.runInteractive): Renamed from runEntryPoint and adapted
+	to use collectCmds.
+
+	* src/machine/machine.py (call): Renamed to callIterator.
+
+2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.buttonCommand): Implement
+	correctly: don not use a restart operation.
+	(VirtualMachine.wrapCallOperation): Use linkCell to jump to the
+	return cell.
+	(ProgramChainPlayer.buttonCommand): Deleted.
+
+2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py (ExecutionError, Scheduler.next): Add
+	support for carrying the traceback produced beyond the scheduler.
+	(Scheduler.restart): Reimplement to avoid destroying the stack if
+	the restart method is not found. This way a proper stack trace
+	will be produced if a restart fails.
+
+2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.setCurrentNav): Do not
+	update the highlight here.
+	(VirtualMachine.setButtonNav): New method to set the button nav
+	packet and update the state as necessary.
+	(TitlePlayer.linkProgramChain): Fix the method used to find the
+	program chain.
+
+	* src/machine/pipeline.py (Pipeline.vobuHeader): Update the
+	button nav packet as well.
+	(Pipeline.updateNav): New method.
+
+	* src/machine/machine.py (VirtualMachine.__slots__): New attribute
+	buttonNav.
+	(VirtualMachine.setButtonNav): New method.
+	(VirtualMachine.wrapCallOperation): Save buttonNav as well while
+	performing a call.
+	(VirtualMachine.getButtonObj, VirtualMachine.updateHighlight): Use
+	buttonNav instead of currentNav.
+
+	* src/machine/shell.py (MachineShell.selectButtonInteractive): Add
+	autoAction support.
+
+	* src/machine/pipeline.py (Pipeline.flush): Reset the highlight
+	state after a flush.
+
+	* src/machine/machine.py (VirtualMachine.selectButton): Update the
+	highlight from select button.
+
+2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py (ExecutionError): New exception class
+	to allow for reporting errors with tracebacks.
+	(Scheduler.next): Trap exceptions and encapsulate them in
+	ExecutionError objects, including a current traceback.
+	(Scheduler.traceback): New method.
+	(__all__): Export ExecutionError.
+
+2005-04-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/pipeline.py: 
+	* src/machine/events.py: 
+	Eliminate 'Event' at the end of most names.
+
+	* src/machine/pipeline.py (Pipeline.defer): Operation moved to use
+	command objects. The machines, as well as the entry points, are
+	expected to return only command objects that can be run on the
+	pipeline.
+
+	Added a whole set of pipeline control operations. The object keeps
+	track of the internal pipeline state and tries not to send
+	unnecessary events.
+
+	* src/machine/pipelinecmds.py: Renamed from pipelineops. Add
+	factory methods for all pipeline oprations.
+
+	* src/machine/machine.py (VirtualMachine.wrapCallOperation) 
+	(VirtualMachine.updateAudio, VirtualMachine.updateSubpicture) 
+	(VirtualMachine.updateHighlight, CellPlayer.playFromVobu): Use
+	the command objects from pipelinecmds.
+
+2005-04-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/pipeline.py (Pipeline.flush): 
+	* src/machine/machine.py (VirtualMachine.wrapCallOperation) 
+	(ProgramChainPlayer.playProgramChain): Update the calls to
+	events.subpictureClutEvent.
+
+	* src/dvdread/_dvdread.pyx (ProgramChain.clut): Change the way to
+	access the color lookup table: Now there's a clut property whose
+	value is a 16 position python array.
+
+	* src/machine/pipeline.py (Pipeline.vobuHeader): Call
+	events.navEvent properly.
+
+	* src/machine/events.py (navEvent): Receive start and end times
+	instead of nav packet.
+
+	* src/machine/pipeline.py (Pipeline.vobuRead):
+	(Pipeline.vobuRead): Use events.fillerEvent() and
+	events.eosEvent().
+
+	* src/machine/machine.py (VirtualMachine.updateHighlight): Move
+	code from events, that decides which type of event to send.
+
+	* src/machine/events.py (eosEvent, fillerEvent): New functions.
+	(highlightEvent, highlightResetEvent): Use separate functions for
+	highlight and highlight reset events. Simplify functions to just
+	create the events.
+
+2005-04-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/pipelineops.py: 
+	* src/machine/pipeline.py: 
+	* src/machine/shell.py: 
+	* src/machine/machine.py: 
+	Large reorganization. Break up the big machine module into a
+	machine module, only concerned with generating an abstract
+	sequence of instructions for the pipeline, a pipeline module, that
+	is responsible for the interaction with the GStreamer pipeline,
+	and a shell module, that provides the facade for interactive
+	operations.
+
+	* src/dvdplayer.py (DVDPlayer.__init__): Now use a MachineShell.
+	(DVDPlayer): Rename machine to shell.
+
+	* src/machine/itersched.py (Scheduler.__init__, Scheduler.call) 
+	(Scheduler.chain): Call 'iter' on the passed objects.
+
+2005-04-17  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (PerformMachine.wrapCallOperation):
+	Update the pipeline.
+	(PerformMachine.updateSubpicture): Invoke getAttributeContainer
+	correctly.
+	(VirtualMachine.defer): New method. The defer token is now hidden.
+	(VirtualMachine.flush): New method.
+	(VirtualMachine.prevProgram, VirtualMachine.nextProgram): React
+	properly when the beginning or the end of the program chain have
+	been reached.
+	(VirtualMachine.stop, VirtualMachine.prevProgram) 
+	(VirtualMachine.nextProgram, VirtualMachine.up) 
+	(VirtualMachine.down, VirtualMachine.left, VirtualMachine.right) 
+	(VirtualMachine.confirm, VirtualMachine.menu): Adapted to use the
+	new methods.
+
+	* src/machine/itersched.py (Scheduler.restartable): restartable
+	must also take the current into account.
+
+2005-04-17  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (callOperation.wrapper) 
+	(PerformMachine.wrapCallOperation, PerformMachine.callFirstPlay) 
+	(PerformMachine.callTitleMenu) 
+	(PerformMachine.callManagerProgramChain, PerformMachine.callMenu):
+	Refactor call operations to concentrate state saving and restoring
+	code in a single method. Nav packet must be saved and restored.
+	(DiscPlayer.exit): Propagate exit command when exit is trapped by
+	a called DiscPlayer.
+	(ProgramChainPlayer.buttonCommand): New method.
+	(CommandBlockPlayer.playButtonCmd): New method.
+	(Defer, entryPoint, VirtualMachine.runEntryPoint): New approach to
+	implementing entry points. The entry point is run in a separate
+	scheduler, but if it returns the 'Defer' object, execution is
+	moved to the main scheduler.
+	(VirtualMachine.stop, VirtualMachine.prevProgram) 
+	(VirtualMachine.nextProgram, VirtualMachine.up) 
+	(VirtualMachine.down, VirtualMachine.left, VirtualMachine.right) 
+	(VirtualMachine.confirm, VirtualMachine.menu): Now work properly
+	(next and prevProgram don't do proper bounds check.)
+
+	* src/machine/itersched.py (Scheduler.call, Scheduler.chain):
+	Allow for absorbing schedulers when they are called or chained by
+	other scheduler.
+
+	* src/machine/events.py (flushEvent): New procedure.
+
+	* src/machine/decode.py (CommandDecoder.perform3): rtn parameter
+	to call operations is now mandatory.
+
+2005-04-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (makeDummyOperation): Erased.
+	(PerformMachine.getAttributeContainer): Fixed access to objects in
+	dvdread module.
+	(PerformMachine.updateHighlight): New procedure.
+	(PerformMachine.getButtonObj): New procedure.
+	(entryInstant, VirtualMachine.runInstant): Add a decorator and
+	method to run entry points in "instant mode", i.e. they run in a
+	separate itersched and their results (onyl events) are immediately
+	sent down the pipeline.
+	(CellPlayer.playFromVobu, VirtualMachine.vobuHeader): vobuHeader
+	works now as an instant entry point. Highlight update moved from
+	the cell player.
+	(VirtualMachine.selectButtonInteractive): New method.
+	(VirtualMachine.up, VirtualMachine.down, VirtualMachine.left) 
+	(VirtualMachine.right): Implemented.
+
+2005-04-15  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (PerformMachine.updateAudio): 
+	(PerformMachine.updateSubpicture): New methods.
+
+	* src/machine/decode.py (CommandDecoder.performLink): Issue the
+	performButton operations before the link operations. Otherwise the
+	button changes get lost.
+
+2005-04-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (ProgramChainPlayer.playProgramChain):
+	Add CLUT update.
+	(PerformMachine.finishCallOp): New method implement de common part
+	of call operations.
+	(PerformMachine.callMenu, PerformMachine.callManagerProgramChain) 
+	(PerformMachine.callTitleMenu, PerformMachine.callFirstPlay): Use
+	finishCallOp.
+	(PerformMachine.__init__): Erase pipeline state.
+	(PerformMachine.selectButton, PerformMachine.setSystemParam8):
+	Implemented.
+
+2005-04-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.vobuHeader): Send
+	navigation events.
+	(PerformMachine.setAudio): Method implemented.
+
+	* src/machine/events.py (mpegTimeToGstTime): Moved from
+	machine.py.
+
+	* src/machine/machine.py (VirtualMachine.vobuHeader): Erased.
+	(PerformMachine.__slots__, PerformMachine.__init__): New attribute
+	currentNav to make the current navigation packet accessible to the
+	whole set of execution objects.
+	(CellPlayer.selectButton, CellPlayer.setSystemParam8) 
+	(CellPlayer.setAngle, CellPlayer.setAudio) 
+	(CellPlayer.setSubpicture, CellPlayer.setKaraokeMode): Erased.
+	(CellPlayer.playVobu): Renamed to playFromVobu
+	(CellPlayer.setNav): Mixed with playFromVobu.
+	(MachineStill): New class.
+	(PerformMachine.callMenu, PerformMachine.getSystem4): Use
+	currentTitle instead of getTitle.
+	(CellPlayer.__slots__): Get rid of nav attribute.
+	(VirtualMachine.vobuRead): Properly handle pausing the pipeline.
+	(VirtualMachine): Get rid of synchronization in many methods (will
+	be readded in some form).
+	(VirtualMachine.__init__, VirtualMachine.wrapHeader): Renamed to
+	vobuHeader.
+
+2005-04-10  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py: Many dummy operations made active.
+	(PerformMachine.callFirstPlay, PerformMachine.callTitleMenu)
+	(PerformMachine.callManagerProgramChain, PerformMachine.callMenu):
+	Implemented.
+	(DiscPlayer.__init__): Add callOp parameter, and document
+	function.
+	(DiscPlayer.resume): If a resume happens without a matching call
+	operation just restart playback.
+	(ProgramChainPlayer.linkCell): Call linkTailProgramChain properly.
+	(VirtualMachine.__init__): Start playing the first program chain.
+
+2005-03-28  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (CellPlayer.setNav): nextVOBU ->
+	nextVobu.
+	(PerformMachine.__slots__): New attribute 'info'.
+	(TitlePlayer): Renamed from TitleSetPlayer. Methods implemented.
+	(TitlePlayer.currentTitle): New method.
+	(ProgramChainPlayer.playProgramChain): Added cellNr parameter to
+	allow for selecting the initial cell.
+	(LangUnitPlayer.__slots__): New attribute 'unit'.
+	(LangUnitPlayer): Methods implemented.
+	* src/dvdread/_dvdread.pyx(ProgramChain.getClutEntry,
+	Cell.lastVobuStartSector, NavPacket.nextVobu, NavPacket.prevVobu,
+	NavPacket.getForwardVobu, NavPacket.getBackwardVobu,
+	NavPacket.nextVideoVobu, NavPacket.prevVideoVobu,
+	NavPacket.getNonSeamlessNextVobu, NavPacket.getSeamlessNextVobu):
+	Renamed. Use only first letter capitalized in acronyms.
+
+
+2005-03-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (PlaybackLocation): Rewrite the whole
+	class based on going down the scheduler stack looking for methods
+	that provide the necessary info.
+	(CellPlayer.playCell, CellPlayer.playVobu): No more fiddling with
+	the machine state.
+	(VirtualMachine.__slots__, VirtualMachine.__init__): New
+	'location' attribute.
+	(CellPlayer.currentCell, ProgramChainPlayer.currentProgramChain):
+	New methods to properly handle playback location info.
+	(PerformMachine.setLocation): New method.
+
+	* src/machine/itersched.py (Scheduler.restartable): New method.
+
+	* src/machine/machine.py (makeDummyOperation, PerformMachine):
+	Operations are now dummy, i.e. they only print the
+	invokation. Dummy operations will be gradually replaced by actual
+	operations as the implementation progresses.
+	(GeneralRegister.setValue): Is now a generator.
+
+	* src/machine/itersched.py (RestartableIterator.__init__) 
+	(restartPoint.wrapper): Added more robust error handling for cases
+	where a @restartPoint method does not produce an iterator.
+	(__all__): Export 'NoIterError'.
+
+	* src/machine/machine.py (CommandBlockPlayer): Methods
+	implemented.
+	(ProgramChainPlayer.playProgramChain) 
+	(ProgramChainPlayer.linkCell) 
+	(ProgramChainPlayer.linkTailProgramChain): Actually execute
+	commands.
+
+2005-03-26  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py (Scheduler.restart): Get rid of the
+	getattr functionality. It was a bad idea after all.
+	* src/machine/machine.py (PerformMachine): This class now holds
+	the whole execution state. Register handling and playback location
+	now part of PerformMachine objects.	
+	(CellPlayer.__init__): Receive a perform machine instead of the
+	complete machine object.
+	(VirtualMachine): State information moved to PerformMachine.
+	(ProgramChainPlayer, DiscPlayer, TitleSetPlayer, LangUnitPlayer):
+	Renamed from *Navigator.
+	(entryPoint): New wrapper for machine entry points.
+	(ProgramChainPlayer): Methods implemented. Now it is possible to
+	play complete program chains.
+
+2005-03-25  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py: Many small bugs fixed. Playback of a
+	single cell works now.
+	* src/dvdplayer.py: Eliminate * imports.
+
+2005-03-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (CellPlayer): Class renamed from cell
+	navigator. Modified to use itersched all around.
+
+2005-03-20  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py: Don't use "import *" for dvdread and
+	gst.
+
+	* src/machine/events.py: New module for making events.
+
+	* src/machine/itersched.py (Scheduler.__getattr__): Added getAttr
+	method to access attributes and methods in the stacked
+	objects. This functionality is also accessible through
+	__getattr__.
+
+	* configure.ac: Raise required Python version to 2.4
+
+2005-03-11  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/disassemble.py (CommandDisassembler): Machine
+	functionality split to the separate class DiassembleMachine.
+	(DiassembleMachine): New class.
+	(disasm): Create singleton instance of Diassembler.
+	(diassemble): New simpler entry point to diassemble commands.
+	(__all__): Restrict module access to the disassemble operation.
+	(IndentedText.reset): New method.
+
+2005-03-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/disassemble.py: 
+	* src/machine/decode.py: Converted to operate with itersched.
+	* src/machine/itersched.py (checkItr): New function.
+	(Call.__init__, Chain.__init__): Add calls to checkItr to check
+	for proper parameters.
+
+2005-03-06  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py (YieldOp): Renamed from
+	CallObject. Operations on the scheduler now act directly on it
+	through the modifySched method. This leads to a more efficient and
+	extensible design. 
+	(NoOp): New (no) operation. 
+	(Chain): New chaining operation to yield control to a new
+	iterator. 
+	(Call, Restart, Scheduler.next): Adapt to the new style of yield
+	operations.
+	(__all__): Restrict exported names.
+
+2005-03-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py: Enhance design again (hopefully this
+	time it'll be right.) The scheduler manages a stack of objects and
+	it is possible to restart an arbitrary method of one of the
+	objects.
+
+2005-02-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py: Simplify design to make it more
+	flexible.
+
+2005-02-20  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/itersched.py: New iterator scheduler.
+
+2005-02-11  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine): Do not inherit from
+	CommandPerformer any more.
+	(VirtualMachine.__slots__): Added 'decoder', 'systemRegisters' and
+	'resumeLocation'. The class worked only because it was derived
+	from CommandPerformed, which had no __slots__ declaration at all.
+	(VirtualMachine.__init__): Create the new command decoder. Fix
+	capitalization of 'resumeLocation'.
+	(VirtualMachine.Register): Inherit from decode.Register.
+	(VirtualMachine.Register.__slots__): Added.
+	(VirtualMachine.SystemRegister.__slots__): Added.
+	(VirtualMachine.performCommand): Invoke the command decoder
+	properly.
+
+	* src/machine/disassemble.py (IndentedText.__slots__): Added.
+	(CommandDisassembler.__slots__): Added.
+	(CommandDisassembler.__init__): Initialize command decoder
+	properly.
+	(CommandDisassembler.Register): Now inherit from decode.Register
+	(CommandDisassembler.Register.__slots__): Added.
+
+	* src/machine/decode.py: Renamed from perform.py
+	(CommandDecoder): Class renamed from CommandPerformed. The
+	execution machine used to inherit from this class. Now the
+	constructor receives a machine object as parameter and all
+	operations rely on it.
+	(Register): New class. Replaces the old CommandPerformer.Register.
+	(CommandDecoder.__slots__): Added.
+	(CommandDecoder.performLink): Call the link operations explicitly
+	instead of recurring to an introspection trick.
+
 2005-02-09  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/seamless.py: Don't select a python version number in the #!
 	start line. This is only used for testing anyway.
+
+2005-02-06  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py: Document the command execution functions
+	in preparation for the split-up of the machine.
 
 2005-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
 

@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -18,11 +18,18 @@
 
 import string
 
-from perform import *
+from itersched import *
+import decode
 
 
 class IndentedText(object):
+    __slots__ = ('indentLevel',
+                 'lines')
+
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.indentLevel = 0
         self.lines = []
 
@@ -48,20 +55,11 @@ class IndentedText(object):
     __repr__ = getText
 
 
-class CommandDisassembler(CommandPerformer):
-    def __init__(self):
-        self.resetText()
-
-
-    #
-    # Text Handling 
-    #
-
-    def resetText(self):
-        self.text = IndentedText()
-
-    def getText(self):
-        return self.text.getText()
+class DiassembleMachine(object):
+    __slots__ = ('text',)
+    
+    def __init__(self, text):
+        self.text = text
 
 
     #
@@ -71,6 +69,7 @@ class CommandDisassembler(CommandPerformer):
     def makeMachineOperation(format):
         def printOp(self, *args):
             self.text.append(format % tuple(map(str, args)))
+            yield NoOp
 
         return printOp
 
@@ -92,6 +91,7 @@ class CommandDisassembler(CommandPerformer):
 
     def closeSetParentalLevel(self, cmd):
         self.text.closeIndent()
+        yield NoOp
 
     # Links.
     linkTopCell = makeMachineOperation('linkTopCell()')
@@ -153,7 +153,10 @@ class CommandDisassembler(CommandPerformer):
     # Registers
     #
 
-    class Register(CommandPerformer.Register):
+    class Register(decode.Register):
+        __slots__ = ('parent',
+                     'name')
+
         def __init__(self, parent, name):
             self.parent = parent
             self.name = name
@@ -163,6 +166,7 @@ class CommandDisassembler(CommandPerformer):
                 self.parent.text.append('counter %s = %s' % (self.name, value))
             else:
                 self.parent.text.append('%s = %s' % (self.name, value))
+            yield NoOp
 
         def getValue(self):
             return self.name
@@ -205,6 +209,31 @@ class CommandDisassembler(CommandPerformer):
         return self.Register(self, self.systemParameterNames[regNr])
 
 
+
+class CommandDisassembler(decode.CommandDecoder):
+    """A disassembler for DVD virtual machine commands."""
+
+    __slots__ = ('machine', 'text')
+
+    
+    def __init__(self):
+        self.text = IndentedText()
+
+        self.machine = DiassembleMachine(self.text)
+        decode.CommandDecoder.__init__(self, self.machine)
+
+
+    #
+    # Text Handling 
+    #
+
+    def resetText(self):
+        self.text.reset()
+
+    def getText(self):
+        return self.text.getText()
+
+
     #
     # Conditions
     #
@@ -236,6 +265,8 @@ class CommandDisassembler(CommandPerformer):
 
         self.text.closeIndent()
 
+        yield NoOp 
+
 
     #
     # Arithmetic and Bit Operations
@@ -262,24 +293,37 @@ class CommandDisassembler(CommandPerformer):
     def performArithOperation(self, cmd, regNr, operand):
         opStr = self.arithOpsStrs[cmd[0] & 0xf]
         self.text.append(opStr % \
-                         (str(self.getGeneralPurpose(regNr)), str(operand)))
+                         (str(self.machine.getGeneralPurpose(regNr)),
+                          str(operand)))
+        yield NoOp
 
 
-    #
-    # Entry Point
-    #
+#
+# Entry Point
+#
 
-    def decodeCommand(self, cmd, pos=0, indent=0):
-        self.text.openIndent(indent)
+# A unique instance of a disassembler.
+disasm = CommandDisassembler()
 
-        self.text.append("%03d:" % pos)
-        for i in range(8):
-            self.text.appendToLine(" %02x" % cmd[i])
+def disassemble(cmd, pos=0, indent=0):
+    disasm.resetText()
 
-        self.text.openIndent(5)
+    disasm.text.openIndent(indent)
 
-        self.performCommand(cmd)
+    disasm.text.append("%03d:" % pos)
+    for i in range(8):
+        disasm.text.appendToLine(" %02x" % cmd[i])
 
-        self.text.closeIndent(5)
+    disasm.text.openIndent(5)
 
-        self.text.closeIndent(indent)
+    for i in Scheduler(disasm.performCommand(cmd)):
+        pass
+
+    disasm.text.closeIndent(5)
+
+    disasm.text.closeIndent(indent)
+
+    return disasm.getText()
+
+
+__all__ = ('disassemble',)

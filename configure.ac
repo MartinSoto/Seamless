@@ -75,10 +75,10 @@ AC_SUBST(GST_MAJORMINOR)
 
 dnl Check for Python
 AM_PATH_PYTHON
-AC_MSG_CHECKING(for python >= 2.3)
+AC_MSG_CHECKING(for python >= 2.4)
 prog="
 import sys, string
-minver = (2,3,0,'final',0)
+minver = (2,4,0,'final',0)
 if sys.version_info < minver:
   sys.exit(1)
 sys.exit(0)"
