@@ -62,9 +62,9 @@ cdef extern from "dvdread/nav_types.h":
         			# Button group 1 type
         unsigned int btngr_ns	# Number of button groups <= 3
         unsigned int btngr3_dsp_ty
-        			# Button group 1 type
+        			# Button group 3 type
         unsigned int btngr2_dsp_ty
-        			# Button group 1 type
+        			# Button group 2 type
 
         uint8_t btn_ofn		# button offset number range 0-255
         uint8_t btn_ns		# number of valid buttons <= 36/18/12

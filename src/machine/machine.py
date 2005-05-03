@@ -634,7 +634,9 @@ class VirtualMachine(object):
            not 1 <= self.currentButton <= self.buttonNav.buttonCount:
             return None
         else:
-            return self.buttonNav.getButton(self.currentButton)
+            return self.buttonNav.getButton(self.currentButton,
+                                            dvdread. \
+                                            SUBPICTURE_PHYS_TYPE_WIDESCREEN)
 
 
     #
@@ -736,7 +738,9 @@ class VirtualMachine(object):
             # No highlight button.
             yield cmds.ResetHighlight()
         else:
-            btnObj = self.buttonNav.getButton(self.currentButton)
+            btnObj = self.buttonNav.getButton(self.currentButton,
+                                              dvdread. \
+                                              SUBPICTURE_PHYS_TYPE_WIDESCREEN)
             yield cmds.Highlight(btnObj.area, self.currentButton,
                                  btnObj.paletteSelected)
 

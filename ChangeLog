@@ -1,5 +1,17 @@
 2005-05-03  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (VirtualMachine.getButtonObj)
+	(VirtualMachine.updateHighlight): Properly invoke getButton.
+
+	* src/dvdread/nav_types.pyx: Fix comments.
+
+	* src/dvdread/_dvdread.pyx (CELL_BLOCK_MODE_ANGLE_LAST): Fix name
+	spelling.
+	(NavPacket.getButton): Implement support for button groups. A new
+	parameter is necessary now, to specify the typoe of button group.
+
+2005-05-03  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/machine.py (VirtualMachine.updateSubpicture):
 	Restructure implementation. Fixes selection of the physical stream
 	while in a menu.

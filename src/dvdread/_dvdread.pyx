@@ -1,4 +1,4 @@
-# -*- Python -*-
+# -*- Pyrex -*-
 # Seamless DVD Player
 # Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
 #
@@ -159,7 +159,7 @@ SUBPICTURE_PHYS_TYPE_PAN_SCAN = 3
 CELL_BLOCK_MODE_NORMAL = 0
 CELL_BLOCK_MODE_ANGLE_FIRST = 1
 CELL_BLOCK_MODE_ANGLE_MIDDLE = 2
-CELL_BLOCK_MODE_ANGLE_lAST = 3
+CELL_BLOCK_MODE_ANGLE_LAST = 3
 
 # Cell block types.
 CELL_BLOCK_TYPE_NORMAL = 0
@@ -1318,11 +1318,65 @@ cdef class NavPacket:
         def __get__(self):
             return self.pci.hli.hl_gi.btn_ns
 
-    def getButton(self, buttonNr):
+    def getButton(self, int buttonNr, int subpictureType):
+        cdef int groupCount
+        cdef int mask
+        cdef int group
+        cdef int buttonPos
+
         if not 1 <= buttonNr <= self.pci.hli.hl_gi.btn_ns:
             raise IndexError, "button number out of range"
 
-        return wrapButton(self, &(self.pci.hli.btnit[buttonNr - 1]))
+        # Calculate the mask.
+        if subpictureType == SUBPICTURE_PHYS_TYPE_4_3:
+            mask = 0
+        elif subpictureType == SUBPICTURE_PHYS_TYPE_WIDESCREEN:
+            mask = 1
+        elif subpictureType == SUBPICTURE_PHYS_TYPE_LETTERBOX:
+            mask = 2
+        elif subpictureType == SUBPICTURE_PHYS_TYPE_PAN_SCAN:
+            mask = 4
+        else:
+            raise IndexError, "subpicture type out of range"
+
+        groupCount = self.pci.hli.hl_gi.btngr_ns
+        if not 1 <= groupCount <= 3:
+            # This shouln't happen, but you never know.
+            groupCount = 1
+
+        if mask != 0:
+            group = -1
+
+            # Try finding a group that matches the mask exactly.
+            if groupCount >= 1 and \
+               self.pci.hli.hl_gi.btngr1_dsp_ty & mask:
+                group = 0
+            elif groupCount >= 2 and \
+                 self.pci.hli.hl_gi.btngr2_dsp_ty & mask:
+                group = 1
+            elif groupCount >= 3 and \
+                 self.pci.hli.hl_gi.btngr3_dsp_ty & mask:
+                group = 3
+
+        if mask == 0 or group == -1:
+            # Look for a standard 4:3 group.
+            if groupCount >= 1 and \
+               self.pci.hli.hl_gi.btngr1_dsp_ty == 0:
+                group = 0
+            elif groupCount >= 2 and \
+                 self.pci.hli.hl_gi.btngr2_dsp_ty == 0:
+                group = 1
+            elif groupCount >= 3 and \
+                 self.pci.hli.hl_gi.btngr3_dsp_ty == 0:
+                group = 3
+
+        if group == -1:
+            # We have a funny situation here. Just pick an arbitrary
+            # group and hope for the best.
+            group = 0
+
+        buttonPos = (36 / groupCount) * group + buttonNr - 1
+        return wrapButton(self, &(self.pci.hli.btnit[buttonPos]))
 
     property highlightStatus:
         def __get__(self):
