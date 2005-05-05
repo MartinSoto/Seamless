@@ -236,6 +236,11 @@ class VirtualMachine(object):
             buttonNav.highlightStatus == dvdread.HLSTATUS_NEW_INFO:
             yield Call(self.updateHighlight())
 
+    def clearNavState(self):
+        """Clear any navigation packets stored in the machine."""
+        self.currentNav = None
+        self.buttonNav = None
+
 
     #
     # Standard DVD Machine Operations
@@ -1131,6 +1136,10 @@ class ProgramChainPlayer(object):
         assert 1 <= cellNr <= self.programChain.cellCount
 
         self.cell = self.programChain.getCell(cellNr)
+
+        # We are moving to a new location. Clear the old, navigation
+        # packets stored in the machine.
+        self.machine.clearNavState()
 
         # Play the cell.
         yield Call(CellPlayer(self.machine).playCell(self.cell,

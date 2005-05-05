@@ -1,7 +1,15 @@
 2005-05-03  Martin Soto  <martinsoto@users.sourceforge.net>
 
-	* src/machine/machine.py (VirtualMachine.getButtonObj)
-	(VirtualMachine.updateHighlight): Properly invoke getButton.
+	* src/machine/machine.py (VirtualMachine.clearNavState): New
+	method.
+	(ProgramChainPlayer.linkCell): Clear the navigation state when
+	jumping. This fixes a bug with button auto selection,
+	that was affecting "A Bug's Life" (German Edition).
+
+2005-05-03  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.getButtonObj) 
+	(VirtualMachine.updateHighlight): Properly Invoke getButton.
 
 	* src/dvdread/nav_types.pyx: Fix comments.
 
