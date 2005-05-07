@@ -1,5 +1,11 @@
 2005-05-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (ProgramChainPlayer.linkCell): Make
+	method robust against out of range cell values. Fixes playback of
+	"Die fabelhafte Welt von Amelie".
+
+2005-05-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/machine.py (VirtualMachine.currentTitleSet) 
 	(TitlePlayer.currentTitleSet, DiscPlayer.currentTitleSet): New
 	state retrieval operation.

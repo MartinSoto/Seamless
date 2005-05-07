@@ -1202,25 +1202,25 @@ class ProgramChainPlayer(object):
 
         If a sector number is specified, link to that sector in the
         cell."""
-        assert 1 <= cellNr <= self.programChain.cellCount
+        # Some DVDs use cell numbers out of range.
+        if 1 <= cellNr <= self.programChain.cellCount:
+            self.cell = self.programChain.getCell(cellNr)
 
-        self.cell = self.programChain.getCell(cellNr)
+            # We are moving to a new location. Clear the old,
+            # navigation packets stored in the machine.
+            self.machine.clearNavState()
 
-        # We are moving to a new location. Clear the old, navigation
-        # packets stored in the machine.
-        self.machine.clearNavState()
+            # Play the cell.
+            yield Call(CellPlayer(self.machine).playCell(self.cell,
+                                                         sectorNr))
 
-        # Play the cell.
-        yield Call(CellPlayer(self.machine).playCell(self.cell,
-                                                     sectorNr))
+            # Play the corresponding cell commands.
+            if self.cell.commandNr != 0:
+                yield Call(CommandBlockPlayer(self.machine). \
+                           playBlock(self.programChain.cellCommands,
+                                     self.cell.commandNr))
 
-        # Play the corresponding cell commands.
-        if self.cell.commandNr != 0:
-            yield Call(CommandBlockPlayer(self.machine). \
-                       playBlock(self.programChain.cellCommands,
-                                 self.cell.commandNr))
-
-        if cellNr == self.programChain.cellCount:
+        if cellNr >= self.programChain.cellCount:
             # No more cells. Play the "tail".
             yield Chain(self.linkTailProgramChain())
         else:
