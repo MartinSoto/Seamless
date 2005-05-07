@@ -17,6 +17,7 @@
 # USA
 
 import sys, os, popen2, signal
+import traceback
 
 import gobject
 
