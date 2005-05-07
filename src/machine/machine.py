@@ -594,19 +594,48 @@ class VirtualMachine(object):
     #
 
     def getValue(self, methodName):
+        """Look down the current execution stack for a method with the
+        specified name, call it and return its value."""
         for inst in self.sched.restartable():
             if hasattr(inst, methodName):
                 return getattr(inst, methodName)()
         return None
 
+    def currentTitleSet(self):
+        """Return the `VideoTitleSet` object currently being played,
+        or `None` if no such object is being played."""
+        return self.getValue('currentTitleSet')
+
     def currentTitle(self):
+        """Return the `VideoTitle` object currently being played, or
+        `None` if no such object is being played."""
         return self.getValue('currentTitle')
 
+    def currentLangUnit(self):
+        """Return the `LangUnit` object currently being played, or
+        `None` if no such object is being played."""
+        return self.getValue('currentLangUnit')
+
     def currentProgramChain(self):
+        """Return the `ProgramChain` object currently being played, or
+        `None` if no such object is being played."""
         return self.getValue('currentProgramChain')
 
     def currentCell(self):
+        """Return the `Cell` object currently being played, or
+        `None` if no such object is being played."""
         return self.getValue('currentCell')
+
+    def inMenu(self):
+        """Return a true value if and only if we are playing a menu."""
+        return self.getValue('inMenu')
+
+    def currentVideoAttributes(self):
+        """Return the current video attributes."""
+        if self.inMenu():
+            return self.getValue('currentMenuVideoAttributes')
+        else:
+            return self.getValue('currentVideoAttributes')
 
     def getCurrentTime(self):
         """Return the current playback time with respect to the start
@@ -656,9 +685,8 @@ class VirtualMachine(object):
             # We aren't playing a program chain, or the logical audio
             # track is explicitly set to none.
             physical = -1
-        elif isinstance(programChain.container, dvdread.LangUnit):
-            # We are in the menu domain. The physical audio is always
-            # 0.
+        elif self.inMenu():
+            # In the menu domain the physical audio is always 0.
             physical = 0
         else:
             # Try to find a physical stream from the information in
@@ -679,18 +707,6 @@ class VirtualMachine(object):
 
         yield cmds.SetAudio(physical)
 
-    @staticmethod
-    def getAttributeContainer(programChain):
-        """Find the container of the current stream attributes."""
-        if isinstance(programChain.container, dvdread.LangUnit):
-            return programChain.container.container
-        elif isinstance(programChain.container, dvdread.VideoTitleSet):
-            return programChain.container
-        elif isinstance(programChain.container, dvdread.VideoManager):
-            return programChain.container
-        else:
-            assert 0, 'Unexpected type for program chain container'
-
     def updateSubpicture(self):
         """Send a subpicture event corresponding to the current
         logical subpicture stream."""
@@ -699,9 +715,8 @@ class VirtualMachine(object):
         # Determine the logical stream.
         if programChain == None:
             logical = 0
-        elif isinstance(programChain.container, dvdread.LangUnit):
-            # We are in the menu domain. The logical subpicture is
-            # always 1.
+        elif self.inMenu():
+            # In the menu domain the logical subpicture is always 1.
             logical = 1
         elif self.subpicture & 0x40 == 0 or \
              self.subpicture & 0x3f > 31:
@@ -721,8 +736,8 @@ class VirtualMachine(object):
         if streams == None:
             physical = -1
         else:
-            if self.getAttributeContainer(programChain). \
-               videoAttributes.aspectRatio == dvdread.ASPECT_RATIO_4_3:
+            if self.currentVideoAttributes().aspectRatio == \
+                   dvdread.ASPECT_RATIO_4_3:
                 physical = streams[dvdread.SUBPICTURE_PHYS_TYPE_4_3]
             else:
                 if self.aspectRatio == dvdread.ASPECT_RATIO_16_9:
@@ -919,6 +934,40 @@ class DiscPlayer(object):
 
         self.videoManager = self.machine.info.videoManager
 
+    #
+    # State Retrieval
+    #
+
+    # getValue based state retrieval methods in the machine must all
+    # have a fallback implementation here. Otherwise it is possible to
+    # get spurious values when the DVD performs a call operation.
+
+    def currentTitleSet(self):
+        return None
+
+    def currentTitle(self):
+        return None
+
+    def currentLangUnit(self):
+        return None
+
+    def currentProgramChain(self):
+        return None
+
+    def currentCell(self):
+        return None
+
+    def inMenu(self):
+        return False
+
+    def currentMenuVideoAttributes(self):
+        """Return the menu video attributes for video manager."""
+        return self.videoManager.menuVideoAttributes
+
+    #
+    # Machine Operations
+    #
+
     @restartPoint
     def jumpToFirstPlay(self):
         yield Call(ProgramChainPlayer(self.machine). \
@@ -991,11 +1040,24 @@ class TitlePlayer(object):
 
         self.title = None
 
-    def currentTitle(self):
-        """Return the title currently being played.
+    def currentTitleSet(self):
+        """Return the title set currently being played."""
+        return self.title.videoTitleSet
 
-        'None' is returned if no title is currently being played."""
+    def currentTitle(self):
+        """Return the title currently being played."""
         return self.title
+
+    def inMenu(self):
+        return False
+
+    def currentVideoAttributes(self):
+        """Return the video attributes for the current title set."""
+        return self.title.videoTitleSet.videoAttributes
+
+    def currentMenuVideoAttributes(self):
+        """Return the menu video attributes for the current title set."""
+        return self.title.videoTitleSet.menuVideoAttributes
 
     @restartPoint
     def playTitle(self, title, chapterNr=1):
@@ -1050,6 +1112,13 @@ class LangUnitPlayer(object):
         self.machine = machine
 
         self.unit = None
+
+    def currentLangUnit(self):
+        """Return the language unit currently being played."""
+        return self.unit
+
+    def inMenu(self):
+        return True
 
     @restartPoint
     def playMenuInUnit(self, unit, menuType):
@@ -1293,7 +1362,7 @@ class CellPlayer(object):
     __slots__ = ('machine',
                  'cell',	# Cell currently being played.
                  'domain',	# Playback domain this cell belongs to.
-                 'titleNr',	# DVD title number the cell is in.
+                 'titleSetNr',	# DVD video title set number the cell is in.
                  'sectorNr')	# Last sector played.
 
     def currentCell(self):
@@ -1306,7 +1375,7 @@ class CellPlayer(object):
         self.machine = machine
         self.cell = None
         self.domain = None
-        self.titleNr = None
+        self.titleSetNr = None
         self.sectorNr = None
 
     @restartPoint
@@ -1318,20 +1387,17 @@ class CellPlayer(object):
         self.cell = cell
 
         # Find the playback domain for the cell.
-        if isinstance(cell.programChain.container, dvdread.LangUnit):
+        if self.machine.inMenu():
             self.domain = dvdread.DOMAIN_MENU
         else:
             self.domain = dvdread.DOMAIN_TITLE
 
-        # Find the DVD title number for the cell.
-        if isinstance(cell.programChain.container, dvdread.LangUnit):
-            self.titleNr = cell.programChain.container.container.titleSetNr
-        elif isinstance(cell.programChain.container, dvdread.VideoTitleSet):
-            self.titleNr = cell.programChain.container.titleSetNr
-        elif isinstance(cell.programChain.container, dvdread.VideoManager):
-            self.titleNr = 0
+        # Find the DVD title set number for the cell.
+        titleSet = self.machine.currentTitleSet()
+        if titleSet != None:
+            self.titleSetNr = titleSet.titleSetNr
         else:
-            assert False, 'Unexpected type for program chain container'
+            self.titleSetNr = 0
 
         if sectorNr == None:
             # Just play the first VOBU in the cell.
@@ -1348,11 +1414,11 @@ class CellPlayer(object):
         # Play until the end of the cell.
         nav = None
         while True:
-            yield cmds.PlayVobu(self.domain, self.titleNr, self.sectorNr)
+            yield cmds.PlayVobu(self.domain, self.titleSetNr, self.sectorNr)
 
             # After the yield, the whole VOBU will be read by the
             # playback element and sent down the pipeline. During this
-            # process, a new nav packed (VOBU header) will be seen and
+            # process, a new nav packet (VOBU header) will be seen and
             # stored in the machine object.
 
             # At this point, a new nav packet must be there. If this

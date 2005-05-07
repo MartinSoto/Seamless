@@ -1,5 +1,26 @@
 2005-05-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (VirtualMachine.currentTitleSet) 
+	(TitlePlayer.currentTitleSet, DiscPlayer.currentTitleSet): New
+	state retrieval operation.
+	(DiscPlayer.currentLangUnit, LangUnitPlayer.currentLangUnit) 
+	(VirtualMachine.currentLangUnit): New
+	state retrieval operation.
+	(TitlePlayer.currentVideoAttributes) 
+	(VirtualMachine.currentVideoAttributes) 
+	(TitlePlayer.currentVideoAttributes) 
+	(VirtualMachine.updateSubpicture): New operation to retrieve the
+	current video attributes. Use it to fix a bug that made
+	updateSubpicture fail under some conditions.
+	(VirtualMachine.updateAudio, VirtualMachine.updateSubpicture)
+	(CellPlayer.playCell, VirtualMachine.inMenu, DiscPlayer.inMenu)
+	(TitlePlayer.inMenu, LangUnitPlayer.inMenu): New way to determine
+	if we are in the menu domain.
+	(DiscPlayer): Add fallback implementations of all state retrieval
+	operations.
+
+2005-05-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c (RLE_state)
 	(gst_mpeg2subt_parse_header, gst_mpeg2subt_setup_palette) 
