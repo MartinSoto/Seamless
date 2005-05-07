@@ -69,8 +69,6 @@ struct _GstMpeg2Subt {
 
   gint offset[2];
 
-  YUVA_val palette_cache[4];
-
   /* 
    * Store 1 line width of U, V and A respectively.
    * Y is composited direct onto the frame.
@@ -82,6 +80,10 @@ struct _GstMpeg2Subt {
   guchar menu_alpha[4];
 
   guint32 current_clut[16];
+
+  /* Keep premultiplied color values. */
+  YUVA_val palette_cache[4];
+  YUVA_val highlight_palette_cache[4];
 
   gboolean forced_display;
 

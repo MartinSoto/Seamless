@@ -57,8 +57,8 @@ static void gst_mpeg2subt_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
 static void gst_mpeg2subt_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
-static void gst_mpeg2subt_setup_palette (GstMpeg2Subt * mpeg2subt, guchar * indexes,
-    guchar * alpha);
+static void gst_mpeg2subt_setup_palette (GstMpeg2Subt * mpeg2subt);
+static void gst_mpeg2subt_setup_highlight_palette (GstMpeg2Subt * mpeg2subt);
 static void gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt);
 
 /* elementfactory information */
@@ -127,7 +127,9 @@ typedef struct RLE_state
   gint aligned;
   gint offset[2];
   gint clip_left;
+  gint clip_top;
   gint clip_right;
+  gint clip_bottom;
 
   guchar *target_Y;
   guchar *target_U;
@@ -135,6 +137,8 @@ typedef struct RLE_state
   guchar *target_A;
 
   guchar next;
+
+  gint y;
 }
 RLE_state;
 
@@ -464,6 +468,7 @@ gst_mpeg2subt_parse_header (GstMpeg2Subt * mpeg2subt)
         mpeg2subt->subtitle_index[2] = buf[1] & 0xf;
         mpeg2subt->subtitle_index[1] = buf[2] >> 4;
         mpeg2subt->subtitle_index[0] = buf[2] & 0xf;
+	gst_mpeg2subt_setup_palette (mpeg2subt);
         buf += 3;
         break;
       case SPU_SET_ALPHA:      /* transparency palette */
@@ -473,6 +478,7 @@ gst_mpeg2subt_parse_header (GstMpeg2Subt * mpeg2subt)
         mpeg2subt->subtitle_alpha[2] = buf[1] & 0xf;
         mpeg2subt->subtitle_alpha[1] = buf[2] >> 4;
         mpeg2subt->subtitle_alpha[0] = buf[2] & 0xf;
+	gst_mpeg2subt_setup_palette (mpeg2subt);
         buf += 3;
         break;
       case SPU_SET_SIZE:       /* image coordinates */
@@ -533,10 +539,6 @@ gst_mpeg2subt_parse_header (GstMpeg2Subt * mpeg2subt)
         break;
     }
   }
-
-  if (!mpeg2subt->forced_display)
-    gst_mpeg2subt_setup_palette (mpeg2subt, mpeg2subt->subtitle_index,
-        mpeg2subt->subtitle_alpha);
 }
 
 inline int
@@ -554,19 +556,35 @@ gst_get_nibble (guchar * buffer, RLE_state * state)
 
 /* Premultiply the current lookup table into the palette_cache */
 static void
-gst_mpeg2subt_setup_palette (GstMpeg2Subt * mpeg2subt, guchar * indexes,
-    guchar * alpha)
+gst_mpeg2subt_setup_palette (GstMpeg2Subt * mpeg2subt)
 {
   gint i;
   YUVA_val *target = mpeg2subt->palette_cache;
 
   for (i = 0; i < 4; i++, target++) {
-    guint32 col = mpeg2subt->current_clut[indexes[i]];
+    guint32 col = mpeg2subt->current_clut[mpeg2subt->subtitle_index[i]];
 
-    target->Y = (guint16) ((col >> 16) & 0xff) * alpha[i];
-    target->U = (guint16) ((col >> 8) & 0xff) * alpha[i];
-    target->V = (guint16) (col & 0xff) * alpha[i];
-    target->A = alpha[i];
+    target->Y = (guint16) ((col >> 16) & 0xff) * mpeg2subt->subtitle_alpha[i];
+    target->U = (guint16) ((col >> 8) & 0xff) * mpeg2subt->subtitle_alpha[i];
+    target->V = (guint16) (col & 0xff) * mpeg2subt->subtitle_alpha[i];
+    target->A = mpeg2subt->subtitle_alpha[i];
+  }
+}
+
+/* Premultiply the current lookup table into the highlight_palette_cache */
+static void
+gst_mpeg2subt_setup_highlight_palette (GstMpeg2Subt * mpeg2subt)
+{
+  gint i;
+  YUVA_val *target = mpeg2subt->highlight_palette_cache;
+
+  for (i = 0; i < 4; i++, target++) {
+    guint32 col = mpeg2subt->current_clut[mpeg2subt->menu_index[i]];
+
+    target->Y = (guint16) ((col >> 16) & 0xff) * mpeg2subt->menu_alpha[i];
+    target->U = (guint16) ((col >> 8) & 0xff) * mpeg2subt->menu_alpha[i];
+    target->V = (guint16) (col & 0xff) * mpeg2subt->menu_alpha[i];
+    target->A = mpeg2subt->menu_alpha[i];
   }
 }
 
@@ -596,16 +614,18 @@ gst_get_rle_code (guchar * buffer, RLE_state * state)
 static void
 gst_draw_rle_line (GstMpeg2Subt * mpeg2subt, guchar * buffer, RLE_state * state)
 {
-  gint length, colourid;
+  gint length, segment_length, colourid;
   gint right = mpeg2subt->right + 1;
-  YUVA_val *colour_entry;
+  YUVA_val *normal_colour_entry;
+  YUVA_val *highlight_colour_entry;
   guint code;
-  gint x;
+  gint x, x_final;
   gboolean in_clip = FALSE;
   guchar *target_Y;
   guint16 *target_U;
   guint16 *target_V;
   guint16 *target_A;
+  guint16 inv_alpha;
 
   target_Y = state->target_Y;
   target_U = mpeg2subt->out_buffers[0];
@@ -616,7 +636,8 @@ gst_draw_rle_line (GstMpeg2Subt * mpeg2subt, guchar * buffer, RLE_state * state)
     code = gst_get_rle_code (buffer, state);
     length = code >> 2;
     colourid = code & 3;
-    colour_entry = mpeg2subt->palette_cache + colourid;
+    normal_colour_entry = mpeg2subt->palette_cache + colourid;
+    highlight_colour_entry = mpeg2subt->highlight_palette_cache + colourid;
 
     /* Length = 0 implies fill to the end of the line */
     if (length == 0)
@@ -625,32 +646,51 @@ gst_draw_rle_line (GstMpeg2Subt * mpeg2subt, guchar * buffer, RLE_state * state)
       /* Restrict the colour run to the end of the line */
       length = length < (right - x) ? length : (right - x);
     }
+    x_final = x + length;
 
-    /* Check if this run of colour crosses into the clip region */
-    in_clip = (((x + length) >= state->clip_left) && (x <= state->clip_right));
+    /* FIXME: There's a lot of room for optimization
+       here. Particularly, you can avoid a lot of work when alpha is
+       0. For the moment, I'm just striving for a correct
+       behavior, though. M. S. */
 
-    /* Draw YA onto the frame via target_Y, UVA into the composite buffers */
-    if ((in_clip) && (colour_entry->A)) {
-      guint16 inv_alpha = 0xf - colour_entry->A;
-      gint i;
-
-      for (i = 0; i < length; i++) {
-        *target_Y = ((inv_alpha * (*target_Y)) + colour_entry->Y) / 0xf;
-        *target_U += colour_entry->U;
-        *target_V += colour_entry->V;
-        *target_A += colour_entry->A;
-        target_Y++;
-        target_U++;
-        target_V++;
-        target_A++;
+    if (state->clip_top <= state->y && state->y <= state->clip_bottom) {
+      inv_alpha = 0xf - normal_colour_entry->A;
+      for (; x < state->clip_left && x < x_final; x++) {
+	*target_Y = ((inv_alpha * (*target_Y)) + normal_colour_entry->Y) / 0xf;
+	*target_U += normal_colour_entry->U;
+	*target_V += normal_colour_entry->V;
+	*target_A += normal_colour_entry->A;
+	target_Y++;
+	target_U++;
+	target_V++;
+	target_A++;
       }
-    } else {
-      target_Y += length;
-      target_U += length;
-      target_V += length;
-      target_A += length;
+
+      inv_alpha = 0xf - highlight_colour_entry->A;
+      for (; x <= state->clip_right && x < x_final; x++) {
+	*target_Y = ((inv_alpha * (*target_Y)) +
+		     highlight_colour_entry->Y) / 0xf;
+	*target_U += highlight_colour_entry->U;
+	*target_V += highlight_colour_entry->V;
+	*target_A += highlight_colour_entry->A;
+	target_Y++;
+	target_U++;
+	target_V++;
+	target_A++;
+      }
     }
-    x += length;
+
+    inv_alpha = 0xf - normal_colour_entry->A;
+    for (; x < x_final; x++) {
+      *target_Y = ((inv_alpha * (*target_Y)) + normal_colour_entry->Y) / 0xf;
+      *target_U += normal_colour_entry->U;
+      *target_V += normal_colour_entry->V;
+      *target_A += normal_colour_entry->A;
+      target_Y++;
+      target_U++;
+      target_V++;
+      target_A++;
+    }
   }
 }
 
@@ -703,14 +743,11 @@ gst_merge_uv_data (GstMpeg2Subt * mpeg2subt, guchar * buffer, RLE_state * state)
 static void
 gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt, GstBuffer * buf)
 {
-  gint y;
   gint width = mpeg2subt->right - mpeg2subt->left + 1;
   gint Y_stride;
   gint UV_stride;
 
   guchar *buffer = GST_BUFFER_DATA (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt));
-  gint last_y;
-  gint first_y;
   RLE_state state;
 
   /* Set up the initial offsets, remembering the half-res size for UV in I420 packing
@@ -729,43 +766,25 @@ gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt, GstBuffer * buf)
   state.offset[0] = mpeg2subt->offset[0];
   state.offset[1] = mpeg2subt->offset[1];
 
-  /* skip over lines until we hit the clip region */
+  /* Determine the highlight region. */
   if (mpeg2subt->forced_display) {
     state.clip_right = mpeg2subt->clip_right;
     state.clip_left = mpeg2subt->clip_left;
-    last_y = mpeg2subt->clip_bottom;
-    first_y = mpeg2subt->clip_top;
+    state.clip_bottom = mpeg2subt->clip_bottom;
+    state.clip_top = mpeg2subt->clip_top;
   } else {
-    state.clip_right = mpeg2subt->right;
-    state.clip_left = mpeg2subt->left;
-    last_y = mpeg2subt->bottom;
-    first_y = mpeg2subt->top;
+    state.clip_right = -1;
+    state.clip_left = -1;
+    state.clip_bottom = -1;
+    state.clip_top = -1;
   }
 
-  for (y = mpeg2subt->top; y < first_y; y++) {
-    /* Skip a line of RLE data */
-    gint length;
-    guint code;
-    gint x = 0;
+  state.y = mpeg2subt->top;
 
-    while (x < width) {
-      code = gst_get_rle_code (buffer, &state);
-      length = code >> 2;
-
-      /* Length = 0 implies fill to the end of the line so we're done */
-      if (length == 0)
-        break;
-
-      x += length;
-    }
-    if (!state.aligned)
-      gst_get_nibble (buffer, &state);
-    state.id = !state.id;
-  }
-
-  state.target_Y = GST_BUFFER_DATA (buf) + mpeg2subt->left + (y * Y_stride);
+  state.target_Y = GST_BUFFER_DATA (buf) + mpeg2subt->left +
+    (state.y * Y_stride);
   state.target_V = GST_BUFFER_DATA (buf) + (Y_stride * mpeg2subt->in_height)
-      + ((mpeg2subt->left) / 2) + ((y / 2) * UV_stride);
+      + ((mpeg2subt->left) / 2) + ((state.y / 2) * UV_stride);
   state.target_U =
       state.target_V + UV_stride * ((mpeg2subt->in_height + 1) / 2);
 
@@ -773,8 +792,9 @@ gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt, GstBuffer * buf)
   memset (mpeg2subt->out_buffers[1], 0, sizeof (guint16) * Y_stride);
   memset (mpeg2subt->out_buffers[2], 0, sizeof (guint16) * Y_stride);
 
-  /* Now draw scanlines until we hit last_y or end of RLE data */
-  for (; ((state.offset[1] < mpeg2subt->data_size + 2) && (y <= last_y)); y++) {
+  /* Now draw scanlines until we hit state.clip_bottom or end of RLE data */
+  for (; ((state.offset[1] < mpeg2subt->data_size + 2) &&
+	  (state.y <= mpeg2subt->bottom)); state.y++) {
     gst_draw_rle_line (mpeg2subt, buffer, &state);
     if (state.id) {
       gst_merge_uv_data (mpeg2subt, buffer, &state);
@@ -978,11 +998,10 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
       mpeg2subt->menu_alpha[i] = ((guint32) (palette) >> (i * 4)) & 0x0f;
       mpeg2subt->menu_index[i] = ((guint32) (palette) >> (16 + (i * 4))) & 0x0f;
     }
+    gst_mpeg2subt_setup_highlight_palette (mpeg2subt);
 
     GST_DEBUG_OBJECT (mpeg2subt, "New button activated clip=(%d,%d) to (%d,%d) palette 0x%x", sx,
         sy, ex, ey, palette);
-    gst_mpeg2subt_setup_palette (mpeg2subt, mpeg2subt->menu_index,
-        mpeg2subt->menu_alpha);
 
     gst_mpeg2subt_update_still_frame (mpeg2subt);
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-clut-change")) {
@@ -1000,13 +1019,6 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
       }
       mpeg2subt->current_clut[i] = (guint32) (value);
     }
-
-    if (mpeg2subt->forced_display)
-      gst_mpeg2subt_setup_palette (mpeg2subt, mpeg2subt->menu_index,
-          mpeg2subt->menu_alpha);
-    else
-      gst_mpeg2subt_setup_palette (mpeg2subt, mpeg2subt->subtitle_index,
-          mpeg2subt->subtitle_alpha);
 
     gst_mpeg2subt_update_still_frame (mpeg2subt);
   } else if ((from_sub_pad && !strcmp (event_type, "dvd-spu-stream-change"))

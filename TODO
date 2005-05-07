@@ -1,9 +1,8 @@
 -*- Text -*-
 
-- Correct improper highlight handling in DVDs with letterboxed +
-  widescreen support.
-
 - Support angles.
+
+- Some menu subpictures get displayed too early (Matrix PAL). Why?
 
 - Implement support for other sound types.
 
@@ -13,15 +12,10 @@
 - Honor prohibited operations when it makes sense, or ignore them
   smartly.
 
-- Find out why sounds interrupts shortly when moving in menus and
-  using alsasink.
-
 - Trap the stop (^Z) signal and stop the clock while the program is
   suspended.
 
 - Check for DVD I/O errors when starting and retry if necessary.
-
-- Some menu subpictures get displayed too early (Matrix PAL). Why?
 
 - Implement free changing of sutitles
 
@@ -40,18 +34,16 @@
 - LIRC component fails miserably when no LIRC kernel modules are
   available.
 
-- Really implement letterboxed mode.
+- Correct improper highlight handling in DVDs with letterboxed +
+  widescreen support.
 
 
 Particular DVDs
 ---------------
 
-- The Others: Main menu doesn't show the highlight. You can't get out
-  of the film.
+- The Others: Main menu doesn't show the highlight.
 
-- A Bug's Life: Initial language selection frame doesn't display the
-  first time. Scene selection doesn't work. Seems to be a machine
-  problem.
+- Lola rennt: No highlight in some menus, e.g., Extras.
 
 - Lord of the Rings, The Two Towers: No character voices (only
   background sounds and music) when playing with the a52dec

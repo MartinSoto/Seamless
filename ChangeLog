@@ -1,3 +1,23 @@
+2005-05-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (RLE_state)
+	(gst_mpeg2subt_parse_header, gst_mpeg2subt_setup_palette) 
+	(gst_mpeg2subt_setup_highlight_palette, gst_draw_rle_line) 
+	(gst_mpeg2subt_merge_title, gst_mpeg2subt_handle_dvd_event): 
+
+	Fix big bug in the subtitle decoder. The assumption was that menu
+	highlights are only clip regions that limit the display of a
+	subtitle to a particular region. Not so. Actually, what a menu
+	highlight does is displaying a region of the subpicture with a
+	different palette, namely that provided by the particular DVD
+	button. This allows for effects like obscuring everything with a
+	subpicture, *except* for the highlight (you use a transparent
+	palette for the highlight in this case.)
+
+	The current implementation leaves a lot of room for optimization,
+	but seems to be behaving correctly.
+
 2005-05-03  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (VirtualMachine.clearNavState): New
