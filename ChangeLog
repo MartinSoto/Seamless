@@ -1,5 +1,12 @@
 2005-05-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (VirtualMachine.setAngle): Actually set
+	the angle attribute.
+	(ProgramChainPlayer.linkCell): Take angles into account while
+	deciding which cell to play next.
+
+2005-05-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/lirc.py: Add import for traceback module.
 
 2005-05-07  Martin Soto  <martinsoto@users.sourceforge.net>

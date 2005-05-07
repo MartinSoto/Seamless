@@ -541,7 +541,7 @@ class VirtualMachine(object):
     # Selectable streams
     def setAngle(self, angle):
         """Set the current angle to the one specified."""
-        # FIXME: Implement this.
+        self.angle = angle
         yield NoOp
     
     def setAudio(self, logical):
@@ -1206,6 +1206,13 @@ class ProgramChainPlayer(object):
         if 1 <= cellNr <= self.programChain.cellCount:
             self.cell = self.programChain.getCell(cellNr)
 
+            if self.machine.angle > 1 and \
+               self.cell.blockMode == dvdread.CELL_BLOCK_MODE_ANGLE_FIRST:
+                # We are at the beginning of an angle group. Jump to
+                # the right cell according to the angle.
+                yield Chain(self.linkCell(cellNr +
+                                          self.machine.angle - 1))
+
             # We are moving to a new location. Clear the old,
             # navigation packets stored in the machine.
             self.machine.clearNavState()
@@ -1224,8 +1231,25 @@ class ProgramChainPlayer(object):
             # No more cells. Play the "tail".
             yield Chain(self.linkTailProgramChain())
         else:
-            # Keep playing cells.
-            yield Chain(self.linkCell(cellNr + 1))
+            # Go to the next cell.
+            if self.machine.angle >= 1 and \
+               (self.cell.blockMode == \
+                dvdread.CELL_BLOCK_MODE_ANGLE_FIRST or \
+                self.cell.blockMode == \
+                dvdread.CELL_BLOCK_MODE_ANGLE_MIDDLE):
+                # We just finished playing a cell in an angle
+                # group. Skip to the end.
+                nextCellNr = cellNr + 1
+                nextMode = self.programChain.getCell(nextCellNr).blockMode
+                while nextMode == dvdread.CELL_BLOCK_MODE_ANGLE_MIDDLE or \
+                      nextMode == dvdread.CELL_BLOCK_MODE_ANGLE_LAST:
+                    nextCellNr += 1
+                    nextMode = self.programChain. \
+                               getCell(nextCellNr).blockMode
+                yield Chain(self.linkCell(nextCellNr))
+            else:
+                # Just play the next cell in sequence.
+                yield Chain(self.linkCell(cellNr + 1))
 
     @restartPoint
     def linkTopCell(self):
