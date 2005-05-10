@@ -40,12 +40,34 @@ class PipelineCmd(object):
         getattr(pipeline, self.methodName)(*self.args, **self.keywords)
 
 
+class DoNothing(PipelineCmd):
+    """A do-nothing command object."""
+    __slots__ = ()
+
+    def __call__(self, pipeline):
+        pass
+
+
 class PlayVobu(PipelineCmd):
     """When constructed with parameter list `(domain, titleNr,
     sectorNr)`, play the VOBU corresponding to domain `domain`, title
     number `titleNr`, and sector number `sectorNr`."""
     __slots__ = ()
     methodName = 'playVobu'
+
+
+class CancelVobu(PipelineCmd):
+    """When constructed without parameters, cancel the effect of the
+    last `PlayVobu` operation. A new `PlayVobu` must be sent
+    afterwards in order for the pipeline to be able to resume
+    playback."""
+    __slots__ = ()
+    methodName = 'cancelVobu'
+
+
+# Since accepting the playback of a VOBU is the default, `acceptVobu`
+# is equivalent to doing nothing.
+acceptVobu = DoNothing
 
 
 class SetAudio(PipelineCmd):

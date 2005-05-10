@@ -183,12 +183,16 @@ class VirtualMachine(object):
     def setCurrentNav(self, nav):
         """Set the current navigation packet.
 
+        The machine expects this method to be called always immediatly
+        after it has yielded a `pipelinecmds.PlayVobu`
+        operation. Following the `PlayVobu`, the machine will always
+        send a single operation to cancel or to keep playing the VOBU,
+        potentially based on the contents of the packet set here.
+
         This navigation packet is used strictly for navigation, i.e.,
         to determine the next position in the disc that has to be
         played. For menu highlights see the 'setButtonNav' method."""
         self.currentNav = nav
-
-        yield NoOp
 
     def setButtonNav(self, buttonNav):
         """Set the current navigation packet used for menu buttons.
@@ -201,7 +205,7 @@ class VirtualMachine(object):
         navigation packet is that a playback engine will normally have
         a buffer inserted between the stage that reads material from
         the disc, and the stage that displays it. The engine may want
-        to use the button information in packet only when it has
+        to use the button information in a packet only when it has
         reached the display stage."""
         oldButtonNav = self.buttonNav
         
@@ -1440,14 +1444,12 @@ class CellPlayer(object):
         while True:
             yield cmds.PlayVobu(self.domain, self.titleSetNr, self.sectorNr)
 
-            # After the yield, the whole VOBU will be read by the
-            # playback element and sent down the pipeline. During this
-            # process, a new nav packet (VOBU header) will be seen and
-            # stored in the machine object.
-
             # At this point, a new nav packet must be there. If this
             # is not the case, we have a serious problem.
             assert nav != self.machine.currentNav
+
+            # Accept playing this VOBU.
+            yield cmds.acceptVobu()
 
             nav = self.machine.currentNav
             if nav.nextVobu != 0x3fffffff:

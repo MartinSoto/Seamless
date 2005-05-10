@@ -24,7 +24,6 @@ import sys
 import gst
 
 import itersched
-from itersched import Call
 
 import dvdread
 import events
@@ -72,12 +71,24 @@ class Pipeline(object):
     machine. In this implementation, the virtual machine produces a
     sequence of command objects (as an iterator) that, when invoked
     with the pipeline as parameter, perform the required operations
-    (see module 'pipelinecmds').
+    The machine is restricted to use the operations defined in module
+    'pipelinecmds'.
 
-    One of the main tasks of this class is to determine, in an
-    automatic and reliable way, when a flush operation should be
-    triggered. The problem is that a flush is only necessary when the
-    machine activates certain actions as the result of an interactive
+    The `PlayVobu` operation is particularly important, since it is
+    used by the machine to tell the pipeline which VOBU from the disk
+    to play next. After receiving a `PlayVobu` the pipeline reads the
+    header (navigation packet) of the specified VOBU, and hands it to
+    the machine using the `setCurrentNav` method. After that, it reads
+    one single operation from the machine and executes it
+    immediatly. This is done in order to give the machine a chance of
+    analyzing the header and, if necessary, skipping the playback of
+    the VOBU. To skip the VOBU, the machine can send the `cancelVobu`
+    operation. Otherwise, it should sent a `DoNothing` operation.
+
+    One important task of this class is to determine, in an automatic
+    and reliable way, when a flush operation should be triggered. The
+    problem is that a flush is only necessary when the machine
+    activates certain actions as the result of an interactive
     operation (only interactive operations require breaking the flow
     of playback). A sizeable portion of the logic is devoted to
     that. Basically, commands are read from the machine and collected
@@ -129,21 +140,12 @@ class Pipeline(object):
         # instead of being queued in the source element.
         self.immediate = False
 
-
-    #
-    # Utility Methods
-    #
-
     def sendEvent(self, event):
         """Send `event` down the pipeline."""
         if self.immediate:
             self.src.emit('push-event', event)
         else:
             self.src.emit('queue-event', event)
-
-    def stopSource(self):
-        """Stop the source element instantly."""
-        self.src.set_property('block-count', 0)
 
 
     #
@@ -192,40 +194,40 @@ class Pipeline(object):
 
         self.immediate = False
 
-    def updateNav(self, nav):
-        """Update the machine to use the specified navigation packet."""
-        # Register the nav packet with the machine.
-        yield Call(self.machine.setCurrentNav(nav))
-
-        # FIXME: This should be done later in the game, namely, when
-        # the packet actually reaches the subtitle element.
-        yield Call(self.machine.setButtonNav(nav))
-        
     @synchronized
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
-        # This must be done immediatly. Otherwise, the contents of the
-        # buffer may change before we handle them.
+        # Create a nav packet object.
         nav = dvdread.NavPacket(buf.get_data())
+
+        # Hand the packet to the machine.
+        self.machine.setCurrentNav(nav)
+
+        # Read the confirm/cancel operation and execute it.
+        self.mainItr.next()(self)
+
+        if self.src.get_property('block-count') == 0:
+            # VOBU playback was cancelled.
+            return
 
         # Send a nav event.
         self.src.emit('push-event', events.nav(nav.startTime,
                                                nav.endTime))
 
-        self.machine.callIterator(self.updateNav(nav))
+        # FIXME: This should be done later in the game, namely, when
+        # the packet actually reaches the subtitle element.
+        self.machine.callIterator(self.machine.setButtonNav(nav))
 
 
     #
     # Interactive Operation Support
     #
 
-    class EndInteractive(cmds.PipelineCmd):
+    class EndInteractive(cmds.DoNothing):
         """A do nothing command, used to mark the end of an
         interactive operation."""
         __slots__ = ()
 
-        def __call__(self, pipeline):
-            pass
 
     @synchronized
     def runInteractive(self, itr):
@@ -247,7 +249,7 @@ class Pipeline(object):
         def op():
             """Call the iterator and send an `EndInteractive`
             operation at the end."""
-            yield Call(itr)
+            yield itersched.Call(itr)
             yield self.EndInteractive()
 
         self.machine.callIterator(op())
@@ -263,7 +265,7 @@ class Pipeline(object):
         else:
             # We reached a VOBU playback operation while doing the
             # interactive operation. Flush and go on.
-            self.stopSource()
+            self.cancelVobu()
             cmds[0:0] = [Pipeline.flush]
             self.pendingCmds = cmds
 
@@ -278,6 +280,14 @@ class Pipeline(object):
         self.src.set_property('domain', domain)
         self.src.set_property('title', titleNr)
         self.src.set_property('vobu-start', sectorNr)
+
+    def cancelVobu(self):
+        """Cancel the playback of the current VOBU.
+
+        This forces the source to immediatly ask for more work by
+        firing the `vobu-read` singnal."""
+        # Setting the current block count to 0 does the trick.
+        self.src.set_property('block-count', 0)
 
     def setAudio(self, phys):
         """Set the physical audio stream to 'phys'."""

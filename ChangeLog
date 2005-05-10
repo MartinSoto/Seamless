@@ -1,3 +1,19 @@
+2005-05-10  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.setCurrentNav): Not an
+	iterator anymore.
+	(CellPlayer.playFromVobu): Send an acceptVobu command after
+	playVobu.
+
+	* src/machine/pipeline.py (Pipeline.vobuHeader): Require playback
+	of VOBUs to be confirmed or canceled with an additional command
+	after a PlayVobu is sent.
+	(Pipeline.EndInteractive): Implement in terms of DoNothing.
+	(Pipeline.cancelVobu): Renamed from stop source.
+
+	* src/machine/pipelinecmds.py (DoNothing, CancelVobu)
+	(acceptVobu): New commands.
+
 2005-05-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (VirtualMachine.setAngle): Actually set
