@@ -155,11 +155,13 @@ SUBPICTURE_PHYS_TYPE_WIDESCREEN = 1
 SUBPICTURE_PHYS_TYPE_LETTERBOX = 2
 SUBPICTURE_PHYS_TYPE_PAN_SCAN = 3
 
+
 # Cell block modes.
 CELL_BLOCK_MODE_NORMAL = 0
 CELL_BLOCK_MODE_ANGLE_FIRST = 1
 CELL_BLOCK_MODE_ANGLE_MIDDLE = 2
 CELL_BLOCK_MODE_ANGLE_LAST = 3
+
 
 # Cell block types.
 CELL_BLOCK_TYPE_NORMAL = 0
@@ -1245,6 +1247,14 @@ cdef wrapButton(NavPacket nav, btni_t *btn):
     return button
 
 
+cdef getSimplePointer(unsigned long value):
+    print "+++ Value: 0x%x" % value
+    if value == 0x3fffffff:
+        return None
+
+    return value & 0x3fffffff
+
+
 cdef class NavPacket:
     cdef pci_t pci
     cdef dsi_t dsi
@@ -1262,13 +1272,18 @@ cdef class NavPacket:
         navRead_PCI(&self.pci, <unsigned char *>data + 0x2d);
         navRead_DSI(&self.dsi, <unsigned char *>data + 0x407);
 
+
+    #
+    # Navigation
+    #
+
     property nextVobu:
         def __get__(self):
-            return self.dsi.vobu_sri.next_vobu & 0x3fffffff
+            return getSimplePointer(self.dsi.vobu_sri.next_vobu)
 
     property prevVobu:
         def __get__(self):
-            return self.dsi.vobu_sri.prev_vobu & 0x3fffffff
+            return getSimplePointer(self.dsi.vobu_sri.prev_vobu)
 
     def getForwardVobu(self, int intervalId):
         cdef uint32_t offset
@@ -1296,11 +1311,16 @@ cdef class NavPacket:
 
     property nextVideoVobu:
         def __get__(self):
-            return self.dsi.vobu_sri.next_video & 0x3fffffff
+            return getSimplePointer(self.dsi.vobu_sri.next_video)
 
     property prevVideoVobu:
         def __get__(self):
-            return self.dsi.vobu_sri.prev_video & 0x3fffffff
+            return getSimplePointer(self.dsi.vobu_sri.prev_video)
+
+
+    #
+    # Time
+    #
 
     property startTime:
         def __get__(self):
@@ -1313,6 +1333,11 @@ cdef class NavPacket:
     property cellElapsedTime:
         def __get__(self):
             return wrapTime(&(self.pci.pci_gi.e_eltm))
+
+
+    #
+    # Buttons
+    #
 
     property buttonCount:
         def __get__(self):
@@ -1400,9 +1425,21 @@ cdef class NavPacket:
 
         return self.pci.nsml_agli.nsml_agl_dsta[angleNr - 1]
 
-    property seamlessFlags:
+    property preInterleaved:
         def __get__(self):
-            return self.dsi.sml_pbi.category
+            return self.dsi.sml_pbi.category & 0x8000;
+
+    property interleaved:
+        def __get__(self):
+            return self.dsi.sml_pbi.category & 0x4000;
+
+    property unitStart:
+        def __get__(self):
+            return self.dsi.sml_pbi.category & 0x2000;
+
+    property unitEnd:
+        def __get__(self):
+            return self.dsi.sml_pbi.category & 0x1000;
 
     property seamlessEndInterleavedUnit:
         def __get__(self):
@@ -1416,13 +1453,13 @@ cdef class NavPacket:
         def __get__(self):
             return self.dsi.sml_pbi.size
 
-    def getSeamlessNextVobu(self, angleNr):
+    def getSeamlessNextInterleavedUnit(self, angleNr):
         if not 1 <= angleNr <= 9:
             raise IndexError, "Angle number out of range"
 
         return self.dsi.sml_agli.data[angleNr - 1].address
 
-    def getSeamlessNextSize(self, angleNr):
+    def getSeamlessNextInterleavedUnitSize(self, angleNr):
         if not 1 <= angleNr <= 9:
             raise IndexError, "Angle number out of range"
 

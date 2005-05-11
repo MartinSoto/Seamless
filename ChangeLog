@@ -1,3 +1,21 @@
+2005-05-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (CellPlayer.playFromVobu): Use the new
+	convention (None) to check for the end of a cell.
+	(VirtualMachine.__init__): Start with angle 0.
+
+	* src/dvdread/_dvdread.pyx (getSimplePointer, NavPacket.nextVobu,
+	(NavPacket.prevVobu, NavPacket.nextVideoVobu,
+	(NavPacket.prevVideoVobu): Return None to indicate end of linked
+	list.
+	(NavPacket.preInterleaved, NavPacket.interleaved)
+	(NavPacket.unitStart, NavPacket.unitEnd): New properties to
+	replace the old seamlessFlags.
+	(NavPacket.getSeamlessNextInterleavedUnit)
+	(NavPacket.getSeamlessNextInterleavedUnitSize): Renamed from
+	getSeamlessNextVOBU and getSeamlessNextSize, that were just plain
+	wrong names for these properties.
+
 2005-05-10  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (VirtualMachine.setCurrentNav): Not an

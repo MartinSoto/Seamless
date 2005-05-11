@@ -123,7 +123,7 @@ class VirtualMachine(object):
         # 1, 2, and 3, respectively.
         self.audio = 0		# This seems to be needed by some DVDs.
         self.subpicture = 0x3e	# None
-        self.angle = 1
+        self.angle = 0
 
         # Machine options and state:
 
@@ -1452,7 +1452,8 @@ class CellPlayer(object):
             yield cmds.acceptVobu()
 
             nav = self.machine.currentNav
-            if nav.nextVobu != 0x3fffffff:
+
+            if nav.nextVobu != None:
                 # Progress to the next VOBU.
                 self.sectorNr = self.sectorNr + nav.nextVobu
             else:
