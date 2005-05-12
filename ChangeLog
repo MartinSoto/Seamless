@@ -1,3 +1,25 @@
+2005-05-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/shell.py (MachineShell.seekToPositionRelative):
+	Check for the case that the current position is None.
+
+	* src/machine/pipelinecmds.py (AcceptVobu): Was acceptVobu.
+
+	* src/machine/pipeline.py (Pipeline.playVobu) 
+	(Pipeline.vobuHeader): Hold the lock between the time the source
+	element is programmed to read a VOBU and the time it sends the
+	header back. An interactive operation being activated in this
+	interval can cause problems.
+
+	* src/machine/machine.py (CellPlayer.seekToSector): New procedure
+	to seek to a sector taking seamless angles into account.
+	(CellPlayer.playFromVobu): Use AcceptVobu instead of acceptVobu.
+
+	* src/dvdread/_dvdread.pyx (getBidiPointer): New function to get
+	bidirectional pointers from the data structure.
+	(getNonSeamlessNextVobu, getSeamlessNextInterleavedUnitSize): Use
+	getBidiPointer.
+
 2005-05-12  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (CellPlayer.playFromVobu): Use the new

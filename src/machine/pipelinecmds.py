@@ -67,7 +67,7 @@ class CancelVobu(PipelineCmd):
 
 # Since accepting the playback of a VOBU is the default, `acceptVobu`
 # is equivalent to doing nothing.
-acceptVobu = DoNothing
+AcceptVobu = DoNothing
 
 
 class SetAudio(PipelineCmd):

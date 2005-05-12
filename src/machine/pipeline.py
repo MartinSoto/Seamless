@@ -197,6 +197,9 @@ class Pipeline(object):
     @synchronized
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
+        # Release the lock set by the playVobu operation.
+        self.lock.release()
+
         # Create a nav packet object.
         nav = dvdread.NavPacket(buf.get_data())
 
@@ -280,6 +283,11 @@ class Pipeline(object):
         self.src.set_property('domain', domain)
         self.src.set_property('title', titleNr)
         self.src.set_property('vobu-start', sectorNr)
+
+        # Acquire the lock until the header arrives. An interactive
+        # operation arriving in the middle could cause real
+        # devastation.
+        self.lock.acquire()
 
     def cancelVobu(self):
         """Cancel the playback of the current VOBU.

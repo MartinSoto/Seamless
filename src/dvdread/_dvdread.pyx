@@ -1248,12 +1248,20 @@ cdef wrapButton(NavPacket nav, btni_t *btn):
 
 
 cdef getSimplePointer(unsigned long value):
-    print "+++ Value: 0x%x" % value
     if value == 0x3fffffff:
         return None
 
     return value & 0x3fffffff
 
+cdef getBidiPointer(unsigned long value):
+    if value == 0x7fffffff:
+        return None
+
+    ptr = long(value & 0x7fffffff)
+    if value & 0x10000000:
+        return -ptr
+    else:
+        return ptr
 
 cdef class NavPacket:
     cdef pci_t pci
@@ -1423,7 +1431,8 @@ cdef class NavPacket:
         if not 1 <= angleNr <= 9:
             raise IndexError, "Angle number out of range"
 
-        return self.pci.nsml_agli.nsml_agl_dsta[angleNr - 1]
+        return getBidiPointer(self.pci. \
+                              nsml_agli.nsml_agl_dsta[angleNr - 1])
 
     property preInterleaved:
         def __get__(self):
@@ -1457,7 +1466,8 @@ cdef class NavPacket:
         if not 1 <= angleNr <= 9:
             raise IndexError, "Angle number out of range"
 
-        return self.dsi.sml_agli.data[angleNr - 1].address
+        return getBidiPointer(self.dsi. \
+                              sml_agli.data[angleNr - 1].address)
 
     def getSeamlessNextInterleavedUnitSize(self, angleNr):
         if not 1 <= angleNr <= 9:

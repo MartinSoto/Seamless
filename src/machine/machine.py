@@ -1431,8 +1431,32 @@ class CellPlayer(object):
             # Just play the first VOBU in the cell.
             yield Chain(self.playFromVobu(cell.firstSector))
         else:
-            yield Chain(self.playFromVobu(sectorNr))
-            
+            yield Chain(self.seekToSector(sectorNr))
+
+    @restartPoint
+    def seekToSector(self, sectorNr):
+        """Seek to the specified sector."""
+        self.sectorNr = sectorNr
+
+        nav = self.machine.currentNav
+        yield cmds.PlayVobu(self.domain, self.titleSetNr, self.sectorNr)
+        assert self.machine.currentNav != nav
+        nav = self.machine.currentNav
+
+        if nav.interleaved:
+            yield cmds.CancelVobu()
+
+            if self.machine.angle < 1:
+                self.machine.angle = 1
+
+            nextPtr = nav.getSeamlessNextInterleavedUnit(self. \
+                                                         machine.angle)
+        else:
+            yield cmds.AcceptVobu()
+            nextPtr = nav.nextVobu
+
+        if nextPtr != None:
+            yield Chain(self.playFromVobu(sectorNr + nextPtr))
 
     @restartPoint
     def playFromVobu(self, sectorNr):
@@ -1449,7 +1473,7 @@ class CellPlayer(object):
             assert nav != self.machine.currentNav
 
             # Accept playing this VOBU.
-            yield cmds.acceptVobu()
+            yield cmds.AcceptVobu()
 
             nav = self.machine.currentNav
 

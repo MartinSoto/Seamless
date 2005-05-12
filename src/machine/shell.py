@@ -90,8 +90,9 @@ class MachineShell(object):
     @interactiveOp
     def seekToPositionRelative(self, seconds):
         currentTime = self.machine.getCurrentTime()
-        yield Call(self.machine. \
-                   seekToPosition(currentTime + seconds))
+        if currentTime != None:
+            yield Call(self.machine. \
+                       seekToPosition(currentTime + seconds))
 
 
     #
