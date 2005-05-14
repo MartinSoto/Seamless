@@ -394,7 +394,11 @@ cdef class ProgramChain:
         for i from 1 <= i <= self.chain.nr_of_cells:
             cell = Cell(self, i, startSeconds)
             self.cells.append(cell)
-            startSeconds = startSeconds + cell.playbackTime.seconds
+            # All cells in an interleaved block have the same start
+            # time.
+            if cell.blockMode != CELL_BLOCK_MODE_ANGLE_FIRST and \
+               cell.blockMode != CELL_BLOCK_MODE_ANGLE_MIDDLE:
+                startSeconds = startSeconds + cell.playbackTime.seconds
 
         self.clutArray = None
 

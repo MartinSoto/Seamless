@@ -1,3 +1,8 @@
+2005-05-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/dvdread/_dvdread.pyx (ProgramChain.init): Take interleaved
+	blocks into account while calculating cell initial time.
+
 2005-05-13  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/shell.py (MachineShell.seekToPositionRelative):
