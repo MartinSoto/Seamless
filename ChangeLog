@@ -1,3 +1,17 @@
+2005-05-15  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.callMenu) 
+	(VirtualMachine.getSystem4, VirtualMachine.getSystem5): Use the
+	new VideoTitle attribute names.
+
+	* src/dvdread/_dvdread.pyx (VideoTitle): Create VideoTitles out of
+	the video manager instead of based on a given title set. This
+	makes the video title information from the video manager available
+	from a video title object.
+	(VideoTitleSet.getVideoTitle, VideoManager.getVideoTitle): Adapt
+	to the new VideoTitle design.
+	(VideoManager.findVideoTitle): Erased.
+
 2005-05-14  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/dvdread/_dvdread.pyx (ProgramChain.init): Take interleaved

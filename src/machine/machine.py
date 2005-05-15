@@ -535,7 +535,7 @@ class VirtualMachine(object):
         title = self.currentTitle()
         yield Call(DiscPlayer(self, True). \
                    jumpToMenu(title.videoTitleSet.titleSetNr,
-                              title.titleNr, menuType))
+                              title.titleNrInSet, menuType))
 
     def resume(self):
         """Resume playback at the previously saved location."""
@@ -793,7 +793,7 @@ class VirtualMachine(object):
         """Return the value of system register 4 (title_in_volume)."""
         title = self.currentTitle()
         if title != None:
-            return title.globalTitleNr
+            return title.titleNrInManager
         else:
             return 0
 
@@ -801,7 +801,7 @@ class VirtualMachine(object):
         """Return the value of system register 5 (title_in_vts)."""
         title = self.currentTitle()
         if title != None:
-            return title.titleNr
+            return title.titleNrInSet
         else:
             return 0
 

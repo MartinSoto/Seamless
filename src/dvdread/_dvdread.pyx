@@ -671,24 +671,31 @@ cdef class Chapter:
 
 
 cdef class VideoTitle:
+    cdef readonly VideoManager videoManager
     cdef readonly VideoTitleSet videoTitleSet
+    cdef title_info_t *titleInfo
     cdef ttu_t *title
 
-    cdef readonly int titleNr
+    cdef readonly int titleNrInManager
 
-    def __new__(self, VideoTitleSet videoTitleSet, int titleNr):
-        self.videoTitleSet = videoTitleSet
-        self.titleNr = titleNr
+    def __new__(self, VideoManager videoManager, int titleNrInManager):
+        self.videoManager = videoManager
+        self.titleNrInManager = titleNrInManager
 
-        if titleNr < 1 or \
-           titleNr > videoTitleSet.handle.vts_ptt_srpt.nr_of_srpts:
+        if titleNrInManager < 1 or \
+           titleNrInManager > videoManager.handle.tt_srpt.nr_of_srpts:
             raise IndexError, "video title number out of range"
 
-        self.title = videoTitleSet.handle.vts_ptt_srpt.title + (titleNr - 1)
+        self.titleInfo = videoManager.handle.tt_srpt.title + \
+                         (titleNrInManager - 1)
+        self.videoTitleSet = videoManager. \
+                             getVideoTitleSet(self.titleInfo.title_set_nr)
+        self.title = self.videoTitleSet.handle.vts_ptt_srpt.title + \
+                     (self.titleInfo.vts_ttn - 1)
 
-    property globalTitleNr:
+    property titleNrInSet:
         def __get__(self):
-            return self.videoTitleSet.videoManager.findVideoTitle(self)
+            return self.titleInfo.vts_ttn
 
     property chapterCount:
         def __get__(self):
@@ -892,7 +899,25 @@ cdef class VideoTitleSet:
             return self.handle.vts_ptt_srpt.nr_of_srpts
 
     def getVideoTitle(self, int titleNr):
-        return VideoTitle(self, titleNr)
+        cdef VideoManager videoManager
+        cdef title_info_t *titleInfo
+        cdef int i, titleNrInManager
+
+        videoManager = self.dvd.videoManager
+
+        # Find the title number in the video manager.
+        titleNrInManager = 0
+        for i from 0 <= i < videoManager.handle.tt_srpt.nr_of_srpts:
+            titleInfo = videoManager.handle.tt_srpt.title + i
+            if titleInfo.title_set_nr == self.titleSetNr and \
+               titleInfo.vts_ttn == titleNr:
+                titleNrInManager = i + 1
+                break
+
+        if titleNrInManager == 0:
+            return None
+        else:
+            return videoManager.getVideoTitle(titleNrInManager)
 
     property programChainCount:
         def __get__(self):
@@ -1070,34 +1095,7 @@ cdef class VideoManager:
             return self.handle.tt_srpt.nr_of_srpts
 
     def getVideoTitle(self, int titleNr):
-        cdef title_info_t *titleInfo
-
-        if titleNr < 1 or \
-           titleNr > self.handle.tt_srpt.nr_of_srpts:
-            raise IndexError, "video title number out of range"
-
-        titleInfo = self.handle.tt_srpt.title + (titleNr - 1)
-        return self.getVideoTitleSet(titleInfo.title_set_nr). \
-               getVideoTitle(titleInfo.vts_ttn)
-
-    def findVideoTitle(self, VideoTitle title):
-        """Finds a video title in the video manager.
-        
-        Returns the position of this video title in the global video
-        title table contained in the video manager."""
-
-        cdef title_info_t *titleInfo
-        cdef int i, vtsNr, titleNr
-
-        vtsNr = title.videoTitleSet.titleSetNr
-        titleNr = title.titleNr
-        for i from 0 <= i < self.handle.tt_srpt.nr_of_srpts:
-            titleInfo = self.handle.tt_srpt.title + i
-            if titleInfo.title_set_nr == vtsNr and \
-               titleInfo.vts_ttn == titleNr:
-                return i + 1
-
-        return None
+        return VideoTitle(self, titleNr)
 
     property langUnitCount:
         def __get__(self):
