@@ -146,6 +146,8 @@ class MainUserInterface(object):
             self.player.menu()
         elif keyName == 'F2':
             self.player.nextAudioStream()
+        elif keyName == 'F3':
+            self.player.nextAngle()
 
         return False
 

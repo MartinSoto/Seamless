@@ -1,5 +1,23 @@
 2005-05-15  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/mainui.py (MainUserInterface.mainKeyPress): 
+	* src/machine/shell.py (MachineShell.nextAngle): 
+	Allow for changing angles from the user interface.
+
+	* src/machine/machine.py (VirtualMachine.__init__) 
+	(VirtualMachine.setAngle, VirtualMachine.currentAngle) 
+	(VirtualMachine.currentAngleCount, ProgramChainPlayer.linkCell):
+	Restrict values of the angle register to the 1-9 range.
+	(VirtualMachine.currentAngle, VirtualMachine.currentAngleCount):
+	New methods.
+	(CellPlayer.getNextPointer)
+	(CellPlayer.seekToSector, CellPlayer.playFromVobu): Move the
+	code used to find the next VOBU to a separate method.
+
+	* src/dvdread/_dvdread.pyx (VideoTitle.angleCount): New property.
+
+2005-05-15  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/machine.py (VirtualMachine.callMenu) 
 	(VirtualMachine.getSystem4, VirtualMachine.getSystem5): Use the
 	new VideoTitle attribute names.

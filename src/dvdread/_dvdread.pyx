@@ -704,6 +704,10 @@ cdef class VideoTitle:
     def getChapter(self, int chapterNr):
         return Chapter(self, chapterNr)
 
+    property angleCount:
+        def __get__(self):
+            return self.titleInfo.nr_of_angles
+
 
 cdef class VideoAttributes:
     cdef video_attr_t *attribs

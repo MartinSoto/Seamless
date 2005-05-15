@@ -123,7 +123,7 @@ class VirtualMachine(object):
         # 1, 2, and 3, respectively.
         self.audio = 0		# This seems to be needed by some DVDs.
         self.subpicture = 0x3e	# None
-        self.angle = 0
+        self.angle = 1
 
         # Machine options and state:
 
@@ -545,7 +545,13 @@ class VirtualMachine(object):
     # Selectable streams
     def setAngle(self, angle):
         """Set the current angle to the one specified."""
-        self.angle = angle
+        if angle < 1:
+            self.angle = 1
+        elif angle > 9:
+            self.angle = 9
+        else:
+            self.angle = angle
+
         yield NoOp
     
     def setAudio(self, logical):
@@ -675,6 +681,14 @@ class VirtualMachine(object):
             return self.buttonNav.getButton(self.currentButton,
                                             dvdread. \
                                             SUBPICTURE_PHYS_TYPE_WIDESCREEN)
+
+    def currentAngle(self):
+        """Return the current angle number."""
+        return self.angle
+
+    def currentAngleCount(self):
+        """Return the current total number of angles available."""
+        return self.currentTitle().angleCount
 
 
     #
@@ -1236,8 +1250,7 @@ class ProgramChainPlayer(object):
             yield Chain(self.linkTailProgramChain())
         else:
             # Go to the next cell.
-            if self.machine.angle >= 1 and \
-               (self.cell.blockMode == \
+            if (self.cell.blockMode == \
                 dvdread.CELL_BLOCK_MODE_ANGLE_FIRST or \
                 self.cell.blockMode == \
                 dvdread.CELL_BLOCK_MODE_ANGLE_MIDDLE):
@@ -1433,28 +1446,44 @@ class CellPlayer(object):
         else:
             yield Chain(self.seekToSector(sectorNr))
 
+    def getNextPointer(self, nav, forceAngleJump=False):
+        """Find the pointer to the next VOBU based on the current
+        state and on the provided nav packet."""
+        if self.cell.blockMode != dvdread.CELL_BLOCK_MODE_NORMAL:
+            angle = self.machine.angle
+
+            nextPtr = 0
+            if nav.interleaved and (nav.unitEnd or forceAngleJump):
+                # Seamless angle. We are at the end of an interleaved
+                # unit or we are forced to jump to the next
+                # interleaved unit (normal after a seek).
+                nextPtr = nav.getSeamlessNextInterleavedUnit(angle)
+            else:
+                nextPtr = nav.getNonSeamlessNextVobu(angle)
+
+            if nextPtr == 0:
+                return nav.nextVobu
+            else:
+                return nextPtr
+        else:
+            return nav.nextVobu
+
     @restartPoint
     def seekToSector(self, sectorNr):
         """Seek to the specified sector."""
         self.sectorNr = sectorNr
 
-        nav = self.machine.currentNav
         yield cmds.PlayVobu(self.domain, self.titleSetNr, self.sectorNr)
-        assert self.machine.currentNav != nav
         nav = self.machine.currentNav
 
-        if nav.interleaved:
+        if self.cell.blockMode != dvdread.CELL_BLOCK_MODE_NORMAL:
+            # Don't play the first VOBU but jump to the right angle
+            # first.
             yield cmds.CancelVobu()
-
-            if self.machine.angle < 1:
-                self.machine.angle = 1
-
-            nextPtr = nav.getSeamlessNextInterleavedUnit(self. \
-                                                         machine.angle)
         else:
             yield cmds.AcceptVobu()
-            nextPtr = nav.nextVobu
 
+        nextPtr = self.getNextPointer(nav, True)
         if nextPtr != None:
             yield Chain(self.playFromVobu(sectorNr + nextPtr))
 
@@ -1477,9 +1506,10 @@ class CellPlayer(object):
 
             nav = self.machine.currentNav
 
-            if nav.nextVobu != None:
+            nextPtr = self.getNextPointer(nav)
+            if nextPtr != None:
                 # Progress to the next VOBU.
-                self.sectorNr = self.sectorNr + nav.nextVobu
+                self.sectorNr += nextPtr
             else:
                 # We reached the end of the cell.
                 break

@@ -111,6 +111,18 @@ class MachineShell(object):
 
 
     #
+    # Angle Selection
+    #
+
+    @interactiveOp
+    def nextAngle(self):
+        """Switch to next angle."""
+        yield Call(self.machine. \
+                   setAngle((self.machine.currentAngle() % \
+                             self.machine.currentAngleCount()) + 1))
+
+
+    #
     # Button Navigation
     #
 
