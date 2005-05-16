@@ -1,3 +1,14 @@
+2005-05-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/pipeline.py (Pipeline.__slots__): New attribute
+	interactiveCount.
+	(Pipeline.__init__, Pipeline.collectCmds) 
+	(Pipeline.EndInteractive, Pipeline.runInteractive): Put a
+	consecutive in every EndInteractive marker, and check it while
+	collecting commands. Fixes a bug the prevented necessary flushing
+	in some rare situations where DVD call and resume operations were
+	used.
+
 2005-05-15  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/mainui.py (MainUserInterface.mainKeyPress): 

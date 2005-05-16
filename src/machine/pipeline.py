@@ -108,7 +108,8 @@ class Pipeline(object):
                  'palette',
 
                  'pendingCmds',
-                 'immediate')
+                 'immediate',
+                 'interactiveCount')
 
 
     def __init__(self, src, machine):
@@ -140,6 +141,11 @@ class Pipeline(object):
         # instead of being queued in the source element.
         self.immediate = False
 
+        # A counter that increments itself whenever an interactive
+        # operation is executed. It is used to deal with call/resume
+        # operations an pipeline flushing.
+        self.interactiveCount = 0
+
     def sendEvent(self, event):
         """Send `event` down the pipeline."""
         if self.immediate:
@@ -158,8 +164,9 @@ class Pipeline(object):
         for cmd in self.mainItr:
             events.append(cmd)
             if isinstance(cmd, cmds.PlayVobu) or \
-                   isinstance(cmd, cmds.Pause) or \
-                   isinstance(cmd, self.EndInteractive):
+               isinstance(cmd, cmds.Pause) or \
+               (isinstance(cmd, self.EndInteractive) and
+                cmd.count == self.interactiveCount):
                 return events
 
         return events
@@ -228,8 +235,9 @@ class Pipeline(object):
 
     class EndInteractive(cmds.DoNothing):
         """A do nothing command, used to mark the end of an
-        interactive operation."""
-        __slots__ = ()
+        interactive operation. It carries the serial count of
+        interactive operations stored in the pipeline."""
+        __slots__ = ('count')
 
 
     @synchronized
@@ -248,14 +256,42 @@ class Pipeline(object):
         The `interactiveOp' decorator can be used to have a method be
         executed through this mechanism.
         """
+
+        # Theory of operation: we run the provided iterator inside a
+        # wrapper, that calls the iterator and yields a special marker
+        # (an object of class `EndInteractive`) afterwards. The
+        # `collectCmds` method stops collecting on anything that means
+        # displaying new video (a `PlayVobu` or `Pause` command) or on
+        # `EndInteractive`. If the last element of the sequence
+        # returned by `collectCmds` is an `EndInteractive` we know the
+        # operation completed without attempting to jump anywhere
+        # where new video is played and don't flush the
+        # pipeline. Otherwise, we flush the pipeline before executing
+        # the collected commands.
+        #
+        # There is a caveat, however: when an interactive operation
+        # performs a DVD call operation, the wrapper remains in the
+        # itersched stack, and will eventually return its
+        # `EndInteractive` when the DVD machine does a resume. For
+        # this reason, we put a consecutive count in the
+        # `EndInteractive` objects and check it in `collectCmds` to
+        # make sure that we are reacting to the right `EndInteractive`
+        # command.
         
-        def op():
+        def interactiveWrapper(count):
             """Call the iterator and send an `EndInteractive`
             operation at the end."""
             yield itersched.Call(itr)
-            yield self.EndInteractive()
 
-        self.machine.callIterator(op())
+            end = self.EndInteractive()
+            end.count = count
+            yield end
+
+        self.interactiveCount += 1
+
+        # The end interactive marker carries the sequential count in
+        # it. collectCmds matches this count with the current one.
+        self.machine.callIterator(interactiveWrapper(self.interactiveCount))
 
         cmds = self.collectCmds()
 
