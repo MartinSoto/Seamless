@@ -1,3 +1,12 @@
+2005-05-17  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c: 
+	Big restructuring to execute SPU commands at their prescribed
+	time. Should enable subtitle animations up to some extent, and
+	generally make subtitle playback more correct. Probably unstable
+	and buggy in this first incarnation though.
+
 2005-05-16  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/pipeline.py (Pipeline.__slots__): New attribute

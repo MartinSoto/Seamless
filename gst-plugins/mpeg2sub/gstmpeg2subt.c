@@ -26,9 +26,7 @@
 #include <string.h>
 
 
-/* Retrieve the current subtitle. */
-#define GST_MPEG2SUBT_CURRENT_SUBT(mpeg2subt) \
-    g_queue_peek_head ((mpeg2subt)->subt_queue)
+#define DELAY_TO_GST(delay) ((GST_MSECOND * 1024 * (delay)) / 90)
 
 
 static void gst_mpeg2subt_class_init (GstMpeg2SubtClass * klass);
@@ -41,7 +39,9 @@ static GstPadLinkReturn gst_mpeg2subt_link_video (GstPad * pad,
     const GstCaps * caps);
 static void gst_mpeg2subt_handle_video (GstMpeg2Subt * mpeg2subt,
     GstData * _data);
-static void gst_mpeg2subt_parse_header (GstMpeg2Subt * mpeg2subt);
+static void gst_mpeg2subt_execute_block (GstMpeg2Subt * mpeg2subt);
+static void gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt,
+				  GstClockTime time);
 static gboolean gst_mpeg2subt_src_event (GstPad * pad, GstEvent * event);
 static void gst_mpeg2subt_handle_subtitle (GstMpeg2Subt * mpeg2subt,
     GstData * _data);
@@ -73,14 +73,16 @@ static GstElementDetails mpeg2subt_details = {
 static GstStaticPadTemplate video_template = GST_STATIC_PAD_TEMPLATE ("video",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS ("video/x-raw-yuv, " "format = (fourcc) { I420 }, " /* YV12 later */
+    GST_STATIC_CAPS ("video/x-raw-yuv, " "format = (fourcc) { I420 }, "
+		     /* YV12 later */
         "width = (int) [ 16, 4096 ], " "height = (int) [ 16, 4096 ]")
     );
 
 static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS ("video/x-raw-yuv, " "format = (fourcc) { I420 }, " /* YV12 later */
+    GST_STATIC_CAPS ("video/x-raw-yuv, " "format = (fourcc) { I420 }, "
+		     /* YV12 later */
         "width = (int) [ 16, 4096 ], " "height = (int) [ 16, 4096 ]")
     );
 
@@ -199,7 +201,12 @@ gst_mpeg2subt_class_init (GstMpeg2SubtClass * klass)
   gobject_class = (GObjectClass *) klass;
   gstelement_class = (GstElementClass *) klass;
 
-  g_object_class_install_property (G_OBJECT_CLASS (klass), ARG_SKIP, g_param_spec_int ("skip", "skip", "skip", G_MININT, G_MAXINT, 0, G_PARAM_READWRITE));      /* CHECKME */
+  /* CHECKME: */
+  g_object_class_install_property (G_OBJECT_CLASS (klass), ARG_SKIP,
+				   g_param_spec_int ("skip", "skip",
+						     "skip", G_MININT,
+						     G_MAXINT, 0,
+						     G_PARAM_READWRITE));
 
   parent_class = g_type_class_ref (GST_TYPE_ELEMENT);
 
@@ -242,10 +249,15 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt)
   mpeg2subt->partialbuf = NULL;
   mpeg2subt->subt_queue = g_queue_new ();
   mpeg2subt->last_frame = NULL;
-  mpeg2subt->current_time = GST_CLOCK_TIME_NONE;
-  mpeg2subt->start_display_time = GST_CLOCK_TIME_NONE;
-  mpeg2subt->end_display_time = GST_CLOCK_TIME_NONE;
+
+  mpeg2subt->cur_cmds = NULL;
+  mpeg2subt->cur_cmds_buf = NULL;
+  mpeg2subt->cur_cmds_time = GST_CLOCK_TIME_NONE;
+
+  mpeg2subt->current_buf = NULL;
+  mpeg2subt->display = FALSE;
   mpeg2subt->forced_display = FALSE;
+
   memset (mpeg2subt->current_clut, 0, 16 * sizeof (guint32));
   memset (mpeg2subt->subtitle_index, 0, sizeof (mpeg2subt->subtitle_index));
   memset (mpeg2subt->menu_index, 0, sizeof (mpeg2subt->menu_index));
@@ -338,33 +350,17 @@ gst_mpeg2subt_handle_video (GstMpeg2Subt * mpeg2subt, GstData * _data)
     data = GST_BUFFER_DATA (buf);
     size = GST_BUFFER_SIZE (buf);
 
-    if (mpeg2subt->last_frame != NULL) {
+    if (mpeg2subt->last_frame) {
       gst_buffer_unref (mpeg2subt->last_frame);
     }
     out_buf = mpeg2subt->last_frame = gst_buffer_ref (buf);
 
-    if (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt)) {
-      if (!mpeg2subt->forced_display && 
-          (mpeg2subt->end_display_time < GST_BUFFER_TIMESTAMP (out_buf))) {
-        /* We are past the current subtitle. Check for the next one. */
-        gst_buffer_unref (g_queue_pop_head (mpeg2subt->subt_queue));
+    gst_mpeg2subt_update (mpeg2subt, GST_BUFFER_TIMESTAMP (out_buf));
 
-        if (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt)) {
-          gst_mpeg2subt_parse_header (mpeg2subt);
-        }
-      }
-    }
-
-    if (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt)) {
-      if ((mpeg2subt->forced_display && (mpeg2subt->current_button != 0))
-          ||
-          ((mpeg2subt->start_display_time <= GST_BUFFER_TIMESTAMP (out_buf))
-              && (mpeg2subt->end_display_time >=
-                  GST_BUFFER_TIMESTAMP (out_buf)))) {
-        /* Time to display a subtitle. */
-        out_buf = gst_buffer_copy_on_write (out_buf);
-        gst_mpeg2subt_merge_title (mpeg2subt, out_buf);
-      }
+    if (mpeg2subt->forced_display || mpeg2subt->display) {
+      /* Merge the current subtitle. */
+      out_buf = gst_buffer_copy_on_write (out_buf);
+      gst_mpeg2subt_merge_title (mpeg2subt, out_buf);
     }
 
     GST_LOG_OBJECT (mpeg2subt, "Pushing frame with timestamp %0.3fs",
@@ -409,135 +405,217 @@ gst_mpeg2subt_src_event (GstPad * pad, GstEvent * event)
   return gst_pad_send_event (GST_PAD_PEER (mpeg2subt->videopad), event);
 }
 
+/* Execute the current command block. */
 static void
-gst_mpeg2subt_parse_header (GstMpeg2Subt * mpeg2subt)
+gst_mpeg2subt_execute_block (GstMpeg2Subt * mpeg2subt)
 {
-#define PARSE_BYTES_NEEDED(x) if ((buf+(x)) >= end) \
-  { GST_WARNING("Subtitle stream broken parsing %d", *buf); \
-    broken = TRUE; break; }
-
-  guchar *buf;
-  guchar *start = GST_BUFFER_DATA (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt));
+  guchar *start;
   guchar *end;
+  guchar *cur_cmd;
   gboolean broken = FALSE;
-  gboolean last_seq = FALSE;
-  guchar *next_seq = NULL;
-  guint event_time;
 
-  mpeg2subt->packet_size = GST_READ_UINT16_BE (start);
-  mpeg2subt->data_size = GST_READ_UINT16_BE (start + 2);
+#define PARSE_BYTES_NEEDED(x) \
+  if ((cur_cmd + (x)) >= end) { \
+    GST_WARNING("Subtitle stream broken parsing %d", *cur_cmd); \
+    broken = TRUE; \
+    break; \
+  }
+
+  start = GST_BUFFER_DATA (mpeg2subt->cur_cmds_buf);
+  end = start + GST_READ_UINT16_BE (start);
 
   mpeg2subt->forced_display = FALSE;
-  g_return_if_fail (mpeg2subt->packet_size >= 4);
 
-  buf = start + mpeg2subt->data_size;
-  end = buf + mpeg2subt->packet_size;
-  event_time = GUINT16_FROM_BE (*(guint16 *) (buf));
-  next_seq = start + GUINT16_FROM_BE (*(guint16 *) (buf + 2));
-  /* If the next control sequence is at the current offset, this is 
-   * the last one */
-  last_seq = (next_seq == buf);
-  buf += 4;
+  cur_cmd = mpeg2subt->cur_cmds + 4;
 
-  while ((buf < end) && (!broken)) {
-    switch (*buf) {
-      case SPU_FORCE_DISPLAY:  /* Forced display menu subtitle */
+  while (cur_cmd < end && !broken) {
+    switch (*cur_cmd) {
+      case SPU_FORCE_DISPLAY:  /* Forced display menu subtitle. */
         mpeg2subt->forced_display = TRUE;
-        buf++;
+        cur_cmd++;
         break;
-      case SPU_SHOW:           /* Show the subtitle in this packet */
-        mpeg2subt->start_display_time =
-            GST_BUFFER_TIMESTAMP (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt)) +
-            ((GST_SECOND * event_time) / 90);
-        GST_DEBUG_OBJECT (mpeg2subt, "Subtitle starts at %" G_GUINT64_FORMAT,
-            mpeg2subt->end_display_time);
-        buf++;
+      case SPU_SHOW:           /* Show the current subpicture. */
+	mpeg2subt->display = TRUE;
+        cur_cmd++;
         break;
-      case SPU_HIDE:           /* 02 ff (ff) is the end of the packet, hide the  */
-        mpeg2subt->end_display_time =
-            GST_BUFFER_TIMESTAMP (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt)) +
-            ((GST_SECOND * event_time) / 90);
-        GST_DEBUG_OBJECT (mpeg2subt, "Subtitle ends at %" G_GUINT64_FORMAT,
-            mpeg2subt->end_display_time);
-        buf++;
+      case SPU_HIDE:           /* Hide the current subpicture. */
+        mpeg2subt->display = FALSE;
+        cur_cmd++;
         break;
-      case SPU_SET_PALETTE:    /* palette */
+      case SPU_SET_PALETTE:    /* Set the standard palette. */
         PARSE_BYTES_NEEDED (3);
 
-        mpeg2subt->subtitle_index[3] = buf[1] >> 4;
-        mpeg2subt->subtitle_index[2] = buf[1] & 0xf;
-        mpeg2subt->subtitle_index[1] = buf[2] >> 4;
-        mpeg2subt->subtitle_index[0] = buf[2] & 0xf;
+        mpeg2subt->subtitle_index[3] = cur_cmd[1] >> 4;
+        mpeg2subt->subtitle_index[2] = cur_cmd[1] & 0xf;
+        mpeg2subt->subtitle_index[1] = cur_cmd[2] >> 4;
+        mpeg2subt->subtitle_index[0] = cur_cmd[2] & 0xf;
 	gst_mpeg2subt_setup_palette (mpeg2subt);
-        buf += 3;
+        cur_cmd += 3;
         break;
-      case SPU_SET_ALPHA:      /* transparency palette */
+      case SPU_SET_ALPHA:      /* Set the transparency palette. */
         PARSE_BYTES_NEEDED (3);
 
-        mpeg2subt->subtitle_alpha[3] = buf[1] >> 4;
-        mpeg2subt->subtitle_alpha[2] = buf[1] & 0xf;
-        mpeg2subt->subtitle_alpha[1] = buf[2] >> 4;
-        mpeg2subt->subtitle_alpha[0] = buf[2] & 0xf;
+        mpeg2subt->subtitle_alpha[3] = cur_cmd[1] >> 4;
+        mpeg2subt->subtitle_alpha[2] = cur_cmd[1] & 0xf;
+        mpeg2subt->subtitle_alpha[1] = cur_cmd[2] >> 4;
+        mpeg2subt->subtitle_alpha[0] = cur_cmd[2] & 0xf;
 	gst_mpeg2subt_setup_palette (mpeg2subt);
-        buf += 3;
+        cur_cmd += 3;
         break;
-      case SPU_SET_SIZE:       /* image coordinates */
+      case SPU_SET_SIZE:       /* Set the image coordinates. */
         PARSE_BYTES_NEEDED (7);
 
         mpeg2subt->left =
-            CLAMP ((((unsigned int) buf[1]) << 4) | (buf[2] >> 4), 0,
+            CLAMP ((((unsigned int) cur_cmd[1]) << 4) | (cur_cmd[2] >> 4), 0,
             (mpeg2subt->in_width - 1));
         mpeg2subt->top =
-            CLAMP ((((unsigned int) buf[4]) << 4) | (buf[5] >> 4), 0,
+            CLAMP ((((unsigned int) cur_cmd[4]) << 4) | (cur_cmd[5] >> 4), 0,
             (mpeg2subt->in_height - 1));
         mpeg2subt->right =
-            CLAMP ((((buf[2] & 0x0f) << 8) | buf[3]), 0,
+            CLAMP ((((cur_cmd[2] & 0x0f) << 8) | cur_cmd[3]), 0,
             (mpeg2subt->in_width - 1));
         mpeg2subt->bottom =
-            CLAMP ((((buf[5] & 0x0f) << 8) | buf[6]), 0,
+            CLAMP ((((cur_cmd[5] & 0x0f) << 8) | cur_cmd[6]), 0,
             (mpeg2subt->in_height - 1));
 
-        GST_DEBUG_OBJECT (mpeg2subt, "left %d, top %d, right %d, bottom %d", mpeg2subt->left,
-            mpeg2subt->top, mpeg2subt->right, mpeg2subt->bottom);
-        buf += 7;
+        GST_DEBUG_OBJECT (mpeg2subt, "left %d, top %d, right %d, bottom %d",
+			  mpeg2subt->left, mpeg2subt->top, mpeg2subt->right,
+			  mpeg2subt->bottom);
+        cur_cmd += 7;
         break;
-      case SPU_SET_OFFSETS:    /* image 1 / image 2 offsets */
+      case SPU_SET_OFFSETS:    /* Set the active top and bottom field
+				  image offsets. */
         PARSE_BYTES_NEEDED (5);
-        mpeg2subt->offset[0] = (((unsigned int) buf[1]) << 8) | buf[2];
-        mpeg2subt->offset[1] = (((unsigned int) buf[3]) << 8) | buf[4];
-        GST_DEBUG_OBJECT (mpeg2subt, "Offset1 %d, Offset2 %d", mpeg2subt->offset[0],
-            mpeg2subt->offset[1]);
-        buf += 5;
+
+	/* The current buffer is referenced separately. */
+	if (mpeg2subt->current_buf) {
+	  gst_buffer_unref (mpeg2subt->current_buf);
+	}
+	mpeg2subt->current_buf = gst_buffer_ref (mpeg2subt->cur_cmds_buf);
+
+        mpeg2subt->offset[0] = GST_READ_UINT16_BE (cur_cmd + 1);
+        mpeg2subt->offset[1] = GST_READ_UINT16_BE (cur_cmd + 3);
+        GST_DEBUG_OBJECT (mpeg2subt, "Offset1 %d, Offset2 %d",
+			  mpeg2subt->offset[0], mpeg2subt->offset[1]);
+
+        cur_cmd += 5;
         break;
       case SPU_WIPE:
-      {
-        guint length;
+	{
+	  guint length;
 
-        GST_WARNING ("SPU_WIPE not yet implemented");
-        PARSE_BYTES_NEEDED (3);
+	  GST_WARNING ("SPU_WIPE not yet implemented");
+	  PARSE_BYTES_NEEDED (3);
 
-        length = (buf[1] << 8) | (buf[2]);
-        buf += 1 + length;
-      }
+	  length = (cur_cmd[1] << 8) | (cur_cmd[2]);
+	  cur_cmd += 1 + length;
+	}
         break;
       case SPU_END:
-        buf = (last_seq) ? end : next_seq;
-
-        /* Start a new control sequence */
-        if (buf + 4 < end) {
-          event_time = GUINT16_FROM_BE (*(guint16 *) (buf));
-          next_seq = start + GUINT16_FROM_BE (*(guint16 *) (buf + 2));
-          last_seq = (next_seq == buf);
-        }
-        buf += 4;
-        break;
+	return;
       default:
-        GST_ERROR
-            ("Invalid sequence in subtitle packet header (%.2x). Skipping",
-            *buf);
+        GST_ERROR ("Invalid sequence in subtitle packet header"
+		   " (%.2x). Skipping", *cur_cmd);
         broken = TRUE;
         break;
     }
+  }
+}
+
+/* Advance the current command block pointer to the next command
+   block, or to NULL when no next block is available, and update all
+   related fields.
+
+   Returns TRUE if and only if a transition actually happened. */
+static gboolean
+gst_mpeg2subt_next_block (GstMpeg2Subt * mpeg2subt)
+{
+  guchar *contents;
+
+  if (mpeg2subt->cur_cmds == NULL) {
+    /* Check for a new packet. */
+    mpeg2subt->cur_cmds_buf = g_queue_peek_head ((mpeg2subt)->subt_queue);
+    if (mpeg2subt->cur_cmds_buf == NULL) {
+      /* No transition. */
+      return FALSE;
+    }
+
+    /* Go to the first command block. */
+    contents = GST_BUFFER_DATA (mpeg2subt->cur_cmds_buf);
+    mpeg2subt->cur_cmds = contents + GST_READ_UINT16_BE (contents + 2);
+  } else {
+    guchar *next_cmds;
+
+    contents = GST_BUFFER_DATA (mpeg2subt->cur_cmds_buf);
+
+    /* Determine the address of the next command block. */
+    next_cmds = contents + GST_READ_UINT16_BE (mpeg2subt->cur_cmds + 2);
+
+    /* next_cmds should still fall in the packet. */
+    g_return_if_fail (contents < next_cmds &&
+		      next_cmds < contents + GST_READ_UINT16_BE (contents));
+
+    if (next_cmds != mpeg2subt->cur_cmds) {
+      /* Just move to the next block. */
+      mpeg2subt->cur_cmds = next_cmds;
+    } else {
+      /* We are in the last command block in this packet: */
+
+      /* Discard the current packet... */
+      gst_buffer_unref (GST_BUFFER (g_queue_pop_head
+				    (mpeg2subt->subt_queue)));
+
+      /* and check for a new one. */
+      mpeg2subt->cur_cmds_buf = g_queue_peek_head ((mpeg2subt)->subt_queue);
+      if (mpeg2subt->cur_cmds_buf == NULL) {
+	/* No more packets available for the time being. */
+	mpeg2subt->cur_cmds = NULL;
+      } else {
+	/* Go to the first command block. */
+	contents = GST_BUFFER_DATA (mpeg2subt->cur_cmds_buf);
+	mpeg2subt->cur_cmds = contents + GST_READ_UINT16_BE (contents + 2);
+      }
+    }
+  }
+
+  /* Update the current block time. */
+  if (mpeg2subt->cur_cmds != NULL) {
+    GstClockTime ts;
+
+    ts = GST_BUFFER_TIMESTAMP (mpeg2subt->cur_cmds_buf);
+    if (ts == GST_CLOCK_TIME_NONE) {
+      mpeg2subt->cur_cmds_time = GST_CLOCK_TIME_NONE;
+    } else {
+      mpeg2subt->cur_cmds_time = ts +
+	DELAY_TO_GST(GST_READ_UINT16_BE (mpeg2subt->cur_cmds));
+    }
+  } else {
+    mpeg2subt->cur_cmds_time = GST_CLOCK_TIME_NONE;
+  }
+
+  /* We did a transition. */
+  return TRUE;
+}
+
+/* Execute all SPU commands contained in the queue, whose execution
+   time is smaller than the specified time. */
+static void
+gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt, GstClockTime time)
+{
+  if (time == GST_CLOCK_TIME_NONE) {
+    return;
+  }
+
+  if (mpeg2subt->cur_cmds == NULL) {
+    /* Try to advance once, just in case new SPU packets have arrived. */
+    gst_mpeg2subt_next_block (mpeg2subt);
+  }
+
+  while (mpeg2subt->cur_cmds != NULL &&
+	 (mpeg2subt->cur_cmds_time == GST_CLOCK_TIME_NONE ||
+	  mpeg2subt->cur_cmds_time <= time)) {
+    gst_mpeg2subt_execute_block (mpeg2subt);
+    gst_mpeg2subt_next_block (mpeg2subt);
   }
 }
 
@@ -612,7 +690,8 @@ gst_get_rle_code (guchar * buffer, RLE_state * state)
  * at half width/height
  */
 static void
-gst_draw_rle_line (GstMpeg2Subt * mpeg2subt, guchar * buffer, RLE_state * state)
+gst_draw_rle_line (GstMpeg2Subt * mpeg2subt, guchar * buffer,
+		   RLE_state * state)
 {
   gint length, segment_length, colourid;
   gint right = mpeg2subt->right + 1;
@@ -695,7 +774,8 @@ gst_draw_rle_line (GstMpeg2Subt * mpeg2subt, guchar * buffer, RLE_state * state)
 }
 
 inline void
-gst_merge_uv_data (GstMpeg2Subt * mpeg2subt, guchar * buffer, RLE_state * state)
+gst_merge_uv_data (GstMpeg2Subt * mpeg2subt, guchar * buffer,
+		   RLE_state * state)
 {
   gint x;
   guchar *target_V;
@@ -706,9 +786,10 @@ gst_merge_uv_data (GstMpeg2Subt * mpeg2subt, guchar * buffer, RLE_state * state)
   guint16 *comp_V;
   guint16 *comp_A;
 
-  /* The compositing buffers should contain the results of accumulating 2 scanlines of 
-   * U, V (premultiplied) and A data. Merge them back into their output buffers at 
-   * half width/height.
+  /* The compositing buffers should contain the results of
+   * accumulating 2 scanlines of U, V (premultiplied) and A
+   * data. Merge them back into their output buffers at half
+   * width/height.
    */
   target_U = state->target_U;
   target_V = state->target_V;
@@ -747,11 +828,19 @@ gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt, GstBuffer * buf)
   gint Y_stride;
   gint UV_stride;
 
-  guchar *buffer = GST_BUFFER_DATA (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt));
+  guchar *buffer;
+  guint16 data_size;
   RLE_state state;
 
-  /* Set up the initial offsets, remembering the half-res size for UV in I420 packing
-   * see http://www.fourcc.org for details
+  if (!mpeg2subt->current_buf) {
+    return;
+  }
+
+  buffer = GST_BUFFER_DATA (mpeg2subt->current_buf);
+  data_size = GST_READ_UINT16_BE (buffer);
+
+  /* Set up the initial offsets, remembering the half-res size for UV
+   * in I420 packing see http://www.fourcc.org for details
    */
   Y_stride = mpeg2subt->in_width;
   UV_stride = (mpeg2subt->in_width + 1) / 2;
@@ -793,7 +882,7 @@ gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt, GstBuffer * buf)
   memset (mpeg2subt->out_buffers[2], 0, sizeof (guint16) * Y_stride);
 
   /* Now draw scanlines until we hit state.clip_bottom or end of RLE data */
-  for (; ((state.offset[1] < mpeg2subt->data_size + 2) &&
+  for (; ((state.offset[1] < data_size + 2) &&
 	  (state.y <= mpeg2subt->bottom)); state.y++) {
     gst_draw_rle_line (mpeg2subt, buffer, &state);
     if (state.id) {
@@ -821,25 +910,20 @@ gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt)
 {
   GstBuffer *out_buf;
 
-  if ((mpeg2subt->last_frame) &&
-      (GST_MPEG2SUBT_CURRENT_SUBT (mpeg2subt)) &&
-      ((mpeg2subt->forced_display && (mpeg2subt->current_button != 0)))) {
-    GST_DEBUG_OBJECT (mpeg2subt, "Updating still frame");
+  if (mpeg2subt->last_frame == NULL) {
+    return;
+  }
 
-    if (g_queue_get_length (mpeg2subt->subt_queue) > 1) {
-      /* New subtitle packets arriving while the still frame was
-         displayed, stay with the last one. */
-      while (g_queue_get_length (mpeg2subt->subt_queue) > 1) {
-        gst_buffer_unref (GST_BUFFER (g_queue_pop_head (mpeg2subt->subt_queue)));
-      }
-      gst_mpeg2subt_parse_header (mpeg2subt);
-    }
+  gst_mpeg2subt_update (mpeg2subt,
+			GST_BUFFER_TIMESTAMP (mpeg2subt->last_frame));
+
+  if (mpeg2subt->last_frame && mpeg2subt->forced_display) {
+    GST_DEBUG_OBJECT (mpeg2subt, "Updating still frame");
 
     /* Force the video sink to show this frame instantly. */
     out_buf = gst_buffer_copy (mpeg2subt->last_frame);
     gst_mpeg2subt_merge_title (mpeg2subt, out_buf);
 
-    /* Force the video sink to show this frame instantly. */
     GST_BUFFER_TIMESTAMP (out_buf) = 0L;
 
     GST_INFO_OBJECT (mpeg2subt, "Pushing frame with timestamp %0.3fs",
@@ -860,10 +944,6 @@ gst_mpeg2subt_handle_subtitle (GstMpeg2Subt * mpeg2subt, GstData * _data)
     guchar *data;
     glong size = 0;
 
-    GST_DEBUG_OBJECT (mpeg2subt,
-        "Got subtitle buffer, pts " GST_TIME_FORMAT,
-        GST_TIME_ARGS (GST_BUFFER_TIMESTAMP (buf)));
-
     /* deal with partial frame from previous buffer */
     if (mpeg2subt->partialbuf) {
       GstBuffer *merge;
@@ -883,14 +963,20 @@ gst_mpeg2subt_handle_subtitle (GstMpeg2Subt * mpeg2subt, GstData * _data)
       packet_size = GST_READ_UINT16_BE (data);
 
       if (packet_size == size) {
+	if (GST_BUFFER_TIMESTAMP (mpeg2subt->partialbuf) !=
+	    GST_CLOCK_TIME_NONE) {
+	  GST_DEBUG_OBJECT (mpeg2subt,
+			    "Got subtitle buffer, pts " GST_TIME_FORMAT,
+			    GST_TIME_ARGS (GST_BUFFER_TIMESTAMP
+					   (mpeg2subt->partialbuf)));
+	} else {
+	  GST_DEBUG_OBJECT (mpeg2subt, "Got subtitle buffer, no pts");
+	}
         GST_LOG_OBJECT (mpeg2subt, "Subtitle packet size %d, current size %ld",
-            packet_size, size);
+			packet_size, size);
 
         g_queue_push_tail (mpeg2subt->subt_queue, mpeg2subt->partialbuf);
         mpeg2subt->partialbuf = NULL;
-
-        /* Just in case the queue was empty before inserting... */
-        gst_mpeg2subt_parse_header (mpeg2subt);
       }
     }
 
@@ -901,7 +987,8 @@ gst_mpeg2subt_handle_subtitle (GstMpeg2Subt * mpeg2subt, GstData * _data)
         gst_mpeg2subt_flush_subtitle (mpeg2subt);
         break;
       case GST_EVENT_ANY:
-        GST_LOG_OBJECT (mpeg2subt, "DVD event on subtitle pad with timestamp %llu",
+        GST_LOG_OBJECT (mpeg2subt,
+			"DVD event on subtitle pad with timestamp %llu",
             GST_EVENT_TIMESTAMP (GST_EVENT (_data)));
         gst_mpeg2subt_handle_dvd_event (mpeg2subt, GST_EVENT (_data), TRUE);
         break;
@@ -952,9 +1039,18 @@ gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt)
   while (!g_queue_is_empty (mpeg2subt->subt_queue)) {
     gst_buffer_unref (GST_BUFFER (g_queue_pop_head (mpeg2subt->subt_queue)));
   }
-  mpeg2subt->start_display_time = GST_CLOCK_TIME_NONE;
-  mpeg2subt->end_display_time = GST_CLOCK_TIME_NONE;
+
+  mpeg2subt->cur_cmds = NULL;
+  mpeg2subt->cur_cmds_buf = NULL;
+  mpeg2subt->cur_cmds_time = GST_CLOCK_TIME_NONE;
+
+  if (mpeg2subt->current_buf) {
+    gst_buffer_unref (mpeg2subt->current_buf);
+    mpeg2subt->current_buf = NULL;
+  }
+  mpeg2subt->display = FALSE;
   mpeg2subt->forced_display = FALSE;
+
   memset (mpeg2subt->current_clut, 0, 16 * sizeof (guint32));
   memset (mpeg2subt->subtitle_index, 0, sizeof (mpeg2subt->subtitle_index));
   memset (mpeg2subt->menu_index, 0, sizeof (mpeg2subt->menu_index));
@@ -996,12 +1092,14 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     mpeg2subt->clip_bottom = ey;
     for (i = 0; i < 4; i++) {
       mpeg2subt->menu_alpha[i] = ((guint32) (palette) >> (i * 4)) & 0x0f;
-      mpeg2subt->menu_index[i] = ((guint32) (palette) >> (16 + (i * 4))) & 0x0f;
+      mpeg2subt->menu_index[i] =
+	((guint32) (palette) >> (16 + (i * 4))) & 0x0f;
     }
     gst_mpeg2subt_setup_highlight_palette (mpeg2subt);
 
-    GST_DEBUG_OBJECT (mpeg2subt, "New button activated clip=(%d,%d) to (%d,%d) palette 0x%x", sx,
-        sy, ex, ey, palette);
+    GST_DEBUG_OBJECT (mpeg2subt,
+		      "New button activated clip=(%d,%d) to "
+		      "(%d,%d) palette 0x%x", sx, sy, ex, ey, palette);
 
     gst_mpeg2subt_update_still_frame (mpeg2subt);
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-clut-change")) {

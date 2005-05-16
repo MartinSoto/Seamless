@@ -44,7 +44,7 @@ extern "C" {
 typedef struct _GstMpeg2Subt GstMpeg2Subt;
 typedef struct _GstMpeg2SubtClass GstMpeg2SubtClass;
 
-/* Hold premultimplied colour values */
+/* Hold premultiplied colour values */
 typedef struct YUVA_val {
   guint16 Y;
   guint16 U;
@@ -59,42 +59,52 @@ struct _GstMpeg2Subt {
 
   GstBuffer *partialbuf;	/* Collect together subtitle buffers
                                    until we have a full control
-                                   sequence */
+                                   sequence. */
   GQueue *subt_queue;		/* Queue of subtitle control sequences
-                                   pending for display */
-  GstBuffer *last_frame;	/* Last video frame seen */
+                                   pending for display. */
+  GstBuffer *last_frame;	/* Last video frame seen. */
 
-  guint16 packet_size;
-  guint16 data_size;
+  guchar *cur_cmds;		/* Block of SPU commands to
+				   execute next. */
+  GstBuffer *cur_cmds_buf;	/* Buffer containing the cur_cmds
+				   block. */
+  GstClockTime cur_cmds_time;	/* Time at which the current command
+				   block must be executed. */
 
-  gint offset[2];
+  GstBuffer *current_buf;	/* The packet containing the currently
+				   active SPU image. */
+  gint offset[2];		/* Offsets in the packet of the top
+				   and bottom fields of the SPU
+				   image. */
+
+  gboolean display;		/* TRUE if the current SPU image
+				   should be displayed. */
+  gboolean forced_display;	/* TRUE if menu forced display was
+				   activated. */
 
   /* 
    * Store 1 line width of U, V and A respectively.
    * Y is composited direct onto the frame.
    */
   guint16 *out_buffers[3];
-  guchar subtitle_index[4];
-  guchar menu_index[4];
-  guchar subtitle_alpha[4];
-  guchar menu_alpha[4];
 
-  guint32 current_clut[16];
+  guint32 current_clut[16];	/* Color LookUp Table. */
+
+  guchar subtitle_index[4];	/* Standard color palette. */
+  guchar menu_index[4];		/* Highlight color palette. */
+  guchar subtitle_alpha[4];	/* Standard alpha palette. */
+  guchar menu_alpha[4];		/* Highlight alpha palette. */
 
   /* Keep premultiplied color values. */
   YUVA_val palette_cache[4];
   YUVA_val highlight_palette_cache[4];
 
-  gboolean forced_display;
-
-  GstClockTime current_time;
-
-  GstClockTime start_display_time;
-  GstClockTime end_display_time;
-  gint left, top, 
-      right, bottom;
-  gint clip_left, clip_top, 
-      clip_right, clip_bottom;
+  gint left, top,
+    right, bottom;		/* Current SPU image position and
+				   size. */
+  gint clip_left, clip_top,
+    clip_right, clip_bottom;	/* Highlight area position and
+				   size. */
 
   gint in_width, in_height;
   gint current_button;
