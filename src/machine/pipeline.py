@@ -102,6 +102,7 @@ class Pipeline(object):
 
                  'audio',
                  'subpicture',
+                 'subpictureHide',
                  'clut',
                  'area',
                  'button',
@@ -128,6 +129,7 @@ class Pipeline(object):
         # Initialize the pipeline state variables:
         self.audio = None
         self.subpicture = None
+        self.subpicture = False
         self.clut = None
         self.area = None
         self.button = None
@@ -341,13 +343,22 @@ class Pipeline(object):
 
         self.sendEvent(events.audio(self.audio))
 
-    def setSubpicture(self, phys):
-        """Set the physical subpicture stream to 'phys'."""
-        if self.subpicture == phys:
+    def setSubpicture(self, phys, hide):
+        """Set the physical subpicture stream to `phys`.
+
+        If `hide` is `True` the stream will be hidden and only shown
+        when forced display is set by the SPU packet."""
+        if self.subpicture == phys and self.subpictureHide == hide:
             return
         self.subpicture = phys
+        self.subpictureHide = hide
 
         self.sendEvent(events.subpicture(self.subpicture))
+
+        if self.subpictureHide:
+             self.sendEvent(events.subpictureHide())
+        else:
+             self.sendEvent(events.subpictureShow())
 
     def setSubpictureClut(self, clut):
         """Set the subpicture color lookup table to 'clut'.

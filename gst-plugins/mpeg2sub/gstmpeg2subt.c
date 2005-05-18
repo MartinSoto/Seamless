@@ -256,6 +256,7 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt)
 
   mpeg2subt->current_buf = NULL;
   mpeg2subt->display = FALSE;
+  mpeg2subt->hide = FALSE;
   mpeg2subt->forced_display = FALSE;
 
   memset (mpeg2subt->current_clut, 0, 16 * sizeof (guint32));
@@ -357,7 +358,8 @@ gst_mpeg2subt_handle_video (GstMpeg2Subt * mpeg2subt, GstData * _data)
 
     gst_mpeg2subt_update (mpeg2subt, GST_BUFFER_TIMESTAMP (out_buf));
 
-    if (mpeg2subt->forced_display || mpeg2subt->display) {
+    if ((!mpeg2subt->hide && mpeg2subt->display) ||
+	mpeg2subt->forced_display) {
       /* Merge the current subtitle. */
       out_buf = gst_buffer_copy_on_write (out_buf);
       gst_mpeg2subt_merge_title (mpeg2subt, out_buf);
@@ -1119,8 +1121,7 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     }
 
     gst_mpeg2subt_update_still_frame (mpeg2subt);
-  } else if ((from_sub_pad && !strcmp (event_type, "dvd-spu-stream-change"))
-      || (from_sub_pad && !strcmp (event_type, "dvd-spu-reset-highlight"))) {
+  } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-reset-highlight")) {
     /* Turn off forced highlight display */
     mpeg2subt->current_button = 0;
     mpeg2subt->clip_left = mpeg2subt->left;
@@ -1129,6 +1130,10 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     mpeg2subt->clip_bottom = mpeg2subt->bottom;
     GST_LOG_OBJECT (mpeg2subt, "Clearing button state");
     gst_mpeg2subt_update_still_frame (mpeg2subt);
+  } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-hide")) {
+    mpeg2subt->hide = TRUE;
+  } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-show")) {
+    mpeg2subt->hide = FALSE;
   } else if (!from_sub_pad && !strcmp (event_type, "dvd-spu-still-frame")) {
     /* Handle a still frame */
     GST_DEBUG_OBJECT (mpeg2subt, "Received still frame notification");

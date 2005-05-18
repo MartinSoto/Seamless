@@ -1,3 +1,26 @@
+2005-05-19  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/pipelinecmds.py (SetSubpicture): Add parameter
+	'hide' to SetSubpicture operation.
+
+	* src/machine/pipeline.py (Pipeline.__slots__): New attribute
+	subpicture hide. Indicates if the current subpicture stream is
+	hidden.
+	(Pipeline.__init__, Pipeline.setSubpicture): Send
+	subpictureHide/Show events after setting a subpicture stream.
+
+	* src/machine/machine.py (VirtualMachine.updateSubpicture): 
+	Send hide subpicture information.
+
+	* src/machine/events.py (subpictureHide, subpictureShow): New
+	events.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_handle_video, gst_mpeg2subt_handle_dvd_event): 
+	Add support for hidden subpicture streams that are only shown with
+	forced display.
+
 2005-05-17  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 

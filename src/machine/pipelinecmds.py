@@ -78,8 +78,9 @@ class SetAudio(PipelineCmd):
 
 
 class SetSubpicture(PipelineCmd):
-    """When constructed with parameter list `(phys)`, set the physical
-    subpicture stream to 'phys'."""
+    """When constructed with parameter list `(phys, hide)`, set the
+    physical subpicture stream to `phys` and hide it if `hide` is
+    `True`."""
     __slots__ = ()
     methodName = 'setSubpicture'
 

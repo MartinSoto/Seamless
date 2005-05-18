@@ -100,3 +100,18 @@ def subpicture(physical):
     st.set_value('event', 'dvd-spu-stream-change')
     st.set_value('physical', physical, 'int')
     return gst.event_new_any(st)
+
+def subpictureHide():
+    """Create and return a new subpicture hide event."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-spu-hide')
+
+    return gst.event_new_any(st)
+
+def subpictureShow():
+    """Create and return a new subpicture show event."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-spu-show')
+
+    return gst.event_new_any(st)
+

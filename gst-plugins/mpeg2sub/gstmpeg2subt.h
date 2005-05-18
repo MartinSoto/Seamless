@@ -79,6 +79,9 @@ struct _GstMpeg2Subt {
 
   gboolean display;		/* TRUE if the current SPU image
 				   should be displayed. */
+  gboolean hide;		/* TRUE if subpictures should be
+				   hidden and only shown when forced
+				   display is active. */
   gboolean forced_display;	/* TRUE if menu forced display was
 				   activated. */
 

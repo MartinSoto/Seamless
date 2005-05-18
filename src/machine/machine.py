@@ -733,16 +733,19 @@ class VirtualMachine(object):
         # Determine the logical stream.
         if programChain == None:
             logical = 0
+            hide = False
         elif self.inMenu():
             # In the menu domain the logical subpicture is always 1.
             logical = 1
-        elif self.subpicture & 0x40 == 0 or \
-             self.subpicture & 0x3f > 31:
+            hide = True
+        elif self.subpicture & 0x3f > 31:
             # We aren't playing a program chain, or the logical
             # subpicture is explicitly set to none.
             logical = 0
+            hide = False
         else:
             logical = (self.subpicture & 0x1f) + 1
+            hide = (self.subpicture & 0x40) == 0
 
         # Retrieve the physical streams tuple, if possible.
         if logical > 0:
@@ -765,7 +768,7 @@ class VirtualMachine(object):
                     physical = streams[dvdread. \
                                        SUBPICTURE_PHYS_TYPE_LETTERBOX]
 
-        yield cmds.SetSubpicture(physical)
+        yield cmds.SetSubpicture(physical, hide)
 
     def updateHighlight(self):
         """Send a highlight event corresponding to the current
