@@ -1248,28 +1248,26 @@ class ProgramChainPlayer(object):
                            playBlock(self.programChain.cellCommands,
                                      self.cell.commandNr))
 
-        if cellNr >= self.programChain.cellCount:
+        if (self.cell.blockMode == \
+            dvdread.CELL_BLOCK_MODE_ANGLE_FIRST or \
+            self.cell.blockMode == \
+            dvdread.CELL_BLOCK_MODE_ANGLE_MIDDLE):
+            # We just finished playing a cell in an angle
+            # group. Skip to the end.
+            cellNr += 1
+            nextMode = self.programChain.getCell(cellNr).blockMode
+            while nextMode != dvdread.CELL_BLOCK_MODE_ANGLE_LAST:
+                cellNr += 1
+                nextMode = self.programChain.getCell(cellNr).blockMode
+
+        # Progress to the next cell in sequence.
+        cellNr += 1
+
+        if cellNr > self.programChain.cellCount:
             # No more cells. Play the "tail".
             yield Chain(self.linkTailProgramChain())
         else:
-            # Go to the next cell.
-            if (self.cell.blockMode == \
-                dvdread.CELL_BLOCK_MODE_ANGLE_FIRST or \
-                self.cell.blockMode == \
-                dvdread.CELL_BLOCK_MODE_ANGLE_MIDDLE):
-                # We just finished playing a cell in an angle
-                # group. Skip to the end.
-                nextCellNr = cellNr + 1
-                nextMode = self.programChain.getCell(nextCellNr).blockMode
-                while nextMode == dvdread.CELL_BLOCK_MODE_ANGLE_MIDDLE or \
-                      nextMode == dvdread.CELL_BLOCK_MODE_ANGLE_LAST:
-                    nextCellNr += 1
-                    nextMode = self.programChain. \
-                               getCell(nextCellNr).blockMode
-                yield Chain(self.linkCell(nextCellNr))
-            else:
-                # Just play the next cell in sequence.
-                yield Chain(self.linkCell(cellNr + 1))
+            yield Chain(self.linkCell(cellNr))
 
     @restartPoint
     def linkTopCell(self):
