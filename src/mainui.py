@@ -33,6 +33,7 @@ import pygtk
 pygtk.require('2.0')
 import gtk
 
+import debug
 import dvdplayer
 import videowidget
 
@@ -148,6 +149,8 @@ class MainUserInterface(object):
             self.player.nextAudioStream()
         elif keyName == 'F3':
             self.player.nextAngle()
+        elif event.state == gtk.gdk.SHIFT_MASK and keyName == 'F12':
+            debug.debugConsoleAsync(self.player)
 
         return False
 
