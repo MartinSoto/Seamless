@@ -67,6 +67,9 @@ struct _DVDBlockSrc {
                            from file start). */
   int block_count;	/* Number of blocks yet to read. */
 
+  gboolean cancel_vobu;	/* If set to TRUE, cancel reading of the
+			   current VOBU. */
+
   gchar *open_location;	/* Path to the currently opened DVD location. */
   int open_title_num;	/* Title number of the currently opened file. */
   dvd_read_domain_t open_domain;

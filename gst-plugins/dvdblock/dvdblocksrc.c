@@ -60,7 +60,7 @@ enum {
   ARG_TITLE,
   ARG_DOMAIN,
   ARG_VOBU_START,
-  ARG_BLOCK_COUNT,
+  ARG_CANCEL_VOBU,
 };
 
 
@@ -227,10 +227,10 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
           "file (as specified by 'title' and 'domain') to "
           "start of next VOBU to read",
           -1, G_MAXINT, -1, G_PARAM_READWRITE));
-  g_object_class_install_property (gobject_class, ARG_BLOCK_COUNT,
-      g_param_spec_int ("block-count", "block-count",
-          "Number of blocks still to read in this VOBU",
-          0, G_MAXINT, 0, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, ARG_CANCEL_VOBU,
+      g_param_spec_boolean ("cancel-vobu", "cancel-vobu",
+          "If set to TRUE, cancel reading of the current VOBU",
+          FALSE, G_PARAM_READWRITE));
 
   gobject_class->set_property = dvdblocksrc_set_property;
   gobject_class->get_property = dvdblocksrc_get_property;
@@ -261,6 +261,8 @@ dvdblocksrc_init (DVDBlockSrc *src)
 
   src->block_offset = 0;
   src->block_count = 0;
+
+  src->cancel_vobu = FALSE;
 
   src->open_location = NULL;
   src->open_title_num = -1;
@@ -314,8 +316,8 @@ dvdblocksrc_set_property (GObject *object, guint prop_id,
     case ARG_VOBU_START:
       src->vobu_start = g_value_get_int (value);
       break;
-    case ARG_BLOCK_COUNT:
-      src->block_count = g_value_get_int (value);
+    case ARG_CANCEL_VOBU:
+      src->cancel_vobu = g_value_get_boolean (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -347,8 +349,8 @@ dvdblocksrc_get_property (GObject *object, guint prop_id,
     case ARG_VOBU_START:
       g_value_set_int (value, src->vobu_start);
       break;
-    case ARG_BLOCK_COUNT:
-      g_value_set_int (value, src->block_count);
+    case ARG_CANCEL_VOBU:
+      g_value_set_boolean (value, src->cancel_vobu);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -450,6 +452,13 @@ dvdblocksrc_loop (GstElement *element)
         dvdblocksrc_signals[VOBU_HEADER_SIGNAL], 0, buf);
 
     gst_pad_push (src->src, GST_DATA (buf));
+  }
+
+  if (src->cancel_vobu) {
+    /* VOBU reading was canceled. */
+    src->block_count = 0;
+    src->cancel_vobu = FALSE;
+    return;
   }
 
   /* Some VOBUs contain only the header. src->block_count could be 0

@@ -1,3 +1,21 @@
+2005-05-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/pipelinecmds.py (AcceptVobu): Define as a real class
+	instead of an alias of DoNothing.
+
+	* src/machine/pipeline.py (Pipeline.vobuHeader)
+	(Pipeline.cancelVobu): Use the new cancle-vobu property in the
+	source.
+
+	* gst-plugins/dvdblock/dvdblocksrc.h: 
+	* gst-plugins/dvdblock/dvdblocksrc.c (dvdblocksrc_class_init)
+	(dvdblocksrc_init, dvdblocksrc_set_property)
+	(dvdblocksrc_get_property, dvdblocksrc_loop): Add new property
+	cancel-vobu that, when set to TRUE, stops the reading of the
+	current VOBU. This replaces the old trick of setting block_count
+	to 0, which, under certain conditions could cause an infinite
+	loop. Property block-count completely eliminated.
+
 2005-05-21  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/mainui.py (MainUserInterface.mainKeyPress): Activate the

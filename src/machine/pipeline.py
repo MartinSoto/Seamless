@@ -216,9 +216,10 @@ class Pipeline(object):
         self.machine.setCurrentNav(nav)
 
         # Read the confirm/cancel operation and execute it.
-        self.mainItr.next()(self)
-
-        if self.src.get_property('block-count') == 0:
+        cmd = self.mainItr.next()
+        cmd(self)
+        
+        if isinstance(cmd, cmds.CancelVobu):
             # VOBU playback was cancelled.
             return
 
@@ -332,8 +333,7 @@ class Pipeline(object):
 
         This forces the source to immediatly ask for more work by
         firing the `vobu-read` singnal."""
-        # Setting the current block count to 0 does the trick.
-        self.src.set_property('block-count', 0)
+        self.src.set_property('cancel-vobu', True)
 
     def setAudio(self, phys):
         """Set the physical audio stream to 'phys'."""
