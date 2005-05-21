@@ -121,8 +121,8 @@ class VirtualMachine(object):
         # Current logical audio and subpicture streams and current
         # angle. The values follow the conventions of system registers
         # 1, 2, and 3, respectively.
-        self.audio = 0		# This seems to be needed by some DVDs.
-        self.subpicture = 0x3e	# None
+        self.audio = 0		# Audio stream 0.
+        self.subpicture = 0	# Subpicture stream 0, hidden.
         self.angle = 1
 
         # Machine options and state:

@@ -1,3 +1,10 @@
+2005-05-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/machine.py (VirtualMachine.__init__): Initialize
+	the subpicture register with value 0 (stream 0, hidden) instead of
+	62 (no stream selected). Fixes specials menu not showing a
+	highlight in Lola Rennt.
+
 2005-05-19  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (ProgramChainPlayer.linkCell): Fix crash
