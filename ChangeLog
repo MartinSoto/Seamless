@@ -1,5 +1,11 @@
 2005-05-22  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (ProgramChainPlayer.linkCell): Properly
+	handle the case where the cell number is out of range. Introduced
+	while correcting angle playback.
+
+2005-05-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/pipelinecmds.py (AcceptVobu): Define as a real class
 	instead of an alias of DoNothing.
 

@@ -1248,20 +1248,20 @@ class ProgramChainPlayer(object):
                            playBlock(self.programChain.cellCommands,
                                      self.cell.commandNr))
 
-        if (self.cell.blockMode == \
-            dvdread.CELL_BLOCK_MODE_ANGLE_FIRST or \
-            self.cell.blockMode == \
-            dvdread.CELL_BLOCK_MODE_ANGLE_MIDDLE):
-            # We just finished playing a cell in an angle
-            # group. Skip to the end.
-            cellNr += 1
-            nextMode = self.programChain.getCell(cellNr).blockMode
-            while nextMode != dvdread.CELL_BLOCK_MODE_ANGLE_LAST:
+            if self.cell.blockMode == \
+               dvdread.CELL_BLOCK_MODE_ANGLE_FIRST or \
+               self.cell.blockMode == \
+               dvdread.CELL_BLOCK_MODE_ANGLE_MIDDLE:
+                # We just finished playing a cell in an angle
+                # group. Skip to the end.
                 cellNr += 1
                 nextMode = self.programChain.getCell(cellNr).blockMode
+                while nextMode != dvdread.CELL_BLOCK_MODE_ANGLE_LAST:
+                    cellNr += 1
+                    nextMode = self.programChain.getCell(cellNr).blockMode
 
-        # Progress to the next cell in sequence.
-        cellNr += 1
+            # Progress to the next cell in sequence.
+            cellNr += 1
 
         if cellNr > self.programChain.cellCount:
             # No more cells. Play the "tail".
