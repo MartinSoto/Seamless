@@ -1,5 +1,22 @@
 2005-05-22  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/dvdplayer.py (DVDPlayer.__init__): Use the forked
+	seamless-a52dec element.
+
+	* gst-plugins/a52dec/gsta52dec.c (gst_a52dec_change_state):
+	Requeste DOLBY surround sound. This makes the decoder library
+	downmix to surround.
+	(plugin_init): Initialize the forked plugin properly.
+
+	* m4/Makefile.am (EXTRA_DIST): 
+	* gst-plugins/Makefile.am (A52DEC_DIR): 
+	* configure.ac: 
+	* gst-plugins/a52dec/Makefile.am:
+	* m4/.arch-ids/a52.m4.id:
+	Make the a52dec code compile.
+
+2005-05-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/machine.py (ProgramChainPlayer.linkCell): Properly
 	handle the case where the cell number is out of range. Introduced
 	while correcting angle playback.

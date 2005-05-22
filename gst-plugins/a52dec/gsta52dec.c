@@ -24,7 +24,7 @@
 #include <string.h>
 
 #include <stdlib.h>
-#include "_stdint.h"
+#include <stdint.h>
 
 #include <gst/gst.h>
 #include <gst/audio/multichannel.h>
@@ -522,8 +522,7 @@ gst_a52dec_change_state (GstElement * element)
       a52dec->bit_rate = -1;
       a52dec->sample_rate = -1;
       a52dec->stream_channels = A52_CHANNEL;
-      a52dec->request_channels = A52_3F2R | A52_LFE;
-      //a52dec->request_channels = A52_DOLBY;
+      a52dec->request_channels = A52_DOLBY;
       a52dec->using_channels = A52_CHANNEL;
       a52dec->level = 1;
       a52dec->bias = 0;
@@ -601,7 +600,7 @@ plugin_init (GstPlugin * plugin)
   if (!gst_library_load ("gstaudio"))
     return FALSE;
 
-  if (!gst_element_register (plugin, "a52dec", GST_RANK_PRIMARY,
+  if (!gst_element_register (plugin, "seamless-a52dec", GST_RANK_PRIMARY,
           GST_TYPE_A52DEC))
     return FALSE;
 
@@ -610,6 +609,8 @@ plugin_init (GstPlugin * plugin)
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    "a52dec",
-    "Decodes ATSC A/52 encoded audio streams",
-    plugin_init, VERSION, "GPL", GST_PACKAGE, GST_ORIGIN);
+    "seamless-a52dec",
+    "Decodes ATSC A/52 encoded audio streams (patched for Seamless",
+    plugin_init, VERSION, "LGPL",
+    PACKAGE " (temporary fork from gstreamer)",
+    ORIGIN)

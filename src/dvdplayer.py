@@ -93,8 +93,8 @@ class DVDPlayer(gst.Thread):
         # The audio playback thread.
         if options.audioDecode == 'soft':
             sinkName = 'a52dec'
-            audioDecoder = 'a52dec name=%s ! audioconvert ! audioscale !' \
-                           % sinkName
+            audioDecoder = 'seamless-a52dec name=%s ! audioconvert ! ' \
+                           'audioscale !' % sinkName
         else:
             sinkName = 'audioident'
             audioDecoder = ''
