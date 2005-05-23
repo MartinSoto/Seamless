@@ -1,3 +1,10 @@
+2005-05-24  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.c (dvdblocksrc_loop): Erase
+	pending cancel requests when a VOBU is completed. Otherwise the
+	cancel request cancels the next VOBU, causing undesired effects
+	with some disks.
+
 2005-05-22  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/dvdplayer.py (DVDPlayer.__init__): Use the forked

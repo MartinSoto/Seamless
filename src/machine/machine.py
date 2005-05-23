@@ -36,7 +36,7 @@ def strToIso639(strCode):
     return ord(strCode[0]) * 0x100 + ord(strCode[1])
 
 def iso639ToStr(iso639):
-    """Decode an ISO639 country names from byte form."""
+    """Decode an ISO639 country name from byte form."""
     return chr(iso639 >> 8) + chr(iso639 & 0xff)
 
 

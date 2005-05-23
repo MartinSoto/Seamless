@@ -410,6 +410,10 @@ dvdblocksrc_loop (GstElement *element)
   if (src->block_count == 0 && src->vobu_start == -1) {
     /* No more work to do. */
 
+    /* If there's no more work, any pending cancel request must be
+       erased. */
+    src->cancel_vobu = FALSE;
+
     /* Fire the vobu_read signal to give the application a chance
        to give us more work. */
     g_signal_emit (G_OBJECT (src),
