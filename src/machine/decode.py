@@ -300,9 +300,9 @@ class CommandDecoder(object):
         elif op == 8:
             subop = cmd[5] >> 4
             if subop == 0x0:
-                yield Call(self.machine.callFirstPlay(cmd[4], 0))
+                yield Call(self.machine.callFirstPlay(cmd[4]))
             elif subop == 0x4:
-                yield Call(self.machine.callTitleMenu(cmd[4], 0))
+                yield Call(self.machine.callTitleMenu(cmd[4]))
             elif subop == 0x8:
                 yield Call(self.machine.callMenu(cmd[5] & 0xf, cmd[4]))
             elif subop == 0xc:

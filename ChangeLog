@@ -1,3 +1,11 @@
+2005-05-25  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/machine/decode.py (CommandDecoder.perform3): callFirstPlay
+	and callTitleMenu were being called with a spurious parameter,
+	which, of course, caused a crash. It is increibled how many DVDs
+	worked properly despite of this! The DVD spec is really, really
+	bloated.
+
 2005-05-24  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/dvdblock/dvdblocksrc.c (dvdblocksrc_loop): Erase
