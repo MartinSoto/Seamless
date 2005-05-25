@@ -1,5 +1,17 @@
 2005-05-25  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/pipelinecmds.py (SetAspectRatio): New method.
+
+	* src/machine/pipeline.py (Pipeline.setAspectRatio): New method.
+
+	* src/machine/machine.py (VirtualMachine.updateAspectRatio): New
+	method.
+	(ProgramChainPlayer.playProgramChain,
+	VirtualMachine.wrapCallOperation): Update the aspect ratio
+	information.
+
+2005-05-25  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/machine/decode.py (CommandDecoder.perform3): callFirstPlay
 	and callTitleMenu were being called with a spurious parameter,
 	which, of course, caused a crash. It is increibled how many DVDs

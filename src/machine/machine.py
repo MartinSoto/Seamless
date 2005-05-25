@@ -481,6 +481,7 @@ class VirtualMachine(object):
         if programChain != None:
             yield cmds.SetSubpictureClut(programChain.clut)
 
+        yield Call(self.updateAspectRatio())
         yield Call(self.updateAudio())
         yield Call(self.updateSubpicture())
         yield Call(self.updateHighlight())
@@ -694,6 +695,18 @@ class VirtualMachine(object):
     #
     # Pipeline Management and Events
     #
+
+    def updateAspectRatio(self):
+        """Set the aspect ratio based on the current video attributes."""
+        attrs = self.currentVideoAttributes()
+        if attrs == None:
+            return
+
+        if attrs.aspectRatio == dvdread.ASPECT_RATIO_4_3:
+            yield cmds.SetAspectRatio(cmds.ASPECT_RATIO_4_3)
+        elif attrs.aspectRatio == dvdread.ASPECT_RATIO_16_9:
+            yield cmds.SetAspectRatio(cmds.ASPECT_RATIO_16_9)
+
 
     def updateAudio(self):
         """Send an audio event corresponding to the current logical
@@ -1204,6 +1217,9 @@ class ProgramChainPlayer(object):
 
         # Update the color lookup table.
         yield cmds.SetSubpictureClut(self.programChain.clut)
+
+        # Update the aspect ratio.
+        yield Call(self.machine.updateAspectRatio())
 
         # Update the audio and subpicture streams.
         yield Call(self.machine.updateAudio())

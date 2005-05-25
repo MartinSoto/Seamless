@@ -335,6 +335,11 @@ class Pipeline(object):
         firing the `vobu-read` singnal."""
         self.src.set_property('cancel-vobu', True)
 
+    def setAspectRatio(self, aspectRatio):
+        """Set the display aspect ratio to `aspectRatio`."""
+        print "*** Aspect ratio set to", aspectRatio
+        pass
+
     def setAudio(self, phys):
         """Set the physical audio stream to 'phys'."""
         if self.audio == phys:

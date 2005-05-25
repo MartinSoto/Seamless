@@ -71,6 +71,17 @@ class AcceptVobu(DoNothing):
     pass
 
 
+ASPECT_RATIO_4_3 = 10
+ASPECT_RATIO_16_9 = 11
+
+class SetAspectRatio(PipelineCmd):
+    """When constructed with parameter list `(aspectRatio)`, set the
+    aspect ratio to the one specified. `aspectRatio` must be one of
+    the `ASPECT_RATIO` constants in this module."""
+    __slots__ = ()
+    methodName = 'setAspectRatio'
+
+
 class SetAudio(PipelineCmd):
     """When constructed with parameter list `(phys)`, set the physical
     audio stream to 'phys'."""
