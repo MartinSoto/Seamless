@@ -1,3 +1,37 @@
+2005-05-26  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/__init__.py:
+	* src/seamless.py: 
+	* src/player/player.py: 
+	* src/player/pipeline.py: 
+	* src/player/manager.py: 
+	* src/mainui.py: 
+	* src/machine/machine.py: 
+	* src/machine/__init__.py: 
+	* src/machine/Makefile.am (pypkg_PYTHON): 
+	* src/Makefile.am (pypkg_PYTHON): 
+	* configure.ac: 
+	The big player refactoring:
+	
+	- Move the player control functionality to a new 'player' module.
+	
+	- Shuffle module and class names to better match their
+	  functionality: Pipeline -> Manager, DVDPlayer -> Pipeline, Shell
+	  -> DVDPlayer.
+
+	- Class functionality is now more clearly defined: 
+	  Pipeline: create and manage the GStreamer pipeline.
+	  Manager: manage the interaction between virtual machine and
+	  pipeline.
+	  DVDPlayer: Offer a unified interface to the interactive player
+	  functionality.
+
+	- Clean up the way objects are instanciated and passed to other
+	objects.
+
+	- Concentrate all interactive operations in the single DVDPlayer
+	class.
+
 2005-05-25  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/pipelinecmds.py (SetAspectRatio): New method.

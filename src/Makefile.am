@@ -1,14 +1,9 @@
-SUBDIRS = dvdread machine wrapclock
+SUBDIRS = dvdread machine player wrapclock
 
 pypkgdir = $(pkglibdir)/python
 
-pypkg_PYTHON = \
-	seamless.py \
-	dvdplayer.py \
-	lirc.py \
-	loadplugins.py \
-	mainui.py \
-	videowidget.py \
-	xscreensaver.py
+pypkg_PYTHON = debug.py itersched.py lirc.py mainui.py seamless.py \
+	videowidget.py xscreensaver.py
+
 
 noinst_PYTHON = config/__init__.py

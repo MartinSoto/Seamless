@@ -27,7 +27,7 @@ from itersched import NoOp, Call, Chain, Restart, restartPoint
 import dvdread
 import decode
 import disassemble
-import pipelinecmds as cmds
+import cmds
 
 
 def strToIso639(strCode):
@@ -184,10 +184,10 @@ class VirtualMachine(object):
         """Set the current navigation packet.
 
         The machine expects this method to be called always immediatly
-        after it has yielded a `pipelinecmds.PlayVobu`
-        operation. Following the `PlayVobu`, the machine will always
-        send a single operation to cancel or to keep playing the VOBU,
-        potentially based on the contents of the packet set here.
+        after it has yielded a `cmds.PlayVobu` operation. Following
+        the `PlayVobu`, the machine will always send a single
+        operation to cancel or to keep playing the VOBU, potentially
+        based on the contents of the packet set here.
 
         This navigation packet is used strictly for navigation, i.e.,
         to determine the next position in the disc that has to be

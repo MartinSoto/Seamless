@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -41,15 +41,19 @@ def ghostify(bin, elemName, padName, ghostName=None):
     bin.add_ghost_pad(bin.get_by_name(elemName).get_pad(padName), ghostName)
 
 
-class DVDPlayer(gst.Thread):
-    """
-    """
+class Pipeline(gst.Thread):
+    """The GStreamer pipeline used to play DVDs."""
 
-    def __init__(self, options, name="player"):
+    __slots__ = ('audioIdent',
+                 'audioSink',
+                 'audioSinkElem',
+                 'clock',
+                 'dvdSrc',
+                 'videoIdent',
+                 'videoSink')
+
+    def __init__(self, options, name="dvdplayer"):
         gst.Thread.__init__(self, name)
-
-        # Create an info object for the DVD.
-        self.info = dvdread.DVDInfo(options.location)
 
         # Build the pipeline.
 
@@ -86,7 +90,6 @@ class DVDPlayer(gst.Thread):
         """ % options.videoSink)
         ghostify(self.videoSink, 'mpeg2subt', 'video')
         ghostify(self.videoSink, 'mpeg2subt', 'subtitle')
-        self.videoSinkElem = self.videoSink.get_by_name('videosink')
         self.videoIdent = self.videoSink.get_by_name('videoident')
         self.add(self.videoSink)
 
@@ -126,67 +129,43 @@ class DVDPlayer(gst.Thread):
         else:
             assert 0, 'Unexpected clock type'
         self.use_clock(self.clock)
-        
-
-        # Wrap the source element in the virtual machine.
-        self.shell = machine.MachineShell(self.info,
-                                          self.dvdSrc. \
-                                          get_by_name('dvdblocksrc'))
 
         #self.videoIdent.connect('handoff', self.identHandoff)
         #self.audioIdent.connect('handoff', self.identHandoff)
-
 
     def identHandoff(self, elem, *args):
         print "Handoff: %s" % elem.get_name()
         #pass
 
+
+    #
+    # Component Retrieval
+    #
+
+    def getBlockSource(self):
+        return self.dvdSrc.get_by_name('dvdblocksrc')
+
     def getVideoSink(self):
-        return self.videoSinkElem
+        return self.videoSink.get_by_name('videosink')
 
 
     #
-    # Player Control
+    # Playback Control
     #
-
-    def __getattr__(self, name):
-        # Make this object a proxy for the virtual machine.
-        return getattr(self.shell, name)
 
     def start(self):
         self.set_state(gst.STATE_PLAYING)
 
-    def stop(self):
-        self.shell.stop()
+    def forceStop(self):
+        self.set_state(gst.STATE_NULL)
 
-        # Wait for the pipeline to actually stop. If waiting time is
-        # too long, just give up and hope for the best.
+    def waitForStop(self):
+        """Wait for the pipeline to actually stop. If waiting time is
+        too long, just force a stop."""
         maxIter = 40
         while maxIter > 0 and self.get_state() == gst.STATE_PLAYING:
             time.sleep(0.1)
             maxIter -= 1
 
-        self.set_state(gst.STATE_NULL)
+        self.forceStop()
 
-    def backward10(self):
-        if self.shell.canPositionSeek():
-            self.shell.seekToPositionRelative(-10)
-
-    def forward10(self):
-        if self.shell.canPositionSeek():
-            self.shell.seekToPositionRelative(10)
-
-
-    def nextAudioStream(self):
-        streamNumbers = map(lambda x: x[0],
-                            self.shell.getAudioStreams())
-        if len(streamNumbers) == 0:
-            return
-
-        try:
-            pos = streamNumbers.index(self.shell.audioStream)
-        except:
-            return
-
-        self.shell.audioStream = streamNumbers[(pos + 1) % \
-                                               len(streamNumbers)]

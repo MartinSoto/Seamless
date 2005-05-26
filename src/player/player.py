@@ -16,36 +16,61 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
+import dvdread
 import machine
+import manager
+from manager import interactiveOp
 import pipeline
-from pipeline import interactiveOp
 
 from itersched import NoOp, Call
 
-import dvdread
 
-
-class MachineShell(object):
-    """External interface to interactively control the DVD virtual
-    machine and query its state."""
+class DVDPlayer(object):
+    """Main interface to interactively control the DVD playback system
+    and query its state."""
 
     __slots__ = ('info',
-                 'src',
                  'machine',
-                 'pipeline')
+                 'pipeline',
+                 'manager')
 
-    def __init__(self, info, src):
-        self.info = info
-        self.src = src
+    def __init__(self, options):
+        # Create an info object for the DVD.
+        self.info = dvdread.DVDInfo(options.location)
 
-        # Create the machine and pipeline objects. Both objects will
-        # be sent into motion as soon as the src object is activated.
-        self.machine = machine.VirtualMachine(info)
-        self.pipeline = pipeline.Pipeline(src, self.machine)
+        # Create the machine, pipeline and manager objects. All
+        # objects will be set into motion as soon as the source object
+        # in the pipeline is activated.
+        self.machine = machine.VirtualMachine(self.info)
+        self.pipeline = pipeline.Pipeline(options)
+        self.manager = manager.Manager(self.machine, self.pipeline)
+
+    def getDVDInfo(self):
+        return self.info
+
+    def getVideoSink(self):
+        return self.pipeline.getVideoSink()
+
+
+    #
+    # Basic Playback Control
+    #
+
+    def start(self):
+        self.pipeline.start()
 
     @interactiveOp
-    def stop(self):
+    def stopMachine(self):
         yield Call(self.machine.exit())
+
+    def stop(self):
+        self.stopMachine()
+        self.pipeline.waitForStop()
+
+
+    #
+    # Program Navigation
+    #
 
     @interactiveOp
     def prevProgram(self):
@@ -94,20 +119,27 @@ class MachineShell(object):
             yield Call(self.machine. \
                        seekToPosition(currentTime + seconds))
 
+    def backward10(self):
+        if self.canPositionSeek():
+            self.seekToPositionRelative(-10)
+
+    def forward10(self):
+        if self.canPositionSeek():
+            self.seekToPositionRelative(10)
+
 
     #
     # Stream Control
     #
 
-    def getAudioStream(self):
-        return None
-
     def setAudioStream(self, logical):
         pass
-    audioStream = property(getAudioStream, setAudioStream)
 
     def getAudioStreams(self):
         return None
+
+    def nextAudioStream(self):
+        pass
 
 
     #
@@ -185,18 +217,7 @@ class MachineShell(object):
 
     @interactiveOp
     def menu(self):
-        programChain = self.machine.currentProgramChain()
-        if programChain == None or \
-               isinstance(programChain.container, dvdread.LangUnit):
+        if self.machine.inMenu():
             return
 
         yield Call(self.machine.callMenu(dvdread.MENU_TYPE_ROOT, 0))
-
-    @interactiveOp
-    def rtn(self):
-        yield NoOp
-
-    @interactiveOp
-    def force(self):
-        yield NoOp
-

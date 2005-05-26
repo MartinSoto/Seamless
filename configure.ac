@@ -148,6 +148,7 @@ AC_OUTPUT([
   src/Makefile
   src/dvdread/Makefile
   src/machine/Makefile
+  src/player/Makefile
   src/wrapclock/Makefile
 ])
 

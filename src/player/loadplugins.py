@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -16,6 +16,26 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-from machine import VirtualMachine
+import config
 
-from cmds import *
+import os
+import sys
+
+import gst
+
+# Loaded plugins must be kept in a list in order to guarantee that
+# they are not freed before the end of the execution of the whole
+# program.
+pluginList = []
+
+# Search for all plugin files and try to register them.
+for root, dirs, files in os.walk(config.gstPlugins):
+   for file in files:
+      if file[-len(config.pluginSuffix):] == config.pluginSuffix:
+         plugin = gst.plugin_load_file(os.path.join(root, file))
+         if plugin:
+            pluginList.append(plugin)
+            gst.registry_pool_add_plugin(plugin)
+
+# Don't export any actual symbols.
+__all__ = []

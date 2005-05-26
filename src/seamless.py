@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -47,7 +47,7 @@ import gst
 
 sys.argv.extend(helpOpts)
 
-import dvdplayer
+import player
 import mainui
 
 def main():
@@ -109,8 +109,8 @@ def main():
         gst.scheduler_factory_set_default_name('fairgthread')
 
     # Create the main objects.
-    player = dvdplayer.DVDPlayer(options)
-    appInstance = mainui.MainUserInterface(player, options)
+    playerObj = player.DVDPlayer(options)
+    appInstance = mainui.MainUserInterface(playerObj, options)
 
     gtk.main()
 

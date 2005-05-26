@@ -27,19 +27,19 @@ import itersched
 
 import dvdread
 import events
-import pipelinecmds as cmds
+import machine
 
 
 def interactiveOp(method):
     """Turns an `itersched` runnable generator method into an
     interactive operation, that will be executed as soon as possible
     on the pipeline. Any class using this decorator must have a
-    `pipeline`attribute pointing to an adeuate `Pipeline`instance.
+    `manager`attribute pointing to an adequate `Manager` instance.
 
     `method` will be wrapped to be run using the `runInteractive`
     method in the pipeline object."""
     def wrapper(self, *args, **keywords):
-        self.pipeline.runInteractive(method(self, *args, **keywords))
+        self.manager.runInteractive(method(self, *args, **keywords))
 
     return wrapper
 
@@ -57,8 +57,9 @@ def synchronized(method):
     return wrapper
 
 
-class Pipeline(object):
-    """The object in charge of managing the playback pipeline.
+class Manager(object):
+    """The object in charge of managing the interaction between the
+    machine and the playback pipeline.
 
     The playback pipeline reads material from the disc and processes
     it by demultiplexing it and sending the resulting streams to the
@@ -70,9 +71,9 @@ class Pipeline(object):
     activation of highlights are controlled by the DVD virtual
     machine. In this implementation, the virtual machine produces a
     sequence of command objects (as an iterator) that, when invoked
-    with the pipeline as parameter, perform the required operations
-    The machine is restricted to use the operations defined in module
-    'pipelinecmds'.
+    with the manager as parameter, perform the required operations The
+    machine is restricted to use the operations defined in the
+    `machine` module.
 
     The `PlayVobu` operation is particularly important, since it is
     used by the machine to tell the pipeline which VOBU from the disk
@@ -95,8 +96,10 @@ class Pipeline(object):
     until it is clear whether the interactive operation was completed,
     or a flush-requiring operation was triggered."""
 
-    __slots__ = ('src',
+    __slots__ = ('pipeline',
                  'machine',
+
+                 'src',
                  'mainItr',
                  'lock',
 
@@ -113,9 +116,11 @@ class Pipeline(object):
                  'interactiveCount')
 
 
-    def __init__(self, src, machine):
-        self.src = src
+    def __init__(self, machine, pipeline):
         self.machine = machine
+        self.pipeline = pipeline
+
+        self.src = pipeline.getBlockSource()
 
         self.mainItr = iter(self.machine)
 
@@ -123,10 +128,10 @@ class Pipeline(object):
         self.lock = threading.RLock()
 
         # Connect our signals to the source object.
-        src.connect('vobu-read', self.vobuRead)
-        src.connect('vobu-header', self.vobuHeader)
+        self.src.connect('vobu-read', self.vobuRead)
+        self.src.connect('vobu-header', self.vobuHeader)
 
-        # Initialize the pipeline state variables:
+        # Initialize the manager state variables:
         self.audio = None
         self.subpicture = None
         self.subpicture = False
@@ -135,17 +140,17 @@ class Pipeline(object):
         self.button = None
         self.palette = None
 
-        # A list of pipeline commands that where already read from the
+        # A list of machine commands that where already read from the
         # machine, but haven't yet been executed.
         self.pendingCmds = []
 
-        # If true, events will be sent directly down the pipeline,
+        # When true, events will be sent directly down the pipeline,
         # instead of being queued in the source element.
         self.immediate = False
 
         # A counter that increments itself whenever an interactive
         # operation is executed. It is used to deal with call/resume
-        # operations an pipeline flushing.
+        # operations and pipeline flushing.
         self.interactiveCount = 0
 
     def sendEvent(self, event):
@@ -165,8 +170,8 @@ class Pipeline(object):
         events = []
         for cmd in self.mainItr:
             events.append(cmd)
-            if isinstance(cmd, cmds.PlayVobu) or \
-               isinstance(cmd, cmds.Pause) or \
+            if isinstance(cmd, machine.PlayVobu) or \
+               isinstance(cmd, machine.Pause) or \
                (isinstance(cmd, self.EndInteractive) and
                 cmd.count == self.interactiveCount):
                 return events
@@ -219,7 +224,7 @@ class Pipeline(object):
         cmd = self.mainItr.next()
         cmd(self)
         
-        if isinstance(cmd, cmds.CancelVobu):
+        if isinstance(cmd, machine.CancelVobu):
             # VOBU playback was cancelled.
             return
 
@@ -236,7 +241,7 @@ class Pipeline(object):
     # Interactive Operation Support
     #
 
-    class EndInteractive(cmds.DoNothing):
+    class EndInteractive(machine.DoNothing):
         """A do nothing command, used to mark the end of an
         interactive operation. It carries the serial count of
         interactive operations stored in the pipeline."""
@@ -308,7 +313,7 @@ class Pipeline(object):
             # We reached a VOBU playback operation while doing the
             # interactive operation. Flush and go on.
             self.cancelVobu()
-            cmds[0:0] = [Pipeline.flush]
+            cmds[0:0] = [Manager.flush]
             self.pendingCmds = cmds
 
 
