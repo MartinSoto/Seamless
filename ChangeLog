@@ -1,5 +1,13 @@
 2005-06-05  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/machine/machine.py (VirtualMachine.setTimedJump): Print
+	error to stderr.
+	(CommandBlockPlayer.playButtonCmd): Don't print the dissasembled
+	button command.
+	(CommandBlockPlayer.goto): Don't print disassembled commands.
+
+2005-06-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/player.py (DVDPlayer.setAudioStream) 
 	(DVDPlayer.getAudioStreams, DVDPlayer.nextAudioStream): Support
 	for moving to the next audio stream adapted from old player

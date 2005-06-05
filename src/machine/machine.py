@@ -456,7 +456,7 @@ class VirtualMachine(object):
         the value reaches 0, an automatic jump to the video manager
         program chain stored in register 10 will happen."""
         # FIXME: Implement this.
-        print 'setTimeJump attempted, implement me!' 
+        print >> sys.stder, 'setTimeJump attempted, implement me!' 
         yield NoOp
 
     # Call and resume
@@ -1427,8 +1427,8 @@ class CommandBlockPlayer(object):
         The command will use the cell commands block as context."""
         self.commands = cellCommands
 
-        print 'Button command:'
-        print disassemble.disassemble(buttonCmd)
+        #print 'Button command:'
+        #print disassemble.disassemble(buttonCmd)
         yield Call(self.decoder.performCommand(buttonCmd))
 
     @restartPoint
@@ -1439,8 +1439,8 @@ class CommandBlockPlayer(object):
 
         while self.commandNr <= self.commands.count:
             # Actually perform the command.
-            print disassemble.disassemble(self.commands.get(self.commandNr),
-                                          pos=self.commandNr)
+            #print disassemble.disassemble(self.commands.get(self.commandNr),
+            #                              pos=self.commandNr)
             yield Call(self.decoder.performCommand( \
                 self.commands.get(self.commandNr)))
 
