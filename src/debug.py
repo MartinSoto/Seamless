@@ -27,11 +27,13 @@ def debugConsole(player):
     executing normally."""
     code.interact('Seamless debug console', None,
                   {'player': player,
-                   'pipeline': player.shell.pipeline,
-                   'machine': player.shell.machine})
+                   'info': player.info,
+                   'machine': player.machine,
+                   'pipeline': player.pipeline,
+                   'manager': player.manager})
 
 def debugConsoleAsync(player):
-    """Start an debug console in the controlling terminal.
+    """Start a debug console in the controlling terminal.
 
     The program execution continues concurrently with the
     console. This means that the console can peek into the running

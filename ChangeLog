@@ -1,5 +1,11 @@
 2005-06-05  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/debug.py (debugConsole): Fix references to the player
+	related objects. They were still pointing to teh old player
+	structure.
+
+2005-06-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/sig.py (Signal.connect): Add an optional parameter to allow
 	for registering handlers that don't receive the originating object
 	as parameter.
