@@ -58,6 +58,7 @@ class VideoWidget(gtk.EventBox):
         self.imageSink = None
 
         self.desiredAspect = 4.0 / 3
+        self.presetAspect = None
 
         self.cursorTimeout = None
         self.invisibleCursor = None
@@ -71,6 +72,16 @@ class VideoWidget(gtk.EventBox):
 
     def getImageSink(self):
         return self.imageSink
+
+
+    def presetAspectRatio(self, presetAspect):
+        """Preset an aspect ratio to use from the next aspect ratio
+        change on.
+
+        The preset value will supersede any values set by the stream,
+        but will be activated only when the stream changes aspect
+        ratios. Passing a `None` value will deactivate the preset."""
+        self.presetAspect = presetAspect
 
 
     #
@@ -119,7 +130,10 @@ class VideoWidget(gtk.EventBox):
     #
 
     def desiredSizeChanged(self, imageSink, width, height):
-        self.desiredAspect = float(width) / height
+        if self.presetAspect:
+            self.desiredAspect = self.presetAspect
+        else:
+            self.desiredAspect = float(width) / height
         self.resizeVideo()
 
 

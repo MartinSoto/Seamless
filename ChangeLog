@@ -1,3 +1,28 @@
+2005-06-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/sig.py (Signal.connect): Add an optional parameter to allow
+	for registering handlers that don't receive the originating object
+	as parameter.
+
+	* src/mainui.py (MainUserInterface.__init__): Preset the aspect
+	ratio in the video widget when the player changes it.
+
+	* src/player/player.py (DVDPlayer.__init__) 
+	(DVDPlayer.aspectRatioChanged): Proxy the aspectRatioChanged
+	signal in the manager.
+
+	* src/player/manager.py (Manager.setAspectRatio) 
+	(Manager.aspectRatioChanged): Emit a signal when aspect ratio is
+	changed by the machine.
+
+	* src/videowidget.py (VideoWidget.__init__) 
+	(VideoWidget.presetAspectRatio, VideoWidget.desiredSizeChanged):
+	Add support for preseting an aspect ratio that will be used
+	instead of that specified by the MPEG video stream. Necessary
+	since some DVD MPEG streams specify a wrong aspect ratio, often
+	that of the actual film (without the black bands) an not that of
+	the encoded video.
+
 2005-06-02  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/sig.py: New file.

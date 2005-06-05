@@ -23,9 +23,10 @@ from manager import interactiveOp
 import pipeline
 
 from itersched import NoOp, Call
+from sig import SignalHolder, signal
 
 
-class DVDPlayer(object):
+class DVDPlayer(SignalHolder):
     """Main interface to interactively control the DVD playback system
     and query its state."""
 
@@ -44,6 +45,9 @@ class DVDPlayer(object):
         self.machine = machine.VirtualMachine(self.info)
         self.pipeline = pipeline.Pipeline(options)
         self.manager = manager.Manager(self.machine, self.pipeline)
+
+        self.manager.aspectRatioChanged.connect(self.aspectRatioChanged,
+                                                passInstance=False)
 
     def getDVDInfo(self):
         return self.info
@@ -221,3 +225,14 @@ class DVDPlayer(object):
             return
 
         yield Call(self.machine.callMenu(dvdread.MENU_TYPE_ROOT, 0))
+
+
+    #
+    # Signals
+    #
+
+    @signal
+    def aspectRatioChanged(self, newAspectRatio):
+        pass
+
+    

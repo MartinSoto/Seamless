@@ -20,12 +20,10 @@ class signal(object):
         try:
             return obj._SignalHolder__signals[self.name]
         except KeyError:
-            print 'new value'
             s = Signal(obj, self.defHandler)
             obj._SignalHolder__signals[self.name] = s
             return s
         except AttributeError:
-            print 'new attrib'
             s = Signal(obj, self.defHandler)
             obj._SignalHolder__signals = {self.name: s}
             return s
@@ -48,8 +46,14 @@ class Signal(object):
         for h in self.handlers:
             h(self.obj, *args, **keywords)
 
-    def connect(self, f):
-        self.handlers.append(f)
+    def connect(self, f, passInstance=True):
+        if passInstance:
+            handler = f
+        else:
+            # Don't pass the object to this handler.
+            handler = lambda obj, *args, **keywords: f(*args, **keywords)
+
+        self.handlers.append(handler)
 
     def disconnect(self, f):
         while f in self.handlers:

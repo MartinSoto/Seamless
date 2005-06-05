@@ -24,6 +24,7 @@ import sys
 import gst
 
 import itersched
+from sig import SignalHolder, signal
 
 import dvdread
 import events
@@ -57,7 +58,7 @@ def synchronized(method):
     return wrapper
 
 
-class Manager(object):
+class Manager(SignalHolder):
     """The object in charge of managing the interaction between the
     machine and the playback pipeline.
 
@@ -84,7 +85,7 @@ class Manager(object):
     immediatly. This is done in order to give the machine a chance of
     analyzing the header and, if necessary, skipping the playback of
     the VOBU. To skip the VOBU, the machine can send the `cancelVobu`
-    operation. Otherwise, it should sent a `DoNothing` operation.
+    operation. Otherwise, it should send a `DoNothing` operation.
 
     One important task of this class is to determine, in an automatic
     and reliable way, when a flush operation should be triggered. The
@@ -341,8 +342,15 @@ class Manager(object):
         self.src.set_property('cancel-vobu', True)
 
     def setAspectRatio(self, aspectRatio):
-        """Set the display aspect ratio to `aspectRatio`."""
-        print "*** Aspect ratio set to", aspectRatio
+        """Set the display aspect ratio to `aspectRatio`.
+
+        Emits the aspectRatioChanged signal."""
+        if aspectRatio == machine.ASPECT_RATIO_4_3:
+           self.aspectRatioChanged(4.0/3)
+        elif aspectRatio == machine.ASPECT_RATIO_16_9:
+            self.aspectRatioChanged(16.0/9)
+        else:
+            assert 0, "Invalid aspect ratio value"
         pass
 
     def setAudio(self, phys):
@@ -432,3 +440,11 @@ class Manager(object):
         """Signal the end of stream (EOS) to the pipeline."""
         self.sendEvent(events.eos())
 
+
+    #
+    # Signals
+    #
+
+    @signal
+    def aspectRatioChanged(self, newAspectRatio):
+        pass
