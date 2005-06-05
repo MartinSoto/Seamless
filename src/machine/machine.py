@@ -691,6 +691,52 @@ class VirtualMachine(object):
         """Return the current total number of angles available."""
         return self.currentTitle().angleCount
 
+    #
+    # Current Stream Control
+    #
+
+    def currentAudioStream(self):
+        """Return the current logical audio stream (an integer between
+        1 and 8)."""
+        return self.audio + 1
+
+    def setAudioStream(self, logical):
+        """Set the current audio stream to `logical`.
+
+        `logical` must be an integer between 1 and 8. If the stream
+        doesn't exist in the current program chain, no change will be
+        made."""
+        if not 1 <= logical <= 8:
+            raise MachineException, "Invalid logical stream number"
+
+        programChain = self.currentProgramChain()
+        if programChain == None or \
+           programChain.getAudioPhysStream(logical) == None:
+            return
+
+        self.audio = logical - 1
+        yield Call(self.updateAudio())
+
+    def getAudioStreams(self):
+        """Return the list of active audio streams in the current
+        program chain.
+
+        The return value is a list of pairs `(s, a)` where `s` is the
+        stream number, and `a` are the audio attributes for the stream
+        (a `dvdread.AudioAttributes` object)."""
+        programChain = self.currentProgramChain()
+        if programChain == None:
+            return []
+
+        titleSet = self.currentTitleSet()
+        streams = []
+        for logical in range(1, 9):
+            if programChain.getAudioPhysStream(logical) != None:
+                streams.append((logical,
+                                titleSet.getAudioAttributes(logical)))
+
+        return streams
+
 
     #
     # Pipeline Management and Events

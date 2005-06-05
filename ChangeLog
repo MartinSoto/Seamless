@@ -1,5 +1,17 @@
 2005-06-05  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/player.py (DVDPlayer.setAudioStream) 
+	(DVDPlayer.getAudioStreams, DVDPlayer.nextAudioStream): Support
+	for moving to the next audio stream adapted from old player
+	implementation.
+
+	* src/machine/machine.py (VirtualMachine.currentAudioStream) 
+	(VirtualMachine.setAudioStream, VirtualMachine.getAudioStreams):
+	Support for externally getting a setting the current audio stream
+	adapted from old machine implementation.
+
+2005-06-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/debug.py (debugConsole): Fix references to the player
 	related objects. They were still pointing to teh old player
 	structure.

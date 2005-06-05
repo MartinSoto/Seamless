@@ -136,14 +136,26 @@ class DVDPlayer(SignalHolder):
     # Stream Control
     #
 
+    @interactiveOp
     def setAudioStream(self, logical):
-        pass
+        yield Call(self.machine.setAudioStream(logical))
 
     def getAudioStreams(self):
-        return None
+        return self.machine.getAudioStreams()
 
+    @interactiveOp
     def nextAudioStream(self):
-        pass
+        streamNumbers = [s for (s, a) in self.machine.getAudioStreams()]
+        if streamNumbers == []:
+            return
+
+        try:
+            pos = streamNumbers.index(self.machine.currentAudioStream())
+        except ValueError:
+            return
+
+        stream = streamNumbers[(pos + 1) % len(streamNumbers)]
+        yield Call(self.machine.setAudioStream(stream))
 
 
     #
