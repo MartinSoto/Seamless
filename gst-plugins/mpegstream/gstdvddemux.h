@@ -25,11 +25,7 @@
 #include <gst/gst.h>
 #include "gstmpegdemux.h"
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
+G_BEGIN_DECLS
 
 #define GST_TYPE_DVD_DEMUX \
   (gst_dvd_demux_get_type())
@@ -81,11 +77,14 @@ enum {
    streams. */
 struct _GstDVDLPCMStream {
   GstMPEGStream	 parent;
-  guint8	 sample_info;	/* The type of linear PCM samples
+  guint32	 sample_info;	/* The type of linear PCM samples
                                    associated to this stream. The
                                    values are bit fields with the same
                                    format of the sample_info field in
                                    the linear PCM header. */
+  gint rate, channels, width,
+    dynamic_range;
+  gboolean mute, emphasis;
 };
 
 
@@ -100,21 +99,21 @@ struct _GstDVDDemux {
   gint cur_audio_nr;		/* Current audio stream number. */
   gint cur_subpicture_nr;	/* Current subpicture stream number. */
 
-  GstClockTime last_end_ptm;	/* End presentation time of the last nav packet
+  GstClockTime last_end_ptm;	/* End presentation time of the las nav packet
                                    event received. */
 
   gboolean just_flushed;	/* The element just received a flush event. */
   GstClockTime discont_time;	/* If different from GST_CLOCK_TIME_NONE, a
                                    discontinuous event should be sent with the
-                                   given time, before sending the next dara
-                                   block. */
+                                   given time, before sending the next data
+                                   block.. */
 
   gint mpeg_version;		/* Version of the MPEG video stream */
 
   GstMPEGStream *subpicture_stream[GST_DVD_DEMUX_NUM_SUBPICTURE_STREAMS];
 				/* Subpicture output streams. */
   GstClockTime   subpicture_time[GST_DVD_DEMUX_NUM_SUBPICTURE_STREAMS];
-  				/* Last timestamp for buffer on each stream. */
+  				/* Last timestamp for buffer on each stream */
 };
 
 
@@ -138,10 +137,6 @@ GType		gst_dvd_demux_get_type		(void);
 
 gboolean 	gst_dvd_demux_plugin_init 	(GstPlugin *plugin);
 
-
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
-
+G_END_DECLS
 
 #endif /* __DVD_DEMUX_H__ */
