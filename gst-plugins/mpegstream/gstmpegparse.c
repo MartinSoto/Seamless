@@ -1140,6 +1140,6 @@ gst_mpeg_parse_plugin_init (GstPlugin * plugin)
   scr_format =
       gst_format_register ("scr", "The MPEG system clock reference time");
 
-  return gst_element_register (plugin, "mpegparse",
+  return gst_element_register (plugin, "seamless-mpegparse",
       GST_RANK_NONE, GST_TYPE_MPEG_PARSE);
 }

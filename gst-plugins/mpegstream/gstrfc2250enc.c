@@ -352,6 +352,6 @@ gst_rfc2250_enc_get_property (GObject * object, guint prop_id, GValue * value,
 gboolean
 gst_rfc2250_enc_plugin_init (GstPlugin * plugin)
 {
-  return gst_element_register (plugin, "rfc2250enc",
+  return gst_element_register (plugin, "seamless-rfc2250enc",
       GST_RANK_NONE, GST_TYPE_RFC2250_ENC);
 }
