@@ -1,3 +1,28 @@
+2005-06-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/capspipe/capsaggreg.c: 
+	* gst-plugins/capspipe/capsaggreg.h: 
+	* gst-plugins/capspipe/capsselect.c: 
+	* gst-plugins/capspipe/capsselect.h: 
+	Make these two really work. Negotiation now works properly in both
+	elements. Capsaggreg is now loop based. Both elements communicate
+	now using a simple protocol based on "ANY" events, that guarantees
+	that when a capsselect element changes to another source, the
+	corresponding capsaggreg reads all material from the previous sink
+	before moving to the new sink.
+
+	* gst-plugins/robustclock/robustclock.h:
+	* gst-plugins/robustclock/robustclock.c:
+	(gst_robust_clock_new, gst_robust_clock_get_internal_time): Well,
+	the robust clock wasn't that robust after all. The new, improved
+	algorithm kicks in much more realibly when the underlying clock
+	stalls (now animated menus without sound, like in the German Buena
+	Vista Social Club DVD play smoothly) and guarantees (this time
+	really) that the clock never, ever goes back or stops running for
+	any longer than a 10th of a second.
+
+	* src/mainui.py: Erase spurious import.
+
 2005-06-05  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/machine/machine.py (VirtualMachine.setTimedJump): Print

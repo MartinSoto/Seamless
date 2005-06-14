@@ -1,5 +1,5 @@
 /* Seamless DVD Player
- * Copyright (C) 2003, 2004 Martin Soto <martinsoto@users.sourceforge.net>
+ * Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -48,11 +48,20 @@ struct _GstRobustClock {
 
   GstClockTime last_system;	/* Last time seen from the system
                                    clock. */
+  GstClockTime system_last_progress;	
+                                /* System time observed the last time
+				   the wrapped clock progresed. */
   GstClockTime last_wrapped;	/* Last time seen from the wrapped
                                    clock. */
 
   GstClockTimeDiff adjust;	/* Adjust value to add to the wrapped
                                    clock. */
+  GstClockTimeDiff stall_adjust;
+  				/* Adjust value corresponding to the
+				   current stall period. */
+
+  GstClockTime last_value;	/* Last time value returned by the
+				   clock. */
 };
 
 struct _GstRobustClockClass {

@@ -1,8 +1,8 @@
 /* GStreamer
- * Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+ * Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
  *
  * capsaggreg.c: Aggregate contents from multiple sink pads into a 
- *               single source negociating capabilities as needed.
+ *               single source negotiating capabilities as needed.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -27,10 +27,10 @@
 
 
 #ifndef __GST_DISABLE_GST_DEBUG
-#define DEBUG_CAPS(msg, caps) \
+#define DEBUG_CAPS(capsaggreg, msg, caps) \
 { \
   gchar *_str = gst_caps_to_string(caps); \
-  GST_DEBUG (msg, _str); \
+  GST_DEBUG_OBJECT (capsaggreg, msg, _str); \
   g_free (_str); \
 }
 #else
@@ -44,10 +44,10 @@ GST_DEBUG_CATEGORY_STATIC (capsaggreg_debug);
 
 /* ElementFactory information. */
 static GstElementDetails capsaggreg_details = {
-  "Aggregate many inputs with capabilities negociation",
+  "Aggregate many inputs with capabilities negotiation",
   "Generic",
   "Move buffers from many potentially heterogeneous input pads "
-  "to one output pad, negociating capabilities on it as necessary.",
+  "to one output pad, negotiating capabilities on it as necessary.",
   "Martin Soto <martinsoto@users.sourceforge.net>"
 };
 
@@ -105,8 +105,10 @@ static GstPadLinkReturn
 static GstCaps* capsaggreg_sink_getcaps	(GstPad *pad);
 static void	capsaggreg_src_linked	(GstPad *pad);
 
-static gboolean capsaggreg_handle_event (GstPad *pad, GstEvent *event);
-static void	capsaggreg_chain	(GstPad *pad, GstData *data);
+static void	capsaggreg_nego_src	(CapsAggreg * capsaggreg, GstPad *pad);
+static void	capsaggreg_handle_event (CapsAggreg * capsaggreg, GstPad *pad,
+					 GstEvent * event);
+static void	capsaggreg_loop		(GstElement * element);
 
 
 static GstElementClass *parent_class = NULL;
@@ -181,7 +183,9 @@ capsaggreg_class_init (CapsAggregClass *klass)
 static void 
 capsaggreg_init (CapsAggreg *capsaggreg) 
 {
-  capsaggreg->sinks = g_array_new (FALSE, FALSE, sizeof(GstPad *));
+  GST_FLAG_SET (capsaggreg, GST_ELEMENT_EVENT_AWARE);
+
+  capsaggreg->sinks = NULL;
 
   capsaggreg->src = gst_pad_new_from_template (
                      gst_static_pad_template_get (&capsaggreg_src_template),
@@ -189,6 +193,8 @@ capsaggreg_init (CapsAggreg *capsaggreg)
   g_signal_connect (capsaggreg->src, "linked",
                     G_CALLBACK (capsaggreg_src_linked), NULL);
   gst_element_add_pad (GST_ELEMENT (capsaggreg), capsaggreg->src);
+
+  gst_element_set_loop_function (GST_ELEMENT (capsaggreg), capsaggreg_loop);
 
   /* No input pad to start with. */
   capsaggreg->cur_sink = NULL;
@@ -200,7 +206,7 @@ capsaggreg_finalize (GObject *object)
 {
   CapsAggreg *capsaggreg = CAPSAGGREG (object);
 
-  g_array_free (capsaggreg->sinks, TRUE);
+  g_list_free (capsaggreg->sinks);
 }
 
 
@@ -231,7 +237,7 @@ capsaggreg_get_property (GObject *object, guint prop_id,
   
   switch (prop_id) {
   case ARG_SINK_CNT:
-    g_value_set_int (value, capsaggreg->sinks->len);
+    g_value_set_int (value, g_list_length (capsaggreg->sinks));
     break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -249,23 +255,22 @@ capsaggreg_request_new_pad (GstElement *element,
   char *name;
   GstPad *sink;
   
+  capsaggreg = CAPSAGGREG (element);
+  
   /* Only sink pads can be requested. */
   if (templ->direction != GST_PAD_SINK) {
-    GST_WARNING ("non sink pad requested");
+    GST_WARNING_OBJECT (capsaggreg, "non sink pad requested");
     return NULL;
   }
   
-  capsaggreg = CAPSAGGREG (element);
-  
-  name = g_strdup_printf ("sink%d", capsaggreg->sinks->len);
+  name = g_strdup_printf ("sink%d", g_list_length (capsaggreg->sinks));
   sink = gst_pad_new_from_template (templ, name);
   g_free (name);
   gst_pad_set_link_function (sink, capsaggreg_sink_link);
   gst_pad_set_getcaps_function (sink, capsaggreg_sink_getcaps);
-  gst_pad_set_chain_function (sink, capsaggreg_chain);
   gst_element_add_pad (GST_ELEMENT (capsaggreg), sink);
   
-  g_array_append_val (capsaggreg->sinks, sink);
+  capsaggreg->sinks = g_list_append (capsaggreg->sinks, sink);
   
   return sink;
 }
@@ -274,9 +279,9 @@ capsaggreg_request_new_pad (GstElement *element,
 static GstCaps *
 capsaggreg_sink_getcaps (GstPad *pad)
 {
-  CapsAggreg *capsaggreg = CAPSAGGREG (gst_pad_get_parent (pad));
+  //CapsAggreg *capsaggreg = CAPSAGGREG (gst_pad_get_parent (pad));
 
-  return gst_pad_get_allowed_caps (capsaggreg->src);
+  return gst_pad_proxy_getcaps (pad);
 }
 
 
@@ -297,83 +302,139 @@ static void
 capsaggreg_src_linked (GstPad *pad)
 {
   CapsAggreg *capsaggreg = CAPSAGGREG (gst_pad_get_parent (pad));
-  int i;
+
+  GList *ptr;
   GstPad *sink;
   GstPadLinkReturn ret;
 
-  i = 0;
-  while (i < capsaggreg->sinks->len) {
-    sink = g_array_index(capsaggreg->sinks, GstPad *, i);
+  for (ptr = capsaggreg->sinks; ptr != NULL; ptr = ptr->next) {
+    sink = ptr->data;
 
     ret = gst_pad_renegotiate (sink);
     if (GST_PAD_LINK_FAILED (ret)) {
-      GST_WARNING ("negotiation failed for pad '%s'", GST_PAD_NAME(sink));
+      GST_WARNING_OBJECT (capsaggreg, "negotiation failed for pad '%s'",
+			  GST_PAD_NAME(sink));
     }
-
-    i++;
   }
 }
 
 
-static gboolean
-capsaggreg_handle_event (GstPad *pad, GstEvent *event)
+static void
+capsaggreg_nego_src (CapsAggreg * capsaggreg, GstPad * pad)
 {
-  GstEventType type;
-
-  type = event ? GST_EVENT_TYPE (event) : GST_EVENT_UNKNOWN;
-
-  switch (type) {
-  default:
-    gst_pad_event_default (pad, event);
-    break;
-  }
-
-  return TRUE;
-}
-
-
-static void 
-capsaggreg_chain (GstPad *pad, GstData *data)
-{
-  GstBuffer *buf = GST_BUFFER (data);
-  CapsAggreg *capsaggreg;
   const GstCaps *caps;
   GstPadLinkReturn ret;
 
-  g_return_if_fail (pad != NULL);
-  g_return_if_fail (GST_IS_PAD (pad));
-  g_return_if_fail (buf != NULL);
+  /* We have a new active sink. Try to (re)negotiate the source caps. */
 
-  capsaggreg = CAPSAGGREG (gst_pad_get_parent (pad));
+  capsaggreg->cur_sink = NULL;
 
-  if (GST_IS_EVENT (buf)) {
-    capsaggreg_handle_event (pad, GST_EVENT (buf));
+  caps = gst_pad_get_negotiated_caps (pad);
+  if (caps == NULL) {
+    GST_WARNING_OBJECT (capsaggreg,
+			"unable to get caps from pad '%s:%s'",
+			GST_DEBUG_PAD_NAME(pad));
     return;
   }
 
-  if (capsaggreg->cur_sink != pad) {
-    /* We have a new active sink. Try to negociate caps for it. */
-    caps = gst_pad_get_negotiated_caps (pad);
-    if (caps == NULL) {
-      GST_WARNING ("unable to negotiate caps for pad '%s'",
-                   GST_PAD_NAME(pad));
-      gst_buffer_unref (buf);
-      return;
-    }
-
-    ret = gst_pad_try_set_caps (capsaggreg->src, caps);
-    if (GST_PAD_LINK_FAILED (ret)) {
-      GST_WARNING ("unable to negotiate caps for pad '%s'",
-                   GST_PAD_NAME(pad));
-      gst_buffer_unref (buf);
-      return;
-    }
-
-    DEBUG_CAPS ("new caps set: %s", caps);
-
-    capsaggreg->cur_sink = pad;
-    GST_LOG ("new active source: '%s'", GST_PAD_NAME(pad));
+  ret = gst_pad_try_set_caps (capsaggreg->src, caps);
+  if (GST_PAD_LINK_FAILED (ret)) {
+    GST_WARNING_OBJECT (capsaggreg,
+			"unable to negotiate caps for pad '%s:%s'",
+			GST_DEBUG_PAD_NAME(capsaggreg->src));
+    return;
   }
 
-  gst_pad_push (capsaggreg->src, data);
+  DEBUG_CAPS (capsaggreg, "new caps set: %s", caps);
+
+  capsaggreg->cur_sink = pad;
+
+  GST_DEBUG_OBJECT (capsaggreg, "new active source: '%s:%s'",
+		    GST_DEBUG_PAD_NAME(pad));
 }
+
+
+static void
+capsaggreg_handle_event (CapsAggreg * capsaggreg, GstPad *pad,
+			 GstEvent * event)
+{
+  switch (GST_EVENT_TYPE (event)) {
+  case GST_EVENT_ANY:
+    {
+      GstStructure *structure = event->event_data.structure.structure;
+      const char *event_type = gst_structure_get_string (structure, "event");
+
+      if (strcmp (gst_structure_get_name (structure),
+		  "application/x-gst-capspipe") == 0) {
+	if (strcmp (event_type, "start") == 0) {
+	  GST_DEBUG_OBJECT (capsaggreg,
+			    "start event received from pad '%s:%s'\n",
+			    GST_DEBUG_PAD_NAME (pad));
+	  capsaggreg_nego_src (capsaggreg, pad);
+	  gst_event_unref (event);
+	} else if (strcmp (event_type, "stop") == 0) {
+	  GST_DEBUG_OBJECT (capsaggreg,
+			    "stop event received from pad '%s:%s'\n",
+			    GST_DEBUG_PAD_NAME (pad));
+	  capsaggreg->cur_sink = NULL;
+	  gst_event_unref (event);
+	} else {
+	  g_return_if_reached ();
+	}
+      }
+      else {
+	if (capsaggreg->cur_sink != NULL) {
+	  gst_pad_push (capsaggreg->src, GST_DATA (event));
+	}
+      }
+    }
+    break;
+
+  case GST_EVENT_EOS:
+    gst_pad_event_default (pad, event);
+    break;
+
+  default:
+    if (capsaggreg->cur_sink != NULL) {
+      gst_pad_push (capsaggreg->src, GST_DATA (event));
+    }
+    break;
+  }
+}
+
+
+static void
+capsaggreg_loop (GstElement * element)
+{
+  CapsAggreg *capsaggreg = CAPSAGGREG (element);
+
+  GstData *data;
+  GstPad *read_from;
+
+  if (capsaggreg->cur_sink == NULL) {
+    /* We are waiting for a start event. It may come from any sink. */
+    data = gst_pad_collectv (&read_from, capsaggreg->sinks);
+
+    if (GST_IS_EVENT (data)) {
+      capsaggreg_handle_event (capsaggreg, read_from, GST_EVENT (data));
+    } else {
+      /* Retry negotiation. */
+      capsaggreg_nego_src (capsaggreg, read_from);
+      if (capsaggreg->cur_sink == NULL) {
+	GST_WARNING_OBJECT (capsaggreg, "dropping data %p", data);
+      } else {
+	gst_pad_push (capsaggreg->src, data);
+      }
+    }
+  } else {
+    data = gst_pad_pull (capsaggreg->cur_sink);
+
+    if (GST_IS_EVENT (data)) {
+      capsaggreg_handle_event (capsaggreg, capsaggreg->cur_sink,
+			       GST_EVENT (data));
+    } else {
+      gst_pad_push (capsaggreg->src, data);
+    }
+  }
+}
+

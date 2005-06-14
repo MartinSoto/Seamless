@@ -1,5 +1,5 @@
 /* Seamless DVD Player
- * Copyright (C) 2003, 2004 Martin Soto <martinsoto@users.sourceforge.net>
+ * Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -129,9 +129,13 @@ gst_robust_clock_new (GstClock *wrapped)
   rclock->wrapped_class = GST_CLOCK_GET_CLASS (wrapped);
 
   rclock->last_system = GST_CLOCK_TIME_NONE;
+  rclock->system_last_progress = GST_CLOCK_TIME_NONE;
   rclock->last_wrapped = GST_CLOCK_TIME_NONE;
 
   rclock->adjust = 0;
+  rclock->stall_adjust = 0;
+
+  rclock->last_value = GST_CLOCK_TIME_NONE;
 
   return (GstClock *) rclock;
 }
@@ -180,27 +184,42 @@ gst_robust_clock_get_internal_time (GstClock *clock)
   GTimeVal timeval;
   GstClockTime wrapped_time, system_time;
   GstClockTimeDiff interval;
+  GstClockTime value;
 
   g_get_current_time (&timeval);
   system_time = GST_TIMEVAL_TO_TIME (timeval);
   wrapped_time = rclock->wrapped_class->get_internal_time (rclock->wrapped);
 
   if (rclock->last_wrapped != GST_CLOCK_TIME_NONE &&
-      wrapped_time == rclock->last_wrapped) {
-    /* Wrapped clock is stalled. Progress as much as the system clock
-       did since the last time we were consulted. */
-    interval = GST_CLOCK_DIFF(system_time, rclock->last_system);
+      wrapped_time <= rclock->last_wrapped) {
+    /* Wrapped clock is stalled, or went back. */
 
+    interval = GST_CLOCK_DIFF (system_time, rclock->system_last_progress);
     if (interval > MAX_STALLED) {
-      rclock->adjust += interval;
-      rclock->last_system = system_time;
+      /* Progress as much as the system clock did since the last time
+	 we were consulted. */
+      rclock->stall_adjust = interval;
     }
+
+    /* If the clock actually went back, compensate for the gap. */
+    rclock->adjust += GST_CLOCK_DIFF (rclock->last_wrapped, wrapped_time);
   } else {
-    rclock->last_system = system_time;
-    rclock->last_wrapped = wrapped_time;
+    rclock->system_last_progress = system_time;
+    rclock->adjust += rclock->stall_adjust;
+    rclock->stall_adjust = 0;
   }
 
-  return wrapped_time + rclock->adjust;
+  rclock->last_system = system_time;
+  rclock->last_wrapped = wrapped_time;
+
+  value = wrapped_time + rclock->adjust + rclock->stall_adjust;
+  if (rclock->last_value != GST_CLOCK_TIME_NONE &&
+      value < rclock->last_value) {
+    g_return_val_if_reached (value);
+  }
+
+  rclock->last_value = value;
+  return value;
 }
 
 static GstClockEntryStatus

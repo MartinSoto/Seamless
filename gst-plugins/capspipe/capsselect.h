@@ -1,5 +1,5 @@
 /* GStreamer
- * Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+ * Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
  *
  * capsselect.h: Automatically select the output pad based on the
  *               capabilities of the input pad.
@@ -59,6 +59,9 @@ struct _CapsSelect {
   GstPad *cur_src;	/* The source pad we are currently writing
                            to. */
   GstCaps *cur_caps;	/* The caps currently set for the sink. */
+
+  GstPad *prev_src;	/* The source pad used for the last processed
+			   buffer. */
 };
 
 

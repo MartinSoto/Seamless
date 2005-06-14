@@ -1,5 +1,5 @@
 /* GStreamer
- * Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+ * Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
  *
  * capsaggreg.h: Aggregate contents from multiple sink pads into a 
  *               single source negociating capabilities as needed.
@@ -53,7 +53,7 @@ typedef enum {
 struct _CapsAggreg {
   GstElement element;
 
-  GArray *sinks;	/* Array containing the sink pads. */
+  GList *sinks;		/* Array containing the sink pads. */
   GstPad *src;		/* Src pad. */
 
   GstPad *cur_sink;	/* The sink pad we are currently reading
