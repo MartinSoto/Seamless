@@ -1,5 +1,20 @@
 2005-06-19  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/seamless.py (main): Add a new option --pixel-aspect to allow
+	specifying the pixel aspect ratio.
+
+	* src/mainui.py (MainUserInterface.__init__): Set the pixel aspect
+	ratio in the video widget.
+
+	* src/videowidget.py (VideoWidget.__init__) 
+	(VideoWidget.setPixelAspect, VideoWidget.resizeVideo): Add support
+	for pixel aspect ratios different from 1.
+
+	* src/player/pipeline.py (SpdifAudio.__init__): Actually use the
+	specified spdifCard value specified.
+
+2005-06-19  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/seamless.py (DictOptions): New class to wrap the options in
 	an object that also provides dictionary behavior.
 	(main): --audio-decode option replaced by --spdif-card, allowing

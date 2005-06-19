@@ -88,7 +88,7 @@ def main():
                          help="start in full screen mode")
     optParser.add_option("--device", dest="location",
                          metavar="PATH",
-                         help="Path to DVD device is PATH",
+                         help="set path to DVD device to PATH",
                          default="/dev/dvd")
     optParser.add_option("--lirc", dest="lirc",
                          action="store_true",
@@ -111,6 +111,10 @@ def main():
                          metavar="SINK",
                          help="video sink is SINK",
                          default="xvimagesink")
+    optParser.add_option("--pixel-aspect", dest="pixelAspect",
+                         metavar="ASPECT",
+                         help="set pixel aspect ratio to ASPECT (default 1.0)",
+                         default="1.0")    
     optParser.add_option("--clock", dest="clockType",
                          metavar="TYPE",
                          help="'robust' to use the special robust clock"
@@ -123,6 +127,15 @@ def main():
 
     if args != []:
         optParser.error("invalid argument(s): %s" % string.join(args, ' '))
+
+    # Evaluate the pixel aspect ratio.
+    try:
+        options.pixelAspect = eval(options.pixelAspect, {}, {})
+    except:
+        optParser.error("invalid expression '%s'" % options.pixelAspect)
+    if options.pixelAspect < 1.0 or options.pixelAspect > 10.0:
+        optParser.error("value %0.3f out of range for pixel aspect ratio" %
+                        options.pixelAspect)
 
     # Use the fair scheduler.
     if gst.scheduler_factory_find('fairpth'):

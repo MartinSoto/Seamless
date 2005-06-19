@@ -57,6 +57,7 @@ class VideoWidget(gtk.EventBox):
 
         self.imageSink = None
 
+        self.pixelAspect = 1.0
         self.desiredAspect = 4.0 / 3
         self.presetAspect = None
 
@@ -73,6 +74,8 @@ class VideoWidget(gtk.EventBox):
     def getImageSink(self):
         return self.imageSink
 
+    def setPixelAspect(self, pixelAspect):
+        self.pixelAspect = pixelAspect
 
     def presetAspectRatio(self, presetAspect):
         """Preset an aspect ratio to use from the next aspect ratio
@@ -95,14 +98,16 @@ class VideoWidget(gtk.EventBox):
         allocation = self.get_allocation()
         widgetAspect = float(allocation.width) / allocation.height
 
-        if widgetAspect >= self.desiredAspect:
-            width = allocation.height * self.desiredAspect
+        desiredAspect = self.desiredAspect / self.pixelAspect
+
+        if widgetAspect >= desiredAspect:
+            width = allocation.height * desiredAspect
             height = allocation.height
             x = (allocation.width - width) / 2
             y = 0
         else:
             width = allocation.width
-            height = allocation.width / self.desiredAspect
+            height = allocation.width / desiredAspect
             x = 0
             y = (allocation.height - height) / 2
 

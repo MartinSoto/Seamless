@@ -63,6 +63,8 @@ class MainUserInterface(object):
         self.video.connect('ready', self.videoReady)
         self.video.connect('button-press-event', self.videoButtonPress)
 
+        self.video.setPixelAspect(options.pixelAspect)
+
         # Preset the aspect ratio when the player changes it.
         self.player.aspectRatioChanged.connect(self.video.\
                                                presetAspectRatio,

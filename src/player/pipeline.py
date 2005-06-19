@@ -125,7 +125,8 @@ class SpdifAudio(ParsedBin):
 
         # Can gstparse set property values with spaces?
         audioElem.set_property('device',
-            'spdif:{AES0 0x0 AES1 0x82 AES2 0x0 AES3 0x2 CARD Live}')
+            'spdif:{AES0 0x0 AES1 0x82 AES2 0x0 AES3 0x2 CARD %(spdifCard)s}' %
+            options)
         
         self.ghostify('capsselect', 'sink')
 
