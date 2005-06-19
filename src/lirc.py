@@ -34,7 +34,6 @@ class LIRC(object):
     def readData(self, source, condition):
         cmd = self.cmdFile.readline()[:-1]
         if cmd != 'off' and cmd != 'leave':
-            print >> sys.stderr, "Command: %s" % cmd
             try:
                 getattr(self.mainUi.getPlayer(), cmd)()
             except:

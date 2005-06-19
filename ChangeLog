@@ -1,3 +1,28 @@
+2005-06-19  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/seamless.py (DictOptions): New class to wrap the options in
+	an object that also provides dictionary behavior.
+	(main): --audio-decode option replaced by --spdif-card, allowing
+	to specifiy the alsa card name for the SP/DIf
+	output. --video-decode option erased. Hardware video decoding
+	could be re-added in the future in some other way.
+
+	* src/player/pipeline.py: Complete revamp. New class for bins
+	created from pipeline specs. Define separate classes for the audio
+	and video pipelines. The software and hardware decoded pipelines
+	have separate classes and the hardware pipeline uses alsasink. The
+	video runs the videsink in a separate thread which fixes uneven
+	playback problems in certain situations.  Initial software
+	decoding support for DTS (not functional in most DVDs though).
+
+	* src/lirc.py (LIRC.readData): Don't print commands.
+
+	* gst-plugins/robustclock/robustclock.c (MAX_STALLED): Increase
+	the maximum acceptable stalled time.
+	(MAX_BACKWARDS, gst_robust_clock_get_internal_time): Accept
+	situations in which the clock goes back a short
+	interval. Compensating for that causes incorrect playback.
+
 2005-06-14  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/mpegstream/gstmpegstream.c: Adjust plugin definition

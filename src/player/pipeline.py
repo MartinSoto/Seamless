@@ -31,111 +31,204 @@ import machine
 import wrapclock
 
 
-#
-# Main DVD Player Class
-#
+class ParsedBin(gst.Bin):
+    """A GStgreamer bin whose contents are created by parsing a pipeline
+    specification."""
 
-def ghostify(bin, elemName, padName, ghostName=None):
-    if not ghostName:
-        ghostName = padName
-    bin.add_ghost_pad(bin.get_by_name(elemName).get_pad(padName), ghostName)
+    __slots__ = ()
+
+    def __init__(self, name, pipelineSpec):
+        gst.Bin.__init__(self, name)
+
+        elem = gst.parse_launch(pipelineSpec)
+        if isinstance(elem, gst.Bin):
+            # Move all elements to this instance. Yes, this is sort of
+            # funny, but the GStreamer API doesn't offer anything
+            # better at the moment.
+            for subelem in elem.get_list():
+                elem.remove(subelem)
+                self.add(subelem)
+        else:
+            self.add(elem)
+
+    def ghostify(self, elemName, padName, ghostName=None):
+        if not ghostName:
+            ghostName = padName
+        self.add_ghost_pad(self.get_by_name(elemName).get_pad(padName),
+                           ghostName)
+
+
+class SoftwareAudio(ParsedBin):
+    """An audio playback element that uses software decoders for AC3
+    and DTS."""
+
+    __slots__ = ('clock')
+
+    def __init__(self, options, name='audiodec'):
+        super(SoftwareAudio, self).__init__(name, """
+        (
+          capsselect name=capsselect !
+            seamless-a52dec !
+            audioconvert !
+            audioscale !
+            capsaggreg name=capsaggreg !
+            seamless-queue name=audioqueue !
+            { %(audioSink)s name=audiosink }
+
+          capsselect.src%%d !
+            dvdlpcmdec !
+            audioconvert !
+            audioscale ! capsaggreg.sink%%d
+
+          capsselect.src%%d !
+            dtsdec !
+            audioconvert !
+            audioscale ! capsaggreg.sink%%d
+        )
+        """ % options)
+        self.ghostify('capsselect', 'sink')
+
+        self.clock = self.get_by_name('audiosink').get_clock()
+
+    def getClock(self):
+        return self.clock
+
+
+class SpdifAudio(ParsedBin):
+    """An audio playback element that feeds AC3 sound (DTS coming
+    soon) to an external hardware decoder through an SP/DIF digital
+    audio interface. The SP/DIF device is driven using ALSA."""
+
+    __slots__ = ('clock')
+
+    def __init__(self, options, name='audiodec'):
+        super(SpdifAudio, self).__init__(name, """
+        (
+          capsselect name=capsselect !
+            ac3iec958 !
+            capsaggreg name=capsaggreg !
+            seamless-queue max-size-bytes=40000 !
+            { alsasink name=audiosink }
+
+          capsselect.src%d !
+            dvdlpcmdec !
+            audioconvert !
+            audioscale ! capsaggreg.sink%d
+
+          capsselect.src%d !
+            dtsdec !
+            audioconvert !
+            audioscale ! capsaggreg.sink%d
+        )
+        """)
+        audioElem = self.get_by_name('audiosink')
+
+        # Can gstparse set property values with spaces?
+        audioElem.set_property('device',
+            'spdif:{AES0 0x0 AES1 0x82 AES2 0x0 AES3 0x2 CARD Live}')
+        
+        self.ghostify('capsselect', 'sink')
+
+        self.clock = audioElem.get_clock()
+
+    def getClock(self):
+        return self.clock
+
+
+class SoftwareVideo(ParsedBin):
+    """A video playback element that decodes MPEG2 video using a
+    software decoder."""
+
+    __slots__ = ()
+
+    def __init__(self, options, name='videodec'):
+        super(SoftwareVideo, self).__init__(name, """
+        (
+          mpeg2dec name=mpeg2dec !
+            {
+              seamless-queue !
+                .video seamless-mpeg2subt name=mpeg2subt !
+                ffcolorspace !
+                videoscale !
+                seamless-queue max-size-buffers=3 name=videoqueue !
+                { %(videoSink)s name=videosink }
+
+              seamless-queue name=subtitle ! mpeg2subt.subtitle
+            }
+        )
+        """ % options)
+
+        self.ghostify('mpeg2dec', 'sink', 'video')
+        self.ghostify('subtitle', 'sink', 'subtitle')
+
+
+class BackPlayer(ParsedBin):
+    """The backend playback element that reads material from the DVD
+    disk, demultiplexes it, and feeds to the front-end playback
+    elemens."""
+
+    __slots__ = ()
+
+    def __init__(self, options, name='backplayer'):
+        super(BackPlayer, self).__init__(name, """
+        (
+          dvdblocksrc name=dvdblocksrc location=%(location)s !
+            seamless-dvddemux name=dvddemux
+        )
+        """ % options)
+
+        self.ghostify('dvddemux', 'current_video', 'video')
+        self.ghostify('dvddemux', 'current_subpicture', 'subtitle')
+        self.ghostify('dvddemux', 'current_audio', 'audio')
+
+    def getBlockSource(self):
+        return self.get_by_name('dvdblocksrc')
 
 
 class Pipeline(gst.Thread):
     """The GStreamer pipeline used to play DVDs."""
 
-    __slots__ = ('audioIdent',
-                 'audioSink',
-                 'audioSinkElem',
-                 'clock',
-                 'dvdSrc',
-                 'videoIdent',
-                 'videoSink')
+    __slots__ = ('backPlayer',
+                 'audioSink', 
+                 'videoSink',
+                 'clock')
 
     def __init__(self, options, name="dvdplayer"):
         gst.Thread.__init__(self, name)
 
         # Build the pipeline.
 
-        # The backend thread.
-        if options.videoDecode == 'soft':
-            videoDecoder = 'mpeg2dec name=mpeg2dec !'
-        else:
-            videoDecoder = ''
+        # The back player.
+        self.backPlayer = BackPlayer(options)
+        self.add(self.backPlayer)
 
-        self.dvdSrc = gst.parse_launch("""
-        (
-          dvdblocksrc name=dvdblocksrc location=%s !
-            seamless-dvddemux name=dvddemux .current_video !
-            %s
-            seamless-queue name=video
-          dvddemux.current_subpicture !
-            seamless-queue name=subtitle
-          dvddemux.current_audio !
-            seamless-queue name=audio max-size-buffers=50
-        )
-        """ % (options.location, videoDecoder))
-        ghostify(self.dvdSrc, 'video', 'src', 'video')
-        ghostify(self.dvdSrc, 'subtitle', 'src', 'subtitle')
-        ghostify(self.dvdSrc, 'audio', 'src', 'audio')
-        self.add(self.dvdSrc)
-
-        # The video playback thread.
-        self.videoSink = gst.parse_launch("""
-        {
-          seamless-mpeg2subt name=mpeg2subt !
-            identity name=videoident !
-            %s name=videosink
-        }
-        """ % options.videoSink)
-        ghostify(self.videoSink, 'mpeg2subt', 'video')
-        ghostify(self.videoSink, 'mpeg2subt', 'subtitle')
-        self.videoIdent = self.videoSink.get_by_name('videoident')
+        # The video playback element.
+        self.videoSink = SoftwareVideo(options)
         self.add(self.videoSink)
 
-        # The audio playback thread.
-        if options.audioDecode == 'soft':
-            sinkName = 'a52dec'
-            audioDecoder = 'seamless-a52dec name=%s ! audioconvert ! ' \
-                           'audioscale !' % sinkName
+        # The audio playback element.
+        if options.spdifCard:
+            self.audioSink = SpdifAudio(options)
         else:
-            sinkName = 'audioident'
-            audioDecoder = ''
-
-        self.audioSink = gst.parse_launch("""
-        {
-          %s
-            identity name=audioident !
-            %s name=audiosink
-        }
-        """ % (audioDecoder, options.audioSink))
-        ghostify(self.audioSink, sinkName, 'sink', 'audio')
-        self.audioSinkElem = self.audioSink.get_by_name('audiosink')
-        self.audioIdent = self.audioSink.get_by_name('audioident')
+            self.audioSink = SoftwareAudio(options)
         self.add(self.audioSink)
 
         # All together now.
-        self.dvdSrc.link_pads('video', self.videoSink, 'video')
-        self.dvdSrc.link_pads('subtitle', self.videoSink, 'subtitle')
-        self.dvdSrc.link_pads('audio', self.audioSink, 'audio')
+        self.backPlayer.link_pads('video', self.videoSink, 'video')
+        self.backPlayer.link_pads('subtitle', self.videoSink, 'subtitle')
+        self.backPlayer.link_pads('audio', self.audioSink, 'sink')
 
+        # Set an appropriate clock for the pipeline.
         if options.clockType == 'robust':
             # Wrap the clock in a robust clock.
-            self.clock = wrapclock.wrap(self.audioSinkElem.get_clock())
+            self.clock = wrapclock.wrap(self.audioSink.getClock())
         elif options.clockType == 'audiosink':
-            self.clock = self.audioSinkElem.get_clock()
+            self.clock = self.audioSink.getClock()
         elif options.clockType == 'system':
             self.clock = gst.system_clock_obtain()
         else:
             assert 0, 'Unexpected clock type'
         self.use_clock(self.clock)
-
-        #self.videoIdent.connect('handoff', self.identHandoff)
-        #self.audioIdent.connect('handoff', self.identHandoff)
-
-    def identHandoff(self, elem, *args):
-        print "Handoff: %s" % elem.get_name()
-        #pass
 
 
     #
@@ -143,7 +236,7 @@ class Pipeline(gst.Thread):
     #
 
     def getBlockSource(self):
-        return self.dvdSrc.get_by_name('dvdblocksrc')
+        return self.backPlayer.getBlockSource()
 
     def getVideoSink(self):
         return self.videoSink.get_by_name('videosink')

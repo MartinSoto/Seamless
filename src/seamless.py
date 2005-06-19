@@ -50,6 +50,32 @@ sys.argv.extend(helpOpts)
 import player
 import mainui
 
+
+class DictOptions(object):
+    """A wrapper for the options object that adds dictionary behavior."""
+
+    def __init__(self, options):
+        self.__dict__['options'] = options
+
+    def __getattr__(self, name):
+        return getattr(self.options, name)
+
+    def __setattr__(self, name, value):
+        setattr(self.options, name, value)
+
+    def __getitem__(self, key):
+        return getattr(self.options, key)
+
+    def __setitem__(self, name, value):
+        setattr(self.options, name, value)    
+
+    def __repr__(self):
+        return repr(self.options)
+
+    def __str__(self):
+        return str(self.options)
+
+
 def main():
     progName = os.path.basename(sys.argv[0])
 
@@ -60,9 +86,9 @@ def main():
     optParser.add_option("--fullscreen", dest="fullScreen",
                          action="store_true",
                          help="start in full screen mode")
-    optParser.add_option("--path", dest="location",
+    optParser.add_option("--device", dest="location",
                          metavar="PATH",
-                         help="DVD device path is PATH",
+                         help="Path to DVD device is PATH",
                          default="/dev/dvd")
     optParser.add_option("--lirc", dest="lirc",
                          action="store_true",
@@ -71,25 +97,20 @@ def main():
                          metavar="SINK",
                          help="audio sink is SINK",
                          default="alsasink")
-    optParser.add_option("--audio-decode", dest="audioDecode",
-                         metavar="TYPE",
-                         help="set type to 'hard' if the specified audio "
-                         "sink decodes audio internally in hardware or "
-                         "to 'soft' if it requires a software decoder",
-                         default="soft",
-                         choices = ('soft', 'hard'))
+    optParser.add_option("--spdif-card", dest="spdifCard",
+                         metavar="CARD",
+                         help="Instead of decoding audio in software, "
+                         "output raw AC3 and DTS to the SP/DIF "
+                         "output in card CARD. CARD must be an audio "
+                         "card name as defined by the ALSA driver (look "
+                         "at the contents of your /proc/asound/cards "
+                         "file). This option won't work if you don't "
+                         "have the ALSA audio drivers installed and "
+                         "configured in your machine")
     optParser.add_option("--video-sink", dest="videoSink",
                          metavar="SINK",
                          help="video sink is SINK",
                          default="xvimagesink")
-    optParser.add_option("--video-decode", dest="videoDecode",
-                         metavar="TYPE",
-                         help="'hard' if the specified video "
-                         "sink decodes video internally in hardware or "
-                         "'soft' (default) if it requires a software "
-                         "decoder",
-                         default="soft",
-                         choices = ('soft', 'hard'))
     optParser.add_option("--clock", dest="clockType",
                          metavar="TYPE",
                          help="'robust' to use the special robust clock"
@@ -98,6 +119,7 @@ def main():
                          default="robust",
                          choices = ('robust', 'audiosink', 'system'))
     (options, args) = optParser.parse_args()
+    options = DictOptions(options)
 
     if args != []:
         optParser.error("invalid argument(s): %s" % string.join(args, ' '))

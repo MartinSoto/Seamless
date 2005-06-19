@@ -29,7 +29,11 @@ GST_DEBUG_CATEGORY_STATIC (robustclock_debug);
 
 
 /* Maximum acceptable time for the wrapped clock to be stalled. */
-#define MAX_STALLED (GST_SECOND * 0.1)
+#define MAX_STALLED (GST_SECOND * 0.2)
+
+/* The wrapped clock can go backwards this much without being
+   corrected. */
+# define MAX_BACKWARDS (GST_SECOND * 0.5)
 
 
 static void
@@ -201,8 +205,14 @@ gst_robust_clock_get_internal_time (GstClock *clock)
       rclock->stall_adjust = interval;
     }
 
-    /* If the clock actually went back, compensate for the gap. */
-    rclock->adjust += GST_CLOCK_DIFF (rclock->last_wrapped, wrapped_time);
+    interval = GST_CLOCK_DIFF (rclock->last_wrapped, wrapped_time);
+    if (interval > MAX_BACKWARDS) {
+      /* The wrapped clock actually went back by a large sudden
+	 amount. Smaller backwards steps won't be corrected, since it
+	 turns out some audio clocks do that every now and then, but
+	 correct it in the long term. */
+      rclock->adjust += interval;
+    }
   } else {
     rclock->system_last_progress = system_time;
     rclock->adjust += rclock->stall_adjust;
@@ -213,11 +223,6 @@ gst_robust_clock_get_internal_time (GstClock *clock)
   rclock->last_wrapped = wrapped_time;
 
   value = wrapped_time + rclock->adjust + rclock->stall_adjust;
-  if (rclock->last_value != GST_CLOCK_TIME_NONE &&
-      value < rclock->last_value) {
-    g_return_val_if_reached (value);
-  }
-
   rclock->last_value = value;
   return value;
 }
