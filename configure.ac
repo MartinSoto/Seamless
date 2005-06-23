@@ -1,4 +1,4 @@
-AC_INIT(Seamless DVD Player, 0.0.1)
+AC_INIT(Seamless DVD Player, 0.1.0)
 AC_CONFIG_SRCDIR(src/seamless.py)
 AM_INIT_AUTOMAKE(seamless, ${PACKAGE_VERSION})
 PACKAGE_TARNAME=$PACKAGE
@@ -144,7 +144,6 @@ AC_OUTPUT([
   gst-plugins/mpegstream/Makefile
   gst-plugins/queue/Makefile
   gst-plugins/robustclock/Makefile
-  m4/Makefile
   src/Makefile
   src/dvdread/Makefile
   src/machine/Makefile

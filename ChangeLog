@@ -1,3 +1,19 @@
+2005-06-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/sig.py: Add copyright notice.
+
+	* src/player/pipeline.py (SoftwareVideo.__init__): Use the new
+	name ffmpegcolorspace instead of the old name, ffcolorspace.
+
+	* src/Makefile.am (pypkg_PYTHON): Add sig.py.
+
+	* configure.ac (AC_INIT): Set version number to
+	0.1.0.
+	(AC_OUTPUT): Remove spurious entry.
+
+	* config/seamless.tmpl: Move the #! line to the beginning of the
+	file.
+
 2005-06-19  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/seamless.py (main): Add a new option --pixel-aspect to allow

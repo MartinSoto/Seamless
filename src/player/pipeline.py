@@ -149,7 +149,7 @@ class SoftwareVideo(ParsedBin):
             {
               seamless-queue !
                 .video seamless-mpeg2subt name=mpeg2subt !
-                ffcolorspace !
+                ffmpegcolorspace !
                 videoscale !
                 seamless-queue max-size-buffers=3 name=videoqueue !
                 { %(videoSink)s name=videosink }
