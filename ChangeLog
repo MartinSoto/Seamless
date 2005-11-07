@@ -1,3 +1,12 @@
+2005-11-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.c: Port to 0.9 by deriving from
+	GstPushSrc (not yet tested).
+	* gst-plugins/Makefile.am (#SUBDIRS): Deactivate compilation of
+	most plugins for gradual porting.
+	* configure.ac: Bump GStreamer dependency to 0.9, and fix
+	GStreamer check.
+
 2005-06-23  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/sig.py: Add copyright notice.

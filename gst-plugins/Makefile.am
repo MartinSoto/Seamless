@@ -10,5 +10,6 @@ else
 ALSASPDIF_DIR=
 endif
 
-SUBDIRS=$(A52DEC_DIR) $(ALSASPDIF_DIR) capspipe dvdblock iec958 \
-	 mpegstream mpeg2sub queue robustclock
+#SUBDIRS=$(A52DEC_DIR) $(ALSASPDIF_DIR) capspipe dvdblock iec958 \
+#	 mpegstream mpeg2sub queue robustclock
+SUBDIRS=dvdblock

@@ -32,7 +32,7 @@ plugindir="\$(pkglibdir)/gst-plugins"
 AC_SUBST(plugindir)
 
 dnl Required versions of dependencies
-AC_SUBST(GSTREAMER_REQ, 0.8.0)
+AC_SUBST(GST_REQ, 0.9.0)
 AC_SUBST(GLIB_REQ, 2.0.0)
 AC_SUBST(PYGTK_REQ, 2.4.0)
 
@@ -42,32 +42,12 @@ PKG_CHECK_MODULES(GLIB, glib-2.0 gobject-2.0 gthread-2.0 gmodule-2.0, ,
 AC_SUBST(GLIB_LIBS)
 AC_SUBST(GLIB_CFLAGS)
 
-dnl check for gstreamer
-GST_MAJORMINOR=0.8
-PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GSTREAMER_REQ,
-  HAVE_GSTREAMER=yes, HAVE_GSTREAMER=no)
-if test "x$HAVE_GSTREAMER" = "xno"; then
-  GST_MAJORMINOR="0.7"
-  PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GSTREAMER_REQ, ,
-  AC_MSG_ERROR(Gstreamer >= $GSTREAMER_REQ was not found))
-fi
+dnl Check for GStreamer
+GST_MAJORMINOR=0.9
+AC_SUBST(GST_MAJORMINOR)
+PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GST_REQ)
 AC_SUBST(GST_CFLAGS)
 AC_SUBST(GST_LIBS)
-
-AC_SUBST(GST_VERSION_MAJOR)
-AC_SUBST(GST_VERSION_MINOR)
-AC_SUBST(GST_MAJORMINOR)
-
-dnl check for GStreamer helper libs
-PKG_CHECK_MODULES(GSTLIBS, gstreamer-interfaces-$GST_MAJORMINOR >= $GSTREAMER_REQ, ,
-  AC_MSG_ERROR(Gstreamer Interfaces or Encoder Profiles >= $GSTREAMER_REQ was not found))
-OLD_CPPFLAGS=$CPPFLAGS
-CPPFLAGS="$CPPFLAGS $GSTLIBS_CFLAGS"
-AC_CHECK_HEADERS([gst/audio/audioclock.h], ,
-  AC_MSG_ERROR(Required interfaces not found - please install these))
-CPPFLAGS=$OLD_CPPFLAGS
-AC_SUBST(GSTLIBS_LIBS)
-AC_SUBST(GSTLIBS_CFLAGS)
 
 AC_SUBST(GST_VERSION_MAJOR)
 AC_SUBST(GST_VERSION_MINOR)

@@ -1,5 +1,5 @@
 /* Seamless DVD Player
- * Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+ * Copyright (C) 2005 Martin Soto <martinsoto@users.sourceforge.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -37,30 +37,26 @@ GST_DEBUG_CATEGORY_STATIC (dvdblocksrc_debug);
 
 
 /* ElementFactory information. */
-static GstElementDetails dvdblocksrc_details = {
+static GstElementDetails dvdblocksrc_details = GST_ELEMENT_DETAILS (
   "DVD block based source element",
   "Source/File/DVD",
   "Reads information from a DVD in a block oriented fashion",
-  "Martin Soto <martinsoto@users.sourceforge.net>"
-};
+  "Martin Soto <martinsoto@users.sourceforge.net>");
 
 
-/* DVDBlockSrc signals and args */
+/* DVDBlockSrc signals and properties. */
 enum {
   VOBU_READ_SIGNAL,
   VOBU_HEADER_SIGNAL,
-  QUEUE_EVENT_SIGNAL,
-  PUSH_EVENT_SIGNAL,
   LAST_SIGNAL,
 };
 
 enum {
-  ARG_0,
-  ARG_LOCATION,
-  ARG_TITLE,
-  ARG_DOMAIN,
-  ARG_VOBU_START,
-  ARG_CANCEL_VOBU,
+  PROP_0,
+  PROP_LOCATION,
+  PROP_TITLE,
+  PROP_DOMAIN,
+  PROP_VOBU_START,
 };
 
 
@@ -77,14 +73,22 @@ GST_STATIC_PAD_TEMPLATE (
 );
 
 
+#define _do_init(bla) \
+    GST_DEBUG_CATEGORY_INIT (dvdblocksrc_debug, "dvdblocksrc", 0, \
+        "DVD block reading element");
+
+GST_BOILERPLATE_FULL (DVDBlockSrc, dvdblocksrc, GstElement, GST_TYPE_PUSH_SRC,
+    _do_init);
+
 static void
 dvdblocksrc_base_init(gpointer g_class);
 static void
 dvdblocksrc_class_init (DVDBlockSrcClass *klass);
 static void
-dvdblocksrc_init (DVDBlockSrc *ac3iec);
-static void
 dvdblocksrc_finalize (GObject *object);
+
+static gboolean
+dvdblocksrc_stop (GstBaseSrc * bsrc);
 
 static void
 dvdblocksrc_set_property (GObject *object,
@@ -97,11 +101,8 @@ dvdblocksrc_get_property (GObject *object,
     GValue *value,
     GParamSpec *pspec);
 
-static void
-dvdblocksrc_loop (GstElement *element);
-
-static GstElementStateReturn
-dvdblocksrc_change_state (GstElement *element);
+static GstFlowReturn
+dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf);
 
 static void
 dvdblocksrc_open_root (DVDBlockSrc *src);
@@ -112,42 +113,8 @@ dvdblocksrc_open_file (DVDBlockSrc *src);
 static void
 dvdblocksrc_close_file (DVDBlockSrc *src);
 
-static void
-dvdblocksrc_push_event (DVDBlockSrc * src, GstEvent * event);
-static void
-dvdblocksrc_queue_event (DVDBlockSrc * src, GstEvent * event);
 
-
-static GstElementClass *parent_class = NULL;
 static guint dvdblocksrc_signals[LAST_SIGNAL] = { 0 };
-
-
-GType
-dvdblocksrc_get_type (void) 
-{
-  static GType dvdblocksrc_type = 0;
-
-  if (!dvdblocksrc_type) {
-    static const GTypeInfo dvdblocksrc_info = {
-      sizeof (DVDBlockSrcClass),
-      dvdblocksrc_base_init,
-      NULL,
-      (GClassInitFunc)dvdblocksrc_class_init,
-      NULL,
-      NULL,
-      sizeof (DVDBlockSrc),
-      0,
-      (GInstanceInitFunc)dvdblocksrc_init,
-    };
-    dvdblocksrc_type = g_type_register_static (GST_TYPE_ELEMENT,
-        "DVDBlockSrc",
-        &dvdblocksrc_info, 0);
-
-    GST_DEBUG_CATEGORY_INIT (dvdblocksrc_debug, "dvdblocksrc", 0,
-        "DVD block reading element");
-  }
-  return dvdblocksrc_type;
-}
 
 
 static void
@@ -166,11 +133,15 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
+  GstBaseSrcClass *gstbasesrc_class;
+  GstPushSrcClass *gstpush_src_class;
 
-  gobject_class = (GObjectClass*)klass;
-  gstelement_class = (GstElementClass*)klass;
+  gobject_class = G_OBJECT_CLASS (klass);
+  gstelement_class = GST_ELEMENT_CLASS (klass);
+  gstbasesrc_class = (GstBaseSrcClass *) klass;
+  gstpush_src_class = (GstPushSrcClass *) klass;
 
-  parent_class = g_type_class_ref (GST_TYPE_ELEMENT);
+  parent_class = g_type_class_ref (GST_TYPE_PUSH_SRC);
 
   dvdblocksrc_signals[VOBU_READ_SIGNAL] =
     g_signal_new ("vobu-read",
@@ -190,70 +161,39 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
         gst_marshal_VOID__BOXED,
         G_TYPE_NONE,
         1, GST_TYPE_BUFFER);
-  dvdblocksrc_signals[QUEUE_EVENT_SIGNAL] =
-    g_signal_new ("queue-event",
-        G_TYPE_FROM_CLASS (klass),
-        G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
-        G_STRUCT_OFFSET (DVDBlockSrcClass, queue_event),
-        NULL, NULL,
-        gst_marshal_VOID__BOXED,
-        G_TYPE_NONE,
-        1, GST_TYPE_EVENT);
-  dvdblocksrc_signals[PUSH_EVENT_SIGNAL] =
-    g_signal_new ("push-event",
-        G_TYPE_FROM_CLASS (klass),
-        G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
-        G_STRUCT_OFFSET (DVDBlockSrcClass, push_event),
-        NULL, NULL,
-        gst_marshal_VOID__BOXED,
-        G_TYPE_NONE,
-        1, GST_TYPE_EVENT);
 
-  g_object_class_install_property (gobject_class, ARG_LOCATION,
+  g_object_class_install_property (gobject_class, PROP_LOCATION,
       g_param_spec_string ("location", "location",
           "Path to the location of the DVD device",
           NULL, G_PARAM_READWRITE));
-  g_object_class_install_property (gobject_class, ARG_TITLE,
+  g_object_class_install_property (gobject_class, PROP_TITLE,
       g_param_spec_int ("title", "title",
           "DVD title as defined by libdvdread",
           0, G_MAXINT, 0, G_PARAM_READWRITE));
-  g_object_class_install_property (gobject_class, ARG_DOMAIN,
+  g_object_class_install_property (gobject_class, PROP_DOMAIN,
       g_param_spec_int ("domain", "domain",
           "DVD domain as defined by libdvdread",
           0, G_MAXINT, 0, G_PARAM_READWRITE));
-  g_object_class_install_property (gobject_class, ARG_VOBU_START,
+  g_object_class_install_property (gobject_class, PROP_VOBU_START,
       g_param_spec_int ("vobu-start", "vobu-start",
           "Offset in 2048 byte blocks from begin of DVD "
           "file (as specified by 'title' and 'domain') to "
           "start of next VOBU to read",
           -1, G_MAXINT, -1, G_PARAM_READWRITE));
-  g_object_class_install_property (gobject_class, ARG_CANCEL_VOBU,
-      g_param_spec_boolean ("cancel-vobu", "cancel-vobu",
-          "If set to TRUE, cancel reading of the current VOBU",
-          FALSE, G_PARAM_READWRITE));
 
   gobject_class->set_property = dvdblocksrc_set_property;
   gobject_class->get_property = dvdblocksrc_get_property;
   gobject_class->finalize = dvdblocksrc_finalize;
 
-  gstelement_class->change_state = dvdblocksrc_change_state;
+  gstbasesrc_class->stop = dvdblocksrc_stop;
 
-  klass->queue_event = dvdblocksrc_queue_event;
-  klass->push_event = dvdblocksrc_push_event;
+  gstpush_src_class->create = dvdblocksrc_create;
 }
 
 
 static void 
-dvdblocksrc_init (DVDBlockSrc *src)
+dvdblocksrc_init (DVDBlockSrc * src, DVDBlockSrcClass * klass)
 {
-  src->src = gst_pad_new_from_template (
-      gst_static_pad_template_get (&dvdblocksrc_src_template),
-      "src");
-  gst_element_add_pad (GST_ELEMENT (src), src->src);
-
-  gst_element_set_loop_function (GST_ELEMENT(src),
-      dvdblocksrc_loop);
-
   src->location = g_strdup ("/dev/dvd");
   src->title_num = 0;
   src->domain = DVD_READ_TITLE_VOBS;
@@ -262,16 +202,12 @@ dvdblocksrc_init (DVDBlockSrc *src)
   src->block_offset = 0;
   src->block_count = 0;
 
-  src->cancel_vobu = FALSE;
-
   src->open_location = NULL;
   src->open_title_num = -1;
   src->open_domain = -1;
 
   src->reader = NULL;
   src->file = NULL;
-
-  src->event_queue = g_async_queue_new ();
 }
 
 
@@ -287,6 +223,18 @@ dvdblocksrc_finalize (GObject *object)
 }
 
 
+static gboolean
+dvdblocksrc_stop (GstBaseSrc * bsrc)
+{
+  DVDBlockSrc *src = DVDBLOCKSRC (bsrc);
+
+  dvdblocksrc_close_file (src);
+  dvdblocksrc_close_root (src);
+
+  return TRUE;
+}
+
+
 static void
 dvdblocksrc_set_property (GObject *object, guint prop_id,
     const GValue *value, GParamSpec *pspec)
@@ -296,7 +244,7 @@ dvdblocksrc_set_property (GObject *object, guint prop_id,
   g_return_if_fail (GST_IS_DVDBLOCKSRC (object));
  
   switch (prop_id) {
-    case ARG_LOCATION:
+    case PROP_LOCATION:
       if (src->location != NULL) {
         g_free (src->location);
       }
@@ -307,17 +255,14 @@ dvdblocksrc_set_property (GObject *object, guint prop_id,
         src->location = g_strdup (g_value_get_string (value));
       }
       break;
-    case ARG_TITLE:
+    case PROP_TITLE:
       src->title_num = g_value_get_int (value);
       break;
-    case ARG_DOMAIN:
+    case PROP_DOMAIN:
       src->domain = g_value_get_int (value);
       break;
-    case ARG_VOBU_START:
+    case PROP_VOBU_START:
       src->vobu_start = g_value_get_int (value);
-      break;
-    case ARG_CANCEL_VOBU:
-      src->cancel_vobu = g_value_get_boolean (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -337,20 +282,17 @@ dvdblocksrc_get_property (GObject *object, guint prop_id,
   src = DVDBLOCKSRC (object);
   
   switch (prop_id) {
-    case ARG_LOCATION:
+    case PROP_LOCATION:
       g_value_set_string (value, src->location);
       break;
-    case ARG_TITLE:
+    case PROP_TITLE:
       g_value_set_int (value, src->title_num);
       break;
-    case ARG_DOMAIN:
+    case PROP_DOMAIN:
       g_value_set_int (value, src->domain);
       break;
-    case ARG_VOBU_START:
+    case PROP_VOBU_START:
       g_value_set_int (value, src->vobu_start);
-      break;
-    case ARG_CANCEL_VOBU:
-      g_value_set_boolean (value, src->cancel_vobu);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -392,27 +334,16 @@ dvdblocksrc_read (DVDBlockSrc * src, int block_count)
 }
 
 
-static void
-dvdblocksrc_loop (GstElement *element)
+static GstFlowReturn
+dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
 {
-  DVDBlockSrc *src = DVDBLOCKSRC(element);
+  DVDBlockSrc *src = DVDBLOCKSRC (psrc);
+
   GstBuffer *buf;
   int block_count;
-  GstEvent *event;
-
-  /* Send any queued events. */
-  event = g_async_queue_try_pop (src->event_queue);
-  while (event) {
-    gst_pad_push (src->src, GST_DATA (event));
-    event = g_async_queue_try_pop (src->event_queue);
-  }
 
   if (src->block_count == 0 && src->vobu_start == -1) {
     /* No more work to do. */
-
-    /* If there's no more work, any pending cancel request must be
-       erased. */
-    src->cancel_vobu = FALSE;
 
     /* Fire the vobu_read signal to give the application a chance
        to give us more work. */
@@ -421,7 +352,7 @@ dvdblocksrc_loop (GstElement *element)
 
     if (src->vobu_start == -1) {
       /* We didn't get any more work. */
-      return;
+      return GST_FLOW_ERROR;
     }
   }
 
@@ -442,7 +373,7 @@ dvdblocksrc_loop (GstElement *element)
           ("Block, title %d, domain %d, offset %d is not a VOBU header",
            src->title_num, src->domain, src->block_offset - 1),
           NULL);
-      return;
+      return GST_FLOW_ERROR;
     }
 
     /* Set the number of blocks to read. */
@@ -454,20 +385,7 @@ dvdblocksrc_loop (GstElement *element)
     /* Pass the header to the application. */
     g_signal_emit (G_OBJECT (src),
         dvdblocksrc_signals[VOBU_HEADER_SIGNAL], 0, buf);
-
-    gst_pad_push (src->src, GST_DATA (buf));
-  }
-
-  if (src->cancel_vobu) {
-    /* VOBU reading was canceled. */
-    src->block_count = 0;
-    src->cancel_vobu = FALSE;
-    return;
-  }
-
-  /* Some VOBUs contain only the header. src->block_count could be 0
-     here. */
-  if (src->block_count > 0) {
+  } else {
     /* Determine the size of the new buffer. */
     if (src->block_count > DVDBLOCKSRC_MAX_BUF_SIZE) {
       block_count = DVDBLOCKSRC_MAX_BUF_SIZE;
@@ -476,43 +394,10 @@ dvdblocksrc_loop (GstElement *element)
     }
 
     buf = dvdblocksrc_read (src, block_count);
-
-    gst_pad_push (src->src, GST_DATA (buf));
-  }
-}
-
-
-static GstElementStateReturn
-dvdblocksrc_change_state (GstElement *element)
-{
-  DVDBlockSrc *src;
-
-  g_return_val_if_fail (GST_IS_DVDBLOCKSRC (element), GST_STATE_FAILURE);
-
-  src = DVDBLOCKSRC(element);
-
-  switch (GST_STATE_TRANSITION (element)) {
-    case GST_STATE_NULL_TO_READY:
-      break;
-    case GST_STATE_READY_TO_PAUSED:
-      break;
-    case GST_STATE_PAUSED_TO_PLAYING:
-      break;
-    case GST_STATE_PLAYING_TO_PAUSED:
-      break;
-    case GST_STATE_PAUSED_TO_READY:
-      break;
-    case GST_STATE_READY_TO_NULL:
-      dvdblocksrc_close_file (src);
-      dvdblocksrc_close_root (src);
-      break;
   }
 
-  if (GST_ELEMENT_CLASS (parent_class)->change_state) {
-    return GST_ELEMENT_CLASS (parent_class)->change_state (element);
-  }
-
-  return GST_STATE_SUCCESS;
+  *outbuf = buf;
+  return GST_FLOW_OK;
 }
 
 
@@ -599,26 +484,6 @@ dvdblocksrc_close_file (DVDBlockSrc *src)
   src->file = NULL;
   src->open_title_num = -1;
   src->open_domain = -1;
-}
-
-
-static void
-dvdblocksrc_push_event (DVDBlockSrc * src, GstEvent * event)
-{
-  /* Hack: gst-python should do this somehow. */
-  gst_event_ref (event);
-
-  gst_pad_push (src->src, GST_DATA (event));
-}
-
-
-static void
-dvdblocksrc_queue_event (DVDBlockSrc * src, GstEvent * event)
-{
-  /* Hack: gst-python should do this somehow. */
-  gst_event_ref (event);
-
-  g_async_queue_push (src->event_queue, event);
 }
 
 
