@@ -1,5 +1,14 @@
 2005-11-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/dvdblock/dvdblocksrc.h: Fix parent class.
+	* gst-plugins/dvdblock/dvdblocksrc.c (dvdblocksrc_class_init):
+	Set set un get_property before initialiting properties.
+	* gst-plugins/dvdblock/Makefile.am (libdvdblock_la_CFLAGS) 
+	(libdvdblock_la_LIBADD): Add GStreamer base library flags.
+	* configure.ac: Add check for GStreamer base libs.
+
+2005-11-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/dvdblock/dvdblocksrc.c: Port to 0.9 by deriving from
 	GstPushSrc (not yet tested).
 	* gst-plugins/Makefile.am (#SUBDIRS): Deactivate compilation of

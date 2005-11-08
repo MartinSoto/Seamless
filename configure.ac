@@ -53,6 +53,17 @@ AC_SUBST(GST_VERSION_MAJOR)
 AC_SUBST(GST_VERSION_MINOR)
 AC_SUBST(GST_MAJORMINOR)
 
+dnl Check for gstreamer-base; uninstalled is selected preferentially
+PKG_CHECK_MODULES(GST_BASE, gstreamer-base-$GST_MAJORMINOR >= $GST_REQ,
+  HAVE_GST_BASE="yes", HAVE_GST_BASE="no")
+
+if test "x$HAVE_GST_BASE" = "xno"; then
+  AC_MSG_ERROR(no GStreamer Base Libs found)
+fi
+
+AC_SUBST(GST_BASE_LIBS)
+AC_SUBST(GST_BASE_CFLAGS)
+
 dnl Check for Python
 AM_PATH_PYTHON
 AC_MSG_CHECKING(for python >= 2.4)

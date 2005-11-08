@@ -79,7 +79,7 @@ struct _DVDBlockSrc {
 
 
 struct _DVDBlockSrcClass {
-  GstElementClass parent_class;
+  GstPushSrcClass parent_class;
 
   /* Signals */
   void (*vobu_read)		(DVDBlockSrc * src);

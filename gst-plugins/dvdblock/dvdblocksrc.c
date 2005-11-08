@@ -162,6 +162,10 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
         G_TYPE_NONE,
         1, GST_TYPE_BUFFER);
 
+  gobject_class->set_property = dvdblocksrc_set_property;
+  gobject_class->get_property = dvdblocksrc_get_property;
+  gobject_class->finalize = dvdblocksrc_finalize;
+
   g_object_class_install_property (gobject_class, PROP_LOCATION,
       g_param_spec_string ("location", "location",
           "Path to the location of the DVD device",
@@ -180,10 +184,6 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
           "file (as specified by 'title' and 'domain') to "
           "start of next VOBU to read",
           -1, G_MAXINT, -1, G_PARAM_READWRITE));
-
-  gobject_class->set_property = dvdblocksrc_set_property;
-  gobject_class->get_property = dvdblocksrc_get_property;
-  gobject_class->finalize = dvdblocksrc_finalize;
 
   gstbasesrc_class->stop = dvdblocksrc_stop;
 
