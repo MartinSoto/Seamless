@@ -32,7 +32,7 @@ plugindir="\$(pkglibdir)/gst-plugins"
 AC_SUBST(plugindir)
 
 dnl Required versions of dependencies
-AC_SUBST(GST_REQ, 0.9.0)
+AC_SUBST(GST_REQ, 0.9.7)
 AC_SUBST(GLIB_REQ, 2.0.0)
 AC_SUBST(PYGTK_REQ, 2.4.0)
 
@@ -43,7 +43,7 @@ AC_SUBST(GLIB_LIBS)
 AC_SUBST(GLIB_CFLAGS)
 
 dnl Check for GStreamer
-GST_MAJORMINOR=0.9
+GST_MAJORMINOR=0.10
 AC_SUBST(GST_MAJORMINOR)
 PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GST_REQ)
 AC_SUBST(GST_CFLAGS)
