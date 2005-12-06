@@ -77,7 +77,7 @@ GST_STATIC_PAD_TEMPLATE (
     GST_DEBUG_CATEGORY_INIT (dvdblocksrc_debug, "dvdblocksrc", 0, \
         "DVD block reading element");
 
-GST_BOILERPLATE_FULL (DVDBlockSrc, dvdblocksrc, GstElement, GST_TYPE_PUSH_SRC,
+GST_BOILERPLATE_FULL (DVDBlockSrc, dvdblocksrc, GstPushSrc, GST_TYPE_PUSH_SRC,
     _do_init);
 
 static void
@@ -339,8 +339,10 @@ dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
 {
   DVDBlockSrc *src = DVDBLOCKSRC (psrc);
 
-  GstBuffer *buf;
+  GstBuffer *buf = NULL;
   int block_count;
+
+  GST_INFO_OBJECT (src, "entering create");
 
   if (src->block_count == 0 && src->vobu_start == -1) {
     /* No more work to do. */
@@ -397,6 +399,8 @@ dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
   }
 
   *outbuf = buf;
+
+  GST_INFO_OBJECT (src, "leaving create normally");
   return GST_FLOW_OK;
 }
 

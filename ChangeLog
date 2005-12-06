@@ -1,5 +1,11 @@
 2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/dvdblock/dvdblocksrc.c: Use the right base class in
+	BOILERPLATE macro.
+	(dvdblocksrc_create): Initialize buf to NULL.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* configure.ac (plugindir): Bump GStreamer version requirement to
 	0.10.
 
