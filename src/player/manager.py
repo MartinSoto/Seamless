@@ -161,9 +161,11 @@ class Manager(SignalHolder):
         # contiguous in time.
         self.segmentStart = None
         self.segmentStop = None
+        self.ev = []
 
     def sendEvent(self, event):
         """Send `event` down the pipeline."""
+        self.ev.append(event)
         self.srcPad.push_event(event)
 
 
