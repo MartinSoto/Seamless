@@ -258,7 +258,7 @@ class Pipeline(gst.Pipeline):
     __slots__ = ('backPlayer',
                  'audioSink', 
                  'videoSink',
-                 'clock')
+                 'syncHandlers')
 
     def __init__(self, options, name="dvdplayer"):
         super(Pipeline, self).__init__(name)
@@ -293,6 +293,31 @@ class Pipeline(gst.Pipeline):
 #         self.backPlayer.link_pads('subtitle', self.videoSink, 'subtitle')
         self.backPlayer.link_pads('audio', self.audioSink, 'sink')
 
+        # A list of functions to synchronously handle bus messages.
+        self.syncHandlers = []
+
+        # Install a synchronous message handler to run the functions
+        # in self.syncHandlers.
+        self.get_bus().set_sync_handler(self.syncHandler)
+
+
+    #
+    # Bus Handling
+    #
+
+    def syncHandler(self, *args):
+        for handler in self.syncHandlers:
+            ret = handler(args)
+            if ret != None:
+                return ret
+        return gst.BUS_PASS
+
+    def addSyncBusHandler(self, handler):
+        self.syncHandlers.append(handler)
+
+    def removeSyncBusHandler(self, handler):
+        self.syncHandlers.remove(handler)
+
 
     #
     # Component Retrieval
@@ -326,14 +351,3 @@ class Pipeline(gst.Pipeline):
         self.forceStop()
 
 
-if __name__ == '__main__':
-    p = Pipeline({'location': '/dev/hdd'})
-    p.set_state(gst.STATE_PLAYING)
-
-    gobject.MainLoop().run()
-
-if __name__ == '__main__':
-    p = Pipeline({'location': '/dev/hdd'})
-    p.set_state(gst.STATE_PLAYING)
-
-    gobject.MainLoop().run()
