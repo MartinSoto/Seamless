@@ -1,5 +1,11 @@
 2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.sendEvent): Get rid of hack to keep events
+	referenced. Alredy fixed in gst-python.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/pipeline.py (Pipeline.__slots__, Pipeline.__init__) 
 	(Pipeline.syncHandler, Pipeline.addSyncBusHandler) 
 	(Pipeline.removeSyncBusHandler): Add a simple system to register
