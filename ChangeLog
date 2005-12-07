@@ -1,5 +1,15 @@
 2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/loadplugins.py: Deactivate plugin manual loading (not
+	necessary in 0.10)
+	* src/videowidget.py (VideoWidget.videoEventFilter): Don't
+	register the VideoWidget as GType.
+	* src/seamless.py: Require GStreamer 0.10.
+	(main): Don't set the scheduler anymore. For the moment, don't
+	create the graphical interface.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/events.py (createCustom, audio, eos, filler, flush) 
 	(newsegment, highlight, nav, stillFrame, subpictureClut) 
 	(subpicture, subpictureHide, subpictureShow): Update to GStreamer

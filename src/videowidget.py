@@ -201,6 +201,3 @@ class VideoWidget(gtk.EventBox):
         self.xlock.release()
 
         return gtk.gdk.FILTER_CONTINUE
-
-
-gobject.type_register(VideoWidget)

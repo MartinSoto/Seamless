@@ -43,6 +43,8 @@ while '--help' in sys.argv:
     sys.argv.remove('--help')
     helpOpts = ['--help']
 
+import pygst
+pygst.require('0.10')
 import gst
 
 sys.argv.extend(helpOpts)
@@ -137,17 +139,13 @@ def main():
         optParser.error("value %0.3f out of range for pixel aspect ratio" %
                         options.pixelAspect)
 
-    # Use the fair scheduler.
-    if gst.scheduler_factory_find('fairpth'):
-        gst.scheduler_factory_set_default_name('fairpth')
-    else:
-        gst.scheduler_factory_set_default_name('fairgthread')
-
     # Create the main objects.
     playerObj = player.DVDPlayer(options)
-    appInstance = mainui.MainUserInterface(playerObj, options)
+#     appInstance = mainui.MainUserInterface(playerObj, options)
 
-    gtk.main()
+#     gtk.main()
+    playerObj.start()
+    gobject.MainLoop().run()
 
 if __name__ == "__main__":
     main()
