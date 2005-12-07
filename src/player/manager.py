@@ -42,6 +42,7 @@ def interactiveOp(method):
     def wrapper(self, *args, **keywords):
         self.manager.runInteractive(method(self, *args, **keywords))
 
+    wrapper.__name__ = method.__name__
     return wrapper
 
 
@@ -55,6 +56,7 @@ def synchronized(method):
         finally:
             self.lock.release()
 
+    wrapper.__name__ = method.__name__
     return wrapper
 
 
@@ -72,8 +74,8 @@ class Manager(SignalHolder):
     activation of highlights are controlled by the DVD virtual
     machine. In this implementation, the virtual machine produces a
     sequence of command objects (as an iterator) that, when invoked
-    with the manager as parameter, perform the required operations The
-    machine is restricted to use the operations defined in the
+    with the manager as parameter, perform the required operations.
+    The machine is restricted to use the operations defined in the
     `machine` module.
 
     The `PlayVobu` operation is particularly important, since it is
@@ -101,6 +103,7 @@ class Manager(SignalHolder):
                  'machine',
 
                  'src',
+                 'srcPad',
                  'mainItr',
                  'lock',
 
@@ -113,8 +116,10 @@ class Manager(SignalHolder):
                  'palette',
 
                  'pendingCmds',
-                 'immediate',
-                 'interactiveCount')
+                 'interactiveCount',
+
+                 'segmentStart',
+                 'segmentStop', 'ev')
 
 
     def __init__(self, machine, pipeline):
@@ -122,6 +127,7 @@ class Manager(SignalHolder):
         self.pipeline = pipeline
 
         self.src = pipeline.getBlockSource()
+        self.srcPad = self.src.get_pad('src')
 
         self.mainItr = iter(self.machine)
 
@@ -145,21 +151,20 @@ class Manager(SignalHolder):
         # machine, but haven't yet been executed.
         self.pendingCmds = []
 
-        # When true, events will be sent directly down the pipeline,
-        # instead of being queued in the source element.
-        self.immediate = False
-
         # A counter that increments itself whenever an interactive
         # operation is executed. It is used to deal with call/resume
         # operations and pipeline flushing.
         self.interactiveCount = 0
 
+        # Start and stop times of the current segment. The current
+        # segment covers the current VOBU and all preceeding VOBUs
+        # contiguous in time.
+        self.segmentStart = None
+        self.segmentStop = None
+
     def sendEvent(self, event):
         """Send `event` down the pipeline."""
-        if self.immediate:
-            self.src.emit('push-event', event)
-        else:
-            self.src.emit('queue-event', event)
+        self.srcPad.push_event(event)
 
 
     #
@@ -184,8 +189,6 @@ class Manager(SignalHolder):
         """Invoked by the source element after reading a complete
         VOBU."""
 
-        self.immediate = True
-
         try:
             if self.pendingCmds == []:
                 cmds = self.collectCmds()
@@ -196,7 +199,7 @@ class Manager(SignalHolder):
             if cmds == []:
                 # Time to stop the pipeline.
                 self.src.set_eos()
-                self.src.emit('push-event', events.eos())
+                self.sendEvent(events.eos())
                 return
 
             for cmd in cmds:
@@ -207,16 +210,15 @@ class Manager(SignalHolder):
             traceback.print_exc()
             sys.exit(1)
 
-        self.immediate = False
-
     @synchronized
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
+
         # Release the lock set by the playVobu operation.
         self.lock.release()
 
         # Create a nav packet object.
-        nav = dvdread.NavPacket(buf.get_data())
+        nav = dvdread.NavPacket(buf.data)
 
         # Hand the packet to the machine.
         self.machine.setCurrentNav(nav)
@@ -229,9 +231,23 @@ class Manager(SignalHolder):
             # VOBU playback was cancelled.
             return
 
-        # Send a nav event.
-        self.src.emit('push-event', events.nav(nav.startTime,
-                                               nav.endTime))
+        # Update the current segment and send a corresponding
+        # newsegment event.
+        start = events.mpegTimeToGstTime(nav.startTime)
+        stop = events.mpegTimeToGstTime(nav.endTime)
+        if self.segmentStop != start:
+            # We have a new segment
+            self.segmentStart = start
+            self.segmentStop = stop
+            update = False
+            gst.debug('New current segment')
+        else:
+            # We have an update:
+            self.segmentStop = stop
+            update = True
+            gst.debug('Current segment update')
+        self.sendEvent(events.newsegment(update, self.segmentStart,
+                                         self.segmentStop))
 
         # FIXME: This should be done later in the game, namely, when
         # the packet actually reaches the subtitle element.
@@ -429,7 +445,7 @@ class Manager(SignalHolder):
         """Pause the pipeline for a short time (currently 0.1s).
 
         Warning: This method temporarily releases the object's lock"""
-        self.sendEvent(events.filler())
+        #self.sendEvent(events.filler())
 
         # We don't want to keep the lock while sleeping.
         self.lock.release()
@@ -438,6 +454,7 @@ class Manager(SignalHolder):
 
     def eos(self):
         """Signal the end of stream (EOS) to the pipeline."""
+        print >> sys.stderr, "+++ Sending EOS"
         self.sendEvent(events.eos())
 
 

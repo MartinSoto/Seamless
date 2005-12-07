@@ -1,5 +1,16 @@
 2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (interactiveOp, synchronized): Set the
+	wrapper names to be the same of the wrapped functions.
+	(Manager.__init__, Manager.sendEvent, Manager.vobuRead) 
+	(Manager.vobuHeader): Port to GStreamer 0.10. Get rid of immediate
+	and queued events, since 0.10 don't require this.
+	(Manager.vobuHeader): Instead of sending nav events, keep
+	current segment information and send appropriate newsegment
+	events.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/loadplugins.py: Deactivate plugin manual loading (not
 	necessary in 0.10)
 	* src/videowidget.py (VideoWidget.videoEventFilter): Don't
