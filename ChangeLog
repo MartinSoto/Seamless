@@ -1,5 +1,12 @@
 2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/events.py (createCustom, audio, eos, filler, flush) 
+	(newsegment, highlight, nav, stillFrame, subpictureClut) 
+	(subpicture, subpictureHide, subpictureShow): Update to GStreamer
+	0.10.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/debug.py (enterLeave.wrapper): New debug function to log
 	arbitrary procedure invocations.
 
