@@ -1,5 +1,11 @@
 2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py: Adapt pipeline.py to the extent
+	necessary to achieve basic playback. File still under
+	construction.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.__init__, Manager.sendEvent): Add
 	a hack to keep events referenced until gst_pad_push_event in
 	gst-python gets fixed.
