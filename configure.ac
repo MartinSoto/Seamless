@@ -107,13 +107,6 @@ AC_SUBST(ALSA_CFLAGS)
 AC_SUBST(ALSA_LIBS)
 AM_CONDITIONAL(HAVE_ALSA, test "x$HAVE_ALSA" = "xyes")
 
-dnl Check for liba52
-AC_CHECK_A52DEC(HAVE_A52DEC="yes", HAVE_A52DEC="no")
-AC_SUBST(HAVE_A52DEC)
-AC_SUBST(A52DEC_CFLAGS)
-AC_SUBST(A52DEC_LIBS)
-AM_CONDITIONAL(HAVE_A52DEC, test "x$HAVE_A52DEC" = "xyes")
-
 dnl Check for Pyrex
 AC_PATH_PROG(PYREXC, pyrexc, NOT_FOUND)
 AC_SUBST(PYREXC)
@@ -126,14 +119,11 @@ AC_OUTPUT([
   Makefile
   config/Makefile
   gst-plugins/Makefile
-  gst-plugins/a52dec/Makefile
   gst-plugins/alsaspdif/Makefile
   gst-plugins/capspipe/Makefile
   gst-plugins/dvdblock/Makefile
   gst-plugins/iec958/Makefile
   gst-plugins/mpeg2sub/Makefile
-  gst-plugins/mpegstream/Makefile
-  gst-plugins/queue/Makefile
   gst-plugins/robustclock/Makefile
   src/Makefile
   src/dvdread/Makefile

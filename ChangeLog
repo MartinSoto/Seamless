@@ -1,4 +1,11 @@
 2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/Makefile.am: 
+	* gst-plugins/a52dec:
+	* configure.ac:
+	Erase fork of A52 plugin. Clean up make stuff accordingly.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
  
 	* src/seamless.py (main): 
 	--pixel-aspect now takes a fraction in GStreamer format as value.
