@@ -307,7 +307,7 @@ class Pipeline(gst.Pipeline):
 
     def syncHandler(self, *args):
         for handler in self.syncHandlers:
-            ret = handler(args)
+            ret = handler(*args)
             if ret != None:
                 return ret
         return gst.BUS_PASS

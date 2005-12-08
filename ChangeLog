@@ -1,3 +1,8 @@
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (Pipeline.syncHandler): Fix invocation of
+	registered handlers.
+
 2005-12-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/queue, gst-plugins/mpegstream: Delete old forks of
