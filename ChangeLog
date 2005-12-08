@@ -1,3 +1,8 @@
+2005-12-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/queue, gst-plugins/mpegstream: Delete old forks of
+	GStreamer elements. Fixes 0.10 are now in GStreamer CVS.
+
 2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
