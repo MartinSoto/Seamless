@@ -215,7 +215,9 @@ class SoftwareVideo(Bin):
         self.makeSubelem('ffmpegcolorspace')
         self.makeSubelem('videoscale')
         self.makeSubelem('queue')
-        self.makeSubelem(options['videoSink'], 'videosink')
+        self.makeSubelem(options['videoSink'], 'videosink',
+                         force_aspect_ratio=True,
+                         pixel_aspect_ratio=options['pixelAspect'])
 
         self.link('mpeg2dec', 'ffmpegcolorspace')
         self.link('ffmpegcolorspace', 'videoscale')

@@ -1,4 +1,26 @@
 2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+ 
+	* src/seamless.py (main): 
+	--pixel-aspect now takes a fraction in GStreamer format as value.
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__init__, VideoWidget.setOverlay) 
+	(VideoWidget.getOverlay, VideoWidget.presetAspectRatio) 
+	(resizeVideo, desiredSizeChanged, VideoWidget.prepareWindowCb) 
+	(VideoWidget.sizeAllocateCb, VideoWidget.destroyCb) 
+	(VideoWidget.destroyCb, VideoWidget.backgroundRealizeCb) 
+	(VideoWidget.videoEventFilterCb): 
+	* src/seamless.py (main): 
+	* src/player/pipeline.py (SoftwareVideo.__init__): 
+	* src/mainui.py (MainUserInterface.__init__) 
+	(MainUserInterface.videoReady): 
+	Revamp VideoWidget for Gstreamer 0.10: - Get rid of aspect ratio
+	handling, since the video sink does it now. - Set window id in
+	video sink using synchronous bus message. - Rename
+	set/getVideoSink to set/getOverlay. - Call the "ready" signal from
+	realize.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/pipeline.py (Pipeline.syncHandler): Fix invocation of
 	registered handlers.

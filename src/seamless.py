@@ -115,8 +115,8 @@ def main():
                          default="xvimagesink")
     optParser.add_option("--pixel-aspect", dest="pixelAspect",
                          metavar="ASPECT",
-                         help="set pixel aspect ratio to ASPECT (default 1.0)",
-                         default="1.0")    
+                         help="set pixel aspect ratio to ASPECT (default 1/1)",
+                         default="1/1")    
     optParser.add_option("--clock", dest="clockType",
                          metavar="TYPE",
                          help="'robust' to use the special robust clock"
@@ -130,22 +130,11 @@ def main():
     if args != []:
         optParser.error("invalid argument(s): %s" % string.join(args, ' '))
 
-    # Evaluate the pixel aspect ratio.
-    try:
-        options.pixelAspect = eval(options.pixelAspect, {}, {})
-    except:
-        optParser.error("invalid expression '%s'" % options.pixelAspect)
-    if options.pixelAspect < 1.0 or options.pixelAspect > 10.0:
-        optParser.error("value %0.3f out of range for pixel aspect ratio" %
-                        options.pixelAspect)
-
     # Create the main objects.
     playerObj = player.DVDPlayer(options)
-#     appInstance = mainui.MainUserInterface(playerObj, options)
+    appInstance = mainui.MainUserInterface(playerObj, options)
 
-#     gtk.main()
-    playerObj.start()
-    gobject.MainLoop().run()
+    gtk.main()
 
 if __name__ == "__main__":
     main()

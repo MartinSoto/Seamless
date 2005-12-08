@@ -63,7 +63,9 @@ class MainUserInterface(object):
         self.video.connect('ready', self.videoReady)
         self.video.connect('button-press-event', self.videoButtonPress)
 
-        self.video.setPixelAspect(options.pixelAspect)
+        # FIXME: If the video sink doesn't support XOverlay, we have a
+        # problem.
+        self.video.setOverlay(self.player.getVideoSink())
 
         # Preset the aspect ratio when the player changes it.
         self.player.aspectRatioChanged.connect(self.video.\
@@ -167,8 +169,7 @@ class MainUserInterface(object):
         self.shutDown()
 
     def videoReady(self, widget):
-        # Setup and start the player.
-        self.video.setImageSink(self.player.getVideoSink())
+        # Start the player.
         self.player.start()
 
     def videoButtonPress(self, widget, event):
