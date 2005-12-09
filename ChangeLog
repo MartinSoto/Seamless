@@ -1,5 +1,10 @@
 2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py (Pipeline.syncHandler): Make generic
+	handler robust against exceptions.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/Makefile.am: 
 	* gst-plugins/a52dec:
 	* configure.ac:

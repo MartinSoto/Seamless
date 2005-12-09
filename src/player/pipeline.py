@@ -308,10 +308,14 @@ class Pipeline(gst.Pipeline):
     #
 
     def syncHandler(self, *args):
-        for handler in self.syncHandlers:
-            ret = handler(*args)
-            if ret != None:
-                return ret
+        try:
+            for handler in self.syncHandlers:
+                ret = handler(*args)
+                if ret != None:
+                    return ret
+        except:
+            gst.warning('Handler raised exception')
+
         return gst.BUS_PASS
 
     def addSyncBusHandler(self, handler):
