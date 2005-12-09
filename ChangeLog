@@ -1,5 +1,9 @@
 2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/loadplugins.py: Reenable loadplugins.py.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/events.py (flush_start, flush_stop): Define instead
 	of the old flush.
 
