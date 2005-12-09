@@ -355,7 +355,8 @@ class Manager(SignalHolder):
 
         This forces the source to immediatly ask for more work by
         firing the `vobu-read` singnal."""
-        self.src.set_property('cancel-vobu', True)
+        #FIXME: Reimplement in some way.
+        pass
 
     def setAspectRatio(self, aspectRatio):
         """Set the display aspect ratio to `aspectRatio`.
@@ -431,7 +432,8 @@ class Manager(SignalHolder):
 
     def flush(self):
         """Flush the pipeline."""
-        self.sendEvent(events.flush())
+        self.sendEvent(events.flush_start())
+        self.sendEvent(events.flush_stop())
 
         # A flush erases the CLUT. Restore it.
         self.sendEvent(events.subpictureClut(self.clut))

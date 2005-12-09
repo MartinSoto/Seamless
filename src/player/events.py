@@ -43,9 +43,13 @@ def filler():
     """Create and return a filler event."""
     return gst.event_new_filler()
 
-def flush():
-    """Create and return a flush event."""
+def flush_start():
+    """Create and return a flush start event."""
     return gst.event_new_flush_start()
+
+def flush_stop():
+    """Create and return a flush stop event."""
+    return gst.event_new_flush_stop()
 
 def newsegment(update, startTime, endTime):
     """Create and return a newsegment event for the specified start

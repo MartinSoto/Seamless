@@ -1,5 +1,19 @@
 2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/events.py (flush_start, flush_stop): Define instead
+	of the old flush.
+
+	* src/player/manager.py (Manager.cancelVobu): Disable for the
+	moment since current dvdblock is not able to cancel VOBU
+	playback.
+	(Manager.cancelVobu): Send flush start and stop events.
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.setOverlay, VideoWidget.prepareWindowCb): Store
+	pipeline and use it to remove the handler after it is used.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/pipeline.py (Pipeline.syncHandler): Make generic
 	handler robust against exceptions.
 

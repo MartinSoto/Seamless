@@ -29,6 +29,7 @@ class VideoWidget(gtk.EventBox):
     __slots__ = ('background',
                  'videoWin',
                  'overlay',
+                 'pipeline',
                  'cursorTimeout'
                  'invisibleCursor')
 
@@ -73,12 +74,12 @@ class VideoWidget(gtk.EventBox):
         # Find the pipeline object containing the image sink. It must
         # support installing synchronous message handlers, but we
         # don't check for it.
-        pipeline = overlay
-        while not isinstance(pipeline, gst.Pipeline):
-            pipeline = pipeline.get_parent()
+        self.pipeline = overlay
+        while not isinstance(self.pipeline, gst.Pipeline):
+            self.pipeline = self.pipeline.get_parent()
 
         # Install a handler for the prepare-xwindow-id message.
-        pipeline.addSyncBusHandler(self.prepareWindowCb)
+        self.pipeline.addSyncBusHandler(self.prepareWindowCb)
 
     def getOverlay(self):
         return self.overlay
@@ -121,6 +122,9 @@ class VideoWidget(gtk.EventBox):
             return None
 
         self.overlay.set_xwindow_id(self.videoWin.xid)
+
+        # Remove the callback from the pipeline.
+        self.pipeline.removeSyncBusHandler(self.prepareWindowCb)
 
         return gst.BUS_DROP
 
