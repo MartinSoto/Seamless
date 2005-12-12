@@ -185,18 +185,18 @@ gst_mpeg2subt_class_init (GstMpeg2SubtClass * gclass)
   gobject_class = (GObjectClass *) gclass;
   gstelement_class = (GstElementClass *) gclass;
 
+  parent_class = g_type_class_ref (GST_TYPE_ELEMENT);
+
+  gobject_class->set_property = gst_mpeg2subt_set_property;
+  gobject_class->get_property = gst_mpeg2subt_get_property;
+  gobject_class->finalize = gst_mpeg2subt_finalize;
+
   /* CHECKME: */
   g_object_class_install_property (G_OBJECT_CLASS (gclass), ARG_SKIP,
 				   g_param_spec_int ("skip", "skip",
 						     "skip", G_MININT,
 						     G_MAXINT, 0,
 						     G_PARAM_READWRITE));
-
-  parent_class = g_type_class_ref (GST_TYPE_ELEMENT);
-
-  gobject_class->set_property = gst_mpeg2subt_set_property;
-  gobject_class->get_property = gst_mpeg2subt_get_property;
-  gobject_class->finalize = gst_mpeg2subt_finalize;
 }
 
 static void
@@ -1147,13 +1147,13 @@ gst_mpeg2subt_get_property (GObject * object, guint prop_id, GValue * value,
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
-  return gst_element_register (plugin, "seamless-mpeg2subt",
+  return gst_element_register (plugin, "mpeg2subt",
       GST_RANK_NONE, GST_TYPE_MPEG2SUBT);
 }
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    "seamless-mpeg2sub",
+    "mpeg2sub",
     "MPEG-2 video subtitle parser",
     plugin_init, VERSION, "LGPL",
     PACKAGE " (temporary fork from gst-plugins)",

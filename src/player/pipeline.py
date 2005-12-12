@@ -212,6 +212,7 @@ class SoftwareVideo(Bin):
         super(SoftwareVideo, self).__init__(name)
 
         self.makeSubelem('mpeg2dec')
+        self.makeSubelem('mpeg2subt')
         self.makeSubelem('ffmpegcolorspace')
         self.makeSubelem('videoscale')
         self.makeSubelem('queue')
@@ -219,12 +220,14 @@ class SoftwareVideo(Bin):
                          force_aspect_ratio=True,
                          pixel_aspect_ratio=options['pixelAspect'])
 
-        self.link('mpeg2dec', 'ffmpegcolorspace')
+        self.linkPads('mpeg2dec', 'src', 'mpeg2subt', 'video')
+        self.link('mpeg2subt', 'ffmpegcolorspace')
         self.link('ffmpegcolorspace', 'videoscale')
         self.link('videoscale', 'queue')
         self.link('queue', 'videosink')
 
         self.ghostify('mpeg2dec', 'sink', 'video')
+        self.ghostify('mpeg2subt', 'subtitle', 'subtitle')
 
 
 class BackPlayer(Bin):
@@ -292,7 +295,7 @@ class Pipeline(gst.Pipeline):
 
         # All together now.
         self.backPlayer.link_pads('video', self.videoSink, 'video')
-#         self.backPlayer.link_pads('subtitle', self.videoSink, 'subtitle')
+        self.backPlayer.link_pads('subtitle', self.videoSink, 'subtitle')
         self.backPlayer.link_pads('audio', self.audioSink, 'sink')
 
         # A list of functions to synchronously handle bus messages.

@@ -1,5 +1,10 @@
 2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py (SoftwareVideo.__init__) 
+	(Pipeline.__init__): Add a subtitle decoder to the pipeline.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c
 	(gst_mpeg2subt_handle_dvd_event): Adapt to 0.10.
 	(gst_mpeg2subt_event_subtitle, gst_mpeg2subt_event_video): Don't
