@@ -17,49 +17,22 @@
  * Boston, MA 02111-1307, USA.
  */
 
-
-/*#define DEBUG_ENABLED */
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#include "gstmpeg2subt.h"
+
 #include <string.h>
 
+#include "gstmpeg2subt.h"
 
+
+GST_DEBUG_CATEGORY_STATIC (mpeg2subt_debug);
+#define GST_CAT_DEFAULT (mpeg2subt_debug)
+
+
+/* Convert SPU decoder delays to GStramer time. */
 #define DELAY_TO_GST(delay) ((GST_MSECOND * 1024 * (delay)) / 90)
 
-
-static void gst_mpeg2subt_class_init (GstMpeg2SubtClass * klass);
-static void gst_mpeg2subt_base_init (GstMpeg2SubtClass * klass);
-static void gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt);
-static void gst_mpeg2subt_loop (GstElement * element);
-
-static GstCaps *gst_mpeg2subt_getcaps_video (GstPad * pad);
-static GstPadLinkReturn gst_mpeg2subt_link_video (GstPad * pad,
-    const GstCaps * caps);
-static void gst_mpeg2subt_handle_video (GstMpeg2Subt * mpeg2subt,
-    GstData * _data);
-static void gst_mpeg2subt_execute_block (GstMpeg2Subt * mpeg2subt);
-static void gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt,
-				  GstClockTime time);
-static gboolean gst_mpeg2subt_src_event (GstPad * pad, GstEvent * event);
-static void gst_mpeg2subt_handle_subtitle (GstMpeg2Subt * mpeg2subt,
-    GstData * _data);
-
-static void gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt,
-    GstBuffer * buf);
-static void gst_mpeg2subt_flush_video (GstMpeg2Subt * mpeg2subt);
-static void gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt);
-static void gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt,
-    GstEvent * event, gboolean from_sub_pad);
-static void gst_mpeg2subt_finalize (GObject * gobject);
-static void gst_mpeg2subt_set_property (GObject * object, guint prop_id,
-    const GValue * value, GParamSpec * pspec);
-static void gst_mpeg2subt_get_property (GObject * object, guint prop_id,
-    GValue * value, GParamSpec * pspec);
-static void gst_mpeg2subt_setup_palette (GstMpeg2Subt * mpeg2subt);
-static void gst_mpeg2subt_setup_highlight_palette (GstMpeg2Subt * mpeg2subt);
-static void gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt);
 
 /* elementfactory information */
 static GstElementDetails mpeg2subt_details = {
@@ -67,8 +40,25 @@ static GstElementDetails mpeg2subt_details = {
   "Codec/Decoder/Video",
   "Decodes and merges MPEG2 subtitles into a video frame",
   "Wim Taymans <wim.taymans@chello.be>\n"
-      "Jan Schmidt <thaytan@mad.scientist.com>"
+      "Jan Schmidt <thaytan@mad.scientist.com\n>"
+      "Martin Soto <martinsoto@users.sourceforge.net>"
 };
+
+
+/* GstMpeg2Subt signals and args */
+enum
+{
+  /* FILL ME */
+  LAST_SIGNAL
+};
+
+enum
+{
+  ARG_0,
+  ARG_SKIP
+      /* FILL ME */
+};
+
 
 static GstStaticPadTemplate video_template = GST_STATIC_PAD_TEMPLATE ("video",
     GST_PAD_SINK,
@@ -92,23 +82,6 @@ GST_STATIC_PAD_TEMPLATE ("subtitle",
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS ("video/x-dvd-subpicture")
     );
-
-GST_DEBUG_CATEGORY_STATIC (mpeg2subt_debug);
-#define GST_CAT_DEFAULT (mpeg2subt_debug)
-
-/* GstMpeg2Subt signals and args */
-enum
-{
-  /* FILL ME */
-  LAST_SIGNAL
-};
-
-enum
-{
-  ARG_0,
-  ARG_SKIP
-      /* FILL ME */
-};
 
 enum
 {
@@ -144,43 +117,54 @@ typedef struct RLE_state
 }
 RLE_state;
 
-static GstElementClass *parent_class = NULL;
+
+#define _do_init(bla) \
+    GST_DEBUG_CATEGORY_INIT (mpeg2subt_debug, "mpeg2subt", 0, \
+        "MPEG2 subtitle overlay element");
+
+GST_BOILERPLATE_FULL (GstMpeg2Subt, gst_mpeg2subt, GstElement, GST_TYPE_ELEMENT,
+    _do_init);
+
+
+static void gst_mpeg2subt_class_init (GstMpeg2SubtClass * gclass);
+
+static GstCaps *gst_mpeg2subt_getcaps_video (GstPad * pad);
+static GstPadLinkReturn gst_mpeg2subt_setcaps (GstPad * pad,
+    GstCaps * caps);
+static GstFlowReturn gst_mpeg2subt_chain_video (GstPad * pad,
+    GstBuffer * buffer);
+static gboolean gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event);
+static void gst_mpeg2subt_execute_block (GstMpeg2Subt * mpeg2subt);
+static void gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt,
+				  GstClockTime time);
+static gboolean gst_mpeg2subt_src_event (GstPad * pad, GstEvent * event);
+static GstFlowReturn gst_mpeg2subt_chain_subtitle (GstPad * pad,
+    GstBuffer * buffer);
+static gboolean gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event);
+
+static void gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt,
+    GstBuffer * buf);
+static void gst_mpeg2subt_flush_video (GstMpeg2Subt * mpeg2subt);
+static void gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt);
+static void gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt,
+    GstEvent * event, gboolean from_sub_pad);
+static void gst_mpeg2subt_finalize (GObject * gobject);
+static void gst_mpeg2subt_set_property (GObject * object, guint prop_id,
+    const GValue * value, GParamSpec * pspec);
+static void gst_mpeg2subt_get_property (GObject * object, guint prop_id,
+    GValue * value, GParamSpec * pspec);
+static void gst_mpeg2subt_setup_palette (GstMpeg2Subt * mpeg2subt);
+static void gst_mpeg2subt_setup_highlight_palette (GstMpeg2Subt * mpeg2subt);
+static void gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt);
+
 
 /*static guint gst_mpeg2subt_signals[LAST_SIGNAL] = { 0 };*/
 
-GType
-gst_mpeg2subt_get_type (void)
-{
-  static GType mpeg2subt_type = 0;
-
-  if (!mpeg2subt_type) {
-    static const GTypeInfo mpeg2subt_info = {
-      sizeof (GstMpeg2SubtClass),
-      (GBaseInitFunc) gst_mpeg2subt_base_init,
-      NULL,
-      (GClassInitFunc) gst_mpeg2subt_class_init,
-      NULL,
-      NULL,
-      sizeof (GstMpeg2Subt),
-      0,
-      (GInstanceInitFunc) gst_mpeg2subt_init,
-    };
-
-    mpeg2subt_type =
-        g_type_register_static (GST_TYPE_ELEMENT, "GstMpeg2Subt",
-        &mpeg2subt_info, 0);
-
-    GST_DEBUG_CATEGORY_INIT (mpeg2subt_debug, "mpeg2subt", 0,
-        "MPEG2 subtitle overlay element");
-  }
-
-  return mpeg2subt_type;
-}
 
 static void
-gst_mpeg2subt_base_init (GstMpeg2SubtClass * klass)
+gst_mpeg2subt_base_init (gpointer gclass)
 {
-  GstElementClass *element_class = GST_ELEMENT_CLASS (klass);
+  GstElementClass *element_class = GST_ELEMENT_CLASS (gclass);
 
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&src_template));
@@ -193,16 +177,16 @@ gst_mpeg2subt_base_init (GstMpeg2SubtClass * klass)
 }
 
 static void
-gst_mpeg2subt_class_init (GstMpeg2SubtClass * klass)
+gst_mpeg2subt_class_init (GstMpeg2SubtClass * gclass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
 
-  gobject_class = (GObjectClass *) klass;
-  gstelement_class = (GstElementClass *) klass;
+  gobject_class = (GObjectClass *) gclass;
+  gstelement_class = (GstElementClass *) gclass;
 
   /* CHECKME: */
-  g_object_class_install_property (G_OBJECT_CLASS (klass), ARG_SKIP,
+  g_object_class_install_property (G_OBJECT_CLASS (gclass), ARG_SKIP,
 				   g_param_spec_int ("skip", "skip",
 						     "skip", G_MININT,
 						     G_MAXINT, 0,
@@ -216,21 +200,29 @@ gst_mpeg2subt_class_init (GstMpeg2SubtClass * klass)
 }
 
 static void
-gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt)
+gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt, GstMpeg2SubtClass * gclass)
 {
   mpeg2subt->videopad =
       gst_pad_new_from_template (gst_static_pad_template_get
       (&video_template), "video");
   gst_element_add_pad (GST_ELEMENT (mpeg2subt), mpeg2subt->videopad);
-  gst_pad_set_link_function (mpeg2subt->videopad,
-      GST_DEBUG_FUNCPTR (gst_mpeg2subt_link_video));
+  gst_pad_set_setcaps_function (mpeg2subt->videopad,
+      GST_DEBUG_FUNCPTR (gst_mpeg2subt_setcaps));
   gst_pad_set_getcaps_function (mpeg2subt->videopad,
       GST_DEBUG_FUNCPTR (gst_mpeg2subt_getcaps_video));
+  gst_pad_set_chain_function (mpeg2subt->videopad,
+      GST_DEBUG_FUNCPTR (gst_mpeg2subt_chain_video));
+  gst_pad_set_event_function (mpeg2subt->videopad,
+      GST_DEBUG_FUNCPTR (gst_mpeg2subt_event_video));
 
   mpeg2subt->subtitlepad =
       gst_pad_new_from_template (gst_static_pad_template_get
       (&subtitle_template), "subtitle");
   gst_element_add_pad (GST_ELEMENT (mpeg2subt), mpeg2subt->subtitlepad);
+  gst_pad_set_chain_function (mpeg2subt->subtitlepad,
+      GST_DEBUG_FUNCPTR (gst_mpeg2subt_chain_subtitle));
+  gst_pad_set_event_function (mpeg2subt->subtitlepad,
+      GST_DEBUG_FUNCPTR (gst_mpeg2subt_event_subtitle));
 
   mpeg2subt->srcpad =
       gst_pad_new_from_template (gst_static_pad_template_get
@@ -238,13 +230,10 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt)
   gst_element_add_pad (GST_ELEMENT (mpeg2subt), mpeg2subt->srcpad);
   gst_pad_set_getcaps_function (mpeg2subt->srcpad,
       GST_DEBUG_FUNCPTR (gst_mpeg2subt_getcaps_video));
-  gst_pad_set_link_function (mpeg2subt->srcpad,
-      GST_DEBUG_FUNCPTR (gst_mpeg2subt_link_video));
+  gst_pad_set_setcaps_function (mpeg2subt->srcpad,
+      GST_DEBUG_FUNCPTR (gst_mpeg2subt_setcaps));
   gst_pad_set_event_function (mpeg2subt->srcpad,
       GST_DEBUG_FUNCPTR (gst_mpeg2subt_src_event));
-
-  gst_element_set_loop_function (GST_ELEMENT (mpeg2subt), gst_mpeg2subt_loop);
-  GST_FLAG_SET (GST_ELEMENT (mpeg2subt), GST_ELEMENT_EVENT_AWARE);
 
   mpeg2subt->partialbuf = NULL;
   mpeg2subt->subt_queue = g_queue_new ();
@@ -301,12 +290,12 @@ gst_mpeg2subt_getcaps_video (GstPad * pad)
   return gst_pad_get_allowed_caps (otherpad);
 }
 
-static GstPadLinkReturn
-gst_mpeg2subt_link_video (GstPad * pad, const GstCaps * caps)
+static gboolean
+gst_mpeg2subt_setcaps (GstPad * pad, GstCaps * caps)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
   GstPad *otherpad;
-  GstPadLinkReturn ret;
+  gboolean ret;
   GstStructure *structure;
   gint width, height;
   gint i;
@@ -314,16 +303,15 @@ gst_mpeg2subt_link_video (GstPad * pad, const GstCaps * caps)
   otherpad =
       (pad == mpeg2subt->srcpad) ? mpeg2subt->videopad : mpeg2subt->srcpad;
 
-  ret = gst_pad_try_set_caps (otherpad, caps);
-  if (GST_PAD_LINK_FAILED (ret)) {
-    return ret;
+  if (!gst_pad_set_caps (otherpad, caps)) {
+    return FALSE;
   }
 
   structure = gst_caps_get_structure (caps, 0);
 
   if (!gst_structure_get_int (structure, "width", &width) ||
       !gst_structure_get_int (structure, "height", &height)) {
-    return GST_PAD_LINK_REFUSED;
+    return FALSE;
   }
 
   mpeg2subt->in_width = width;
@@ -336,67 +324,61 @@ gst_mpeg2subt_link_video (GstPad * pad, const GstCaps * caps)
     mpeg2subt->out_buffers[i] = g_malloc (sizeof (guint16) * width);
   }
 
-  return GST_PAD_LINK_OK;
+  return TRUE;
 }
 
-static void
-gst_mpeg2subt_handle_video (GstMpeg2Subt * mpeg2subt, GstData * _data)
+static GstFlowReturn
+gst_mpeg2subt_chain_video (GstPad * pad, GstBuffer * buffer)
 {
-  if (GST_IS_BUFFER (_data)) {
-    GstBuffer *buf = GST_BUFFER (_data);
-    guchar *data;
-    glong size;
-    GstBuffer *out_buf;
+  GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+  guchar *data;
+  glong size;
+  GstBuffer *out_buf;
 
-    data = GST_BUFFER_DATA (buf);
-    size = GST_BUFFER_SIZE (buf);
+  data = GST_BUFFER_DATA (buffer);
+  size = GST_BUFFER_SIZE (buffer);
 
-    if (mpeg2subt->last_frame) {
-      gst_buffer_unref (mpeg2subt->last_frame);
-    }
-    out_buf = mpeg2subt->last_frame = gst_buffer_ref (buf);
+  if (mpeg2subt->last_frame) {
+    gst_buffer_unref (mpeg2subt->last_frame);
+  }
+  out_buf = mpeg2subt->last_frame = gst_buffer_ref (buffer);
 
-    gst_mpeg2subt_update (mpeg2subt, GST_BUFFER_TIMESTAMP (out_buf));
+  gst_mpeg2subt_update (mpeg2subt, GST_BUFFER_TIMESTAMP (out_buf));
 
-    if ((!mpeg2subt->hide && mpeg2subt->display) ||
-	mpeg2subt->forced_display) {
-      /* Merge the current subtitle. */
-      out_buf = gst_buffer_copy_on_write (out_buf);
-      gst_mpeg2subt_merge_title (mpeg2subt, out_buf);
-    }
+  if ((!mpeg2subt->hide && mpeg2subt->display) ||
+      mpeg2subt->forced_display) {
+    /* Merge the current subtitle. */
+    out_buf = gst_buffer_make_writable (out_buf);
+    gst_mpeg2subt_merge_title (mpeg2subt, out_buf);
+  }
 
-    GST_LOG_OBJECT (mpeg2subt, "Pushing frame with timestamp %0.3fs",
-        (double) GST_BUFFER_TIMESTAMP (out_buf) / GST_SECOND);
-    gst_pad_push (mpeg2subt->srcpad, GST_DATA (out_buf));
-  } else if (GST_IS_EVENT (_data)) {
-    switch (GST_EVENT_TYPE (GST_EVENT (_data))) {
-      case GST_EVENT_FLUSH:
-        gst_mpeg2subt_flush_video (mpeg2subt);
-        gst_pad_push (mpeg2subt->srcpad, _data);
-        break;
-      case GST_EVENT_ANY:
-        gst_mpeg2subt_handle_dvd_event (mpeg2subt, GST_EVENT (_data), FALSE);
-        gst_data_unref (_data);
-        break;
-      case GST_EVENT_DISCONTINUOUS:
-        {
-          GstClockTime time;
+  GST_LOG_OBJECT (mpeg2subt, "Pushing frame with timestamp %"
+      GST_TIME_FORMAT, GST_BUFFER_TIMESTAMP (out_buf));
 
-          if (gst_event_discont_get_value (GST_EVENT (_data),
-                  GST_FORMAT_TIME, &time)) {
-            GST_INFO_OBJECT (mpeg2subt,
-                "Video discont event, time: %0.3fs",
-                (double) time / GST_SECOND);
-          }
-        }
-        gst_pad_push (mpeg2subt->srcpad, _data);
-        break;
-      default:
-        gst_pad_event_default (mpeg2subt->videopad, GST_EVENT(_data));
-        break;
-    }
-  } else
-    gst_data_unref (_data);
+  return gst_pad_push (mpeg2subt->srcpad, out_buf);
+}
+
+static gboolean
+gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event)
+{
+  gboolean ret = TRUE;
+  GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+
+  switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_FLUSH_START:
+      gst_mpeg2subt_flush_video (mpeg2subt);
+      ret = gst_pad_push_event (mpeg2subt->srcpad, event);
+      break;
+    case GST_EVENT_CUSTOM_DOWNSTREAM:
+      gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, FALSE);
+      gst_event_unref (event);
+      break;
+    default:
+      ret = gst_pad_event_default (mpeg2subt->videopad, event);
+      break;
+  }
+
+  return ret;
 }
 
 static gboolean
@@ -730,9 +712,9 @@ gst_draw_rle_line (GstMpeg2Subt * mpeg2subt, guchar * buffer,
     x_final = x + length;
 
     /* FIXME: There's a lot of room for optimization
-       here. Particularly, you can avoid a lot of work when alpha is
-       0. For the moment, I'm just striving for a correct
-       behavior, though. M. S. */
+       here. Particularly, you can avoid a good deal of work when
+       alpha is 0. For the moment, however, I'm just striving for a
+       correct behavior. M. S. */
 
     if (state->clip_top <= state->y && state->y <= state->clip_bottom) {
       inv_alpha = 0xf - normal_colour_entry->A;
@@ -930,92 +912,78 @@ gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt)
 
     GST_INFO_OBJECT (mpeg2subt, "Pushing frame with timestamp %0.3fs",
         (double) GST_BUFFER_TIMESTAMP (out_buf) / GST_SECOND);
-    gst_pad_push (mpeg2subt->srcpad, GST_DATA (out_buf));
+    gst_pad_push (mpeg2subt->srcpad, out_buf);
   }
 }
 
-static void
-gst_mpeg2subt_handle_subtitle (GstMpeg2Subt * mpeg2subt, GstData * _data)
+static GstFlowReturn
+gst_mpeg2subt_chain_subtitle (GstPad * pad, GstBuffer * buffer)
 {
+  GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
   guint16 packet_size;
+  guchar *data;
+  glong size = 0;
 
-  g_return_if_fail (_data != NULL);
+  /* deal with partial frame from previous buffer */
+  if (mpeg2subt->partialbuf) {
+    GstBuffer *merge;
 
-  if (GST_IS_BUFFER (_data)) {
-    GstBuffer *buf = GST_BUFFER (_data);
-    guchar *data;
-    glong size = 0;
+    merge = gst_buffer_merge (mpeg2subt->partialbuf, buffer);
+    gst_buffer_unref (mpeg2subt->partialbuf);
+    gst_buffer_unref (buffer);
+    mpeg2subt->partialbuf = merge;
+  } else {
+    mpeg2subt->partialbuf = buffer;
+  }
 
-    /* deal with partial frame from previous buffer */
-    if (mpeg2subt->partialbuf) {
-      GstBuffer *merge;
+  data = GST_BUFFER_DATA (mpeg2subt->partialbuf);
+  size = GST_BUFFER_SIZE (mpeg2subt->partialbuf);
 
-      merge = gst_buffer_merge (mpeg2subt->partialbuf, buf);
-      gst_buffer_unref (mpeg2subt->partialbuf);
-      gst_buffer_unref (buf);
-      mpeg2subt->partialbuf = merge;
-    } else {
-      mpeg2subt->partialbuf = buf;
-    }
+  if (size > 4) {
+    packet_size = GST_READ_UINT16_BE (data);
 
-    data = GST_BUFFER_DATA (mpeg2subt->partialbuf);
-    size = GST_BUFFER_SIZE (mpeg2subt->partialbuf);
-
-    if (size > 4) {
-      packet_size = GST_READ_UINT16_BE (data);
-
-      if (packet_size == size) {
-	if (GST_BUFFER_TIMESTAMP (mpeg2subt->partialbuf) !=
-	    GST_CLOCK_TIME_NONE) {
-	  GST_DEBUG_OBJECT (mpeg2subt,
-			    "Got subtitle buffer, pts " GST_TIME_FORMAT,
-			    GST_TIME_ARGS (GST_BUFFER_TIMESTAMP
-					   (mpeg2subt->partialbuf)));
-	} else {
-	  GST_DEBUG_OBJECT (mpeg2subt, "Got subtitle buffer, no pts");
-	}
-        GST_LOG_OBJECT (mpeg2subt, "Subtitle packet size %d, current size %ld",
-			packet_size, size);
-
-        g_queue_push_tail (mpeg2subt->subt_queue, mpeg2subt->partialbuf);
-        mpeg2subt->partialbuf = NULL;
+    if (packet_size == size) {
+      if (GST_BUFFER_TIMESTAMP (mpeg2subt->partialbuf) !=
+	  GST_CLOCK_TIME_NONE) {
+	GST_DEBUG_OBJECT (mpeg2subt,
+	    "Got subtitle buffer, pts " GST_TIME_FORMAT,
+	    GST_TIME_ARGS (GST_BUFFER_TIMESTAMP
+		(mpeg2subt->partialbuf)));
+      } else {
+	GST_DEBUG_OBJECT (mpeg2subt, "Got subtitle buffer, no pts");
       }
-    }
+      GST_LOG_OBJECT (mpeg2subt, "Subtitle packet size %d, current size %ld",
+	  packet_size, size);
 
-    gst_mpeg2subt_update_still_frame (mpeg2subt);
-  } else if (GST_IS_EVENT (_data)) {
-    switch (GST_EVENT_TYPE (GST_EVENT (_data))) {
-      case GST_EVENT_FLUSH:
-        gst_mpeg2subt_flush_subtitle (mpeg2subt);
-        break;
-      case GST_EVENT_ANY:
-        GST_LOG_OBJECT (mpeg2subt,
-			"DVD event on subtitle pad with timestamp %llu",
-            GST_EVENT_TIMESTAMP (GST_EVENT (_data)));
-        gst_mpeg2subt_handle_dvd_event (mpeg2subt, GST_EVENT (_data), TRUE);
-        break;
-      case GST_EVENT_FILLER:
-        break;
-      case GST_EVENT_DISCONTINUOUS:
-        {
-          GstClockTime time;
-
-          if (gst_event_discont_get_value (GST_EVENT (_data),
-                  GST_FORMAT_TIME, &time)) {
-            GST_INFO_OBJECT (mpeg2subt,
-                "Subtitle discont event, time: %0.3fs",
-                (double) time / GST_SECOND);
-          }
-        }
-        break;
-      default:
-        GST_LOG_OBJECT (mpeg2subt, "Got event of type %d on subtitle pad",
-            GST_EVENT_TYPE (GST_EVENT (_data)));
-        break;
+      g_queue_push_tail (mpeg2subt->subt_queue, mpeg2subt->partialbuf);
+      mpeg2subt->partialbuf = NULL;
     }
-    gst_data_unref (_data);
-  } else
-    gst_data_unref (_data);
+  }
+
+  gst_mpeg2subt_update_still_frame (mpeg2subt);
+}
+
+static gboolean
+gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
+{
+  GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+
+  switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_FLUSH_START:
+      gst_mpeg2subt_flush_subtitle (mpeg2subt);
+      break;
+    case GST_EVENT_CUSTOM_DOWNSTREAM:
+      GST_LOG_OBJECT (mpeg2subt,
+	  "DVD event on subtitle pad with timestamp %llu",
+	  GST_EVENT_TIMESTAMP (event));
+      gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, TRUE);
+      break;
+    default:
+      GST_LOG_OBJECT (mpeg2subt, "Got event of type %d on subtitle pad",
+	  GST_EVENT_TYPE (event));
+      break;
+  }
+  gst_event_unref (event);
 }
 
 static void
@@ -1064,10 +1032,10 @@ static void
 gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     gboolean from_sub_pad)
 {
-  GstStructure *structure;
+  const GstStructure *structure;
   const gchar *event_type;
 
-  structure = event->event_data.structure.structure;
+  structure = gst_event_get_structure (event);
 
   event_type = gst_structure_get_string (structure, "event");
   g_return_if_fail (event_type != NULL);
@@ -1106,11 +1074,11 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     gst_mpeg2subt_update_still_frame (mpeg2subt);
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-clut-change")) {
     /* Take a copy of the colour table */
-    guchar name[16];
+    gchar name[16];
     int i;
     gint value;
 
-    GST_LOG_OBJECT (mpeg2subt, "New colour table recieved");
+    GST_LOG_OBJECT (mpeg2subt, "New colour table received");
     for (i = 0; i < 16; i++) {
       sprintf (name, "clut%02d", i);
       if (!gst_structure_get_int (structure, name, &value)) {
@@ -1141,34 +1109,6 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     /* Ignore all other unknown events */
     /*GST_LOG_OBJECT (mpeg2subt, "Ignoring DVD event %s from %s pad",
       event_type, from_sub_pad ? "sub" : "video");*/
-  }
-}
-
-static void
-gst_mpeg2subt_loop (GstElement * element)
-{
-  GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (element);
-  GstData *data;
-  GstClockTime timestamp = 0;
-  GstPad *read_from;
-
-  data = gst_pad_collect (&read_from,
-      mpeg2subt->subtitlepad, mpeg2subt->videopad, NULL);
-
-  if (GST_IS_BUFFER (data)) {
-    timestamp = GST_BUFFER_TIMESTAMP (GST_BUFFER (data));
-  } else if (GST_IS_EVENT (data)) {
-    timestamp = GST_EVENT_TIMESTAMP (GST_EVENT (data));
-  } else {
-    GST_WARNING ("Got GstData of unknown type %d", GST_DATA_TYPE (data));
-  }
-
-  if (read_from == mpeg2subt->videopad) {
-    gst_mpeg2subt_handle_video (mpeg2subt, data);
-  } else if (read_from == mpeg2subt->subtitlepad) {
-    gst_mpeg2subt_handle_subtitle (mpeg2subt, data);
-  } else {
-    g_return_if_reached ();
   }
 }
 
