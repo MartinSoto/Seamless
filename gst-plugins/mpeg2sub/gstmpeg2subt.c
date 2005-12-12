@@ -40,7 +40,7 @@ static GstElementDetails mpeg2subt_details = {
   "Codec/Decoder/Video",
   "Decodes and merges MPEG2 subtitles into a video frame",
   "Wim Taymans <wim.taymans@chello.be>\n"
-      "Jan Schmidt <thaytan@mad.scientist.com\n>"
+      "Jan Schmidt <thaytan@mad.scientist.com>\n"
       "Martin Soto <martinsoto@users.sourceforge.net>"
 };
 
@@ -128,7 +128,7 @@ GST_BOILERPLATE_FULL (GstMpeg2Subt, gst_mpeg2subt, GstElement, GST_TYPE_ELEMENT,
 
 static void gst_mpeg2subt_class_init (GstMpeg2SubtClass * gclass);
 
-static GstCaps *gst_mpeg2subt_getcaps_video (GstPad * pad);
+static GstCaps *gst_mpeg2subt_getcaps (GstPad * pad);
 static GstPadLinkReturn gst_mpeg2subt_setcaps (GstPad * pad,
     GstCaps * caps);
 static GstFlowReturn gst_mpeg2subt_chain_video (GstPad * pad,
@@ -209,7 +209,7 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt, GstMpeg2SubtClass * gclass)
   gst_pad_set_setcaps_function (mpeg2subt->videopad,
       GST_DEBUG_FUNCPTR (gst_mpeg2subt_setcaps));
   gst_pad_set_getcaps_function (mpeg2subt->videopad,
-      GST_DEBUG_FUNCPTR (gst_mpeg2subt_getcaps_video));
+      GST_DEBUG_FUNCPTR (gst_mpeg2subt_getcaps));
   gst_pad_set_chain_function (mpeg2subt->videopad,
       GST_DEBUG_FUNCPTR (gst_mpeg2subt_chain_video));
   gst_pad_set_event_function (mpeg2subt->videopad,
@@ -229,7 +229,7 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt, GstMpeg2SubtClass * gclass)
       (&src_template), "src");
   gst_element_add_pad (GST_ELEMENT (mpeg2subt), mpeg2subt->srcpad);
   gst_pad_set_getcaps_function (mpeg2subt->srcpad,
-      GST_DEBUG_FUNCPTR (gst_mpeg2subt_getcaps_video));
+      GST_DEBUG_FUNCPTR (gst_mpeg2subt_getcaps));
   gst_pad_set_setcaps_function (mpeg2subt->srcpad,
       GST_DEBUG_FUNCPTR (gst_mpeg2subt_setcaps));
   gst_pad_set_event_function (mpeg2subt->srcpad,
@@ -279,15 +279,28 @@ gst_mpeg2subt_finalize (GObject * gobject)
 }
 
 static GstCaps *
-gst_mpeg2subt_getcaps_video (GstPad * pad)
+gst_mpeg2subt_getcaps (GstPad * pad)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
   GstPad *otherpad;
+  GstCaps *caps;
 
   otherpad =
       (pad == mpeg2subt->srcpad) ? mpeg2subt->videopad : mpeg2subt->srcpad;
 
-  return gst_pad_get_allowed_caps (otherpad);
+  caps = gst_pad_peer_get_caps (otherpad);
+  if (caps) {
+    GstCaps *temp;
+    const GstCaps *templ;
+
+    /* Filter the peer caps through our own pad template. */
+    templ = gst_pad_get_pad_template_caps (otherpad);
+    temp = gst_caps_intersect (caps, templ);
+    gst_caps_unref (caps);
+    return temp;
+  } else {
+    return gst_caps_copy (gst_pad_get_pad_template_caps (pad));
+  }
 }
 
 static gboolean
