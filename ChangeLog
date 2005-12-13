@@ -1,5 +1,12 @@
 2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (Manager.vobuRead): Add a loop that waits
+	until a command sets a new VOBU, instead of just returning when no
+	VOBU is set. Previously this job was done by the dvdblocksrc
+	element. This change makes still frames work again.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
 	(gst_mpeg2subt_getcaps): Rename getcaps_video to getcaps and adapt
 	it to 0.10.

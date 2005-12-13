@@ -189,26 +189,28 @@ class Manager(SignalHolder):
         """Invoked by the source element after reading a complete
         VOBU."""
 
-        try:
-            if self.pendingCmds == []:
-                cmds = self.collectCmds()
-            else:
-                cmds = self.pendingCmds
-                self.pendingCmds = []
+        while src.get_property('vobu-start') == -1:
+            try:
+                if self.pendingCmds == []:
+                    cmds = self.collectCmds()
+                else:
+                    cmds = self.pendingCmds
+                    self.pendingCmds = []
 
-            if cmds == []:
-                # Time to stop the pipeline.
-                self.src.set_eos()
-                self.sendEvent(events.eos())
-                return
+                if cmds == []:
+                    # Time to stop the pipeline.
+                    # FIXME check if this works properly.
+                    #self.src.set_eos()
+                    self.sendEvent(events.eos())
+                    return
 
-            for cmd in cmds:
-                # Execute the command on the pipeline.
-                cmd(self)
-        except:
-            # We had an exception in the playback code.
-            traceback.print_exc()
-            sys.exit(1)
+                for cmd in cmds:
+                    # Execute the command on the pipeline.
+                    cmd(self)
+            except:
+                # We had an exception in the playback code.
+                traceback.print_exc()
+                sys.exit(1)
 
     @synchronized
     def vobuHeader(self, src, buf):
