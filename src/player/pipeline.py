@@ -212,7 +212,8 @@ class SoftwareVideo(Bin):
         super(SoftwareVideo, self).__init__(name)
 
         self.makeSubelem('mpeg2dec')
-        self.makeSubelem('queue', 'video-queue')
+        self.makeSubelem('queue', 'video-queue',
+                         max_size_bytes=1024 * 1024 * 32)
         self.makeSubelem('mpeg2subt')
         self.makeSubelem('ffmpegcolorspace')
         self.makeSubelem('videoscale')

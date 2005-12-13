@@ -1,3 +1,8 @@
+2005-12-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SoftwareVideo.__init__): Increase video
+	queue size.
+
 2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/pipeline.py (SoftwareVideo.__init__): Remove the
