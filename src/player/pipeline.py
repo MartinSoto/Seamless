@@ -213,7 +213,6 @@ class SoftwareVideo(Bin):
 
         self.makeSubelem('mpeg2dec')
         self.makeSubelem('queue', 'video-queue')
-        self.makeSubelem('queue', 'subtitle-queue')
         self.makeSubelem('mpeg2subt')
         self.makeSubelem('ffmpegcolorspace')
         self.makeSubelem('videoscale')
@@ -223,13 +222,12 @@ class SoftwareVideo(Bin):
 
         self.link('mpeg2dec', 'video-queue')
         self.linkPads('video-queue', 'src', 'mpeg2subt', 'video')
-        self.linkPads('subtitle-queue', 'src', 'mpeg2subt', 'subtitle')
         self.link('mpeg2subt', 'ffmpegcolorspace')
         self.link('ffmpegcolorspace', 'videoscale')
         self.link('videoscale', 'videosink')
 
         self.ghostify('mpeg2dec', 'sink', 'video')
-        self.ghostify('subtitle-queue', 'sink', 'subtitle')
+        self.ghostify('mpeg2subt', 'subtitle', 'subtitle')
 
 
 class BackPlayer(Bin):

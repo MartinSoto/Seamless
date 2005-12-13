@@ -1,5 +1,11 @@
 2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py (SoftwareVideo.__init__): Remove the
+	subtitle queue, since subtitle playback stops after the first
+	subtitle when it is there.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/pipeline.py (SoftwareVideo.__init__): 
 	Move queueing back in the video pipeline, so that there's no
 	buffering between subtitle decoding and video playback. This is
