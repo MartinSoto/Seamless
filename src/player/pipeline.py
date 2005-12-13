@@ -212,22 +212,24 @@ class SoftwareVideo(Bin):
         super(SoftwareVideo, self).__init__(name)
 
         self.makeSubelem('mpeg2dec')
+        self.makeSubelem('queue', 'video-queue')
+        self.makeSubelem('queue', 'subtitle-queue')
         self.makeSubelem('mpeg2subt')
         self.makeSubelem('ffmpegcolorspace')
         self.makeSubelem('videoscale')
-        self.makeSubelem('queue')
         self.makeSubelem(options['videoSink'], 'videosink',
                          force_aspect_ratio=True,
                          pixel_aspect_ratio=options['pixelAspect'])
 
-        self.linkPads('mpeg2dec', 'src', 'mpeg2subt', 'video')
+        self.link('mpeg2dec', 'video-queue')
+        self.linkPads('video-queue', 'src', 'mpeg2subt', 'video')
+        self.linkPads('subtitle-queue', 'src', 'mpeg2subt', 'subtitle')
         self.link('mpeg2subt', 'ffmpegcolorspace')
         self.link('ffmpegcolorspace', 'videoscale')
-        self.link('videoscale', 'queue')
-        self.link('queue', 'videosink')
+        self.link('videoscale', 'videosink')
 
         self.ghostify('mpeg2dec', 'sink', 'video')
-        self.ghostify('mpeg2subt', 'subtitle', 'subtitle')
+        self.ghostify('subtitle-queue', 'sink', 'subtitle')
 
 
 class BackPlayer(Bin):
@@ -242,7 +244,6 @@ class BackPlayer(Bin):
 
         src = self.makeSubelem('dvdblocksrc', location=options['location'])
         demux = self.makeSubelem('dvddemux')
-        demux.connect('pad_added', self.padAdded)
 
         self.link('dvdblocksrc', 'dvddemux')
 
@@ -252,9 +253,6 @@ class BackPlayer(Bin):
 
     def getBlockSource(self):
         return self.get_by_name('dvdblocksrc')
-
-    def padAdded(self, dvddemux, pad):
-        print "+++ New dvddemux pad:", pad.get_name()
 
 
 class Pipeline(gst.Pipeline):

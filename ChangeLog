@@ -1,5 +1,17 @@
 2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py (SoftwareVideo.__init__): 
+	Move queueing back in the video pipeline, so that there's no
+	buffering between subtitle decoding and video playback. This is
+	necessary for instant highlight changes.
+	* src/player/events.py (createCustom, highlight): 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_event_video) 
+	(gst_mpeg2subt_event_subtitle):
+	Send highlight changes as out-of-band. Must still be perfected
+	because certain highlight changes are synchronous.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.vobuRead): Add a loop that waits
 	until a command sets a new VOBU, instead of just returning when no
 	VOBU is set. Previously this job was done by the dvdblocksrc

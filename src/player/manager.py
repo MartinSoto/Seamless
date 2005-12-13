@@ -189,6 +189,8 @@ class Manager(SignalHolder):
         """Invoked by the source element after reading a complete
         VOBU."""
 
+        # FIXME: Instead of polling here, some form of thread
+        # synchronization should be used.
         while src.get_property('vobu-start') == -1:
             try:
                 if self.pendingCmds == []:

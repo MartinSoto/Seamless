@@ -23,9 +23,12 @@ def mpegTimeToGstTime(mpegTime):
     """Convert MPEG time values to the GStreamer time format."""
     return (long(mpegTime) * gst.MSECOND) / 90
 
-def createCustom(st):
+def createCustom(st, outOfBand=False):
     """Create a custom downstream event containing `st`."""
-    return gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM, st)
+    if outOfBand:
+        return gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM_OOB, st)
+    else:
+        return gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM, st)
 
 def audio(physical):
     """Create and return a new audio event for the specified physical
@@ -57,7 +60,7 @@ def newsegment(update, startTime, endTime):
     return gst.event_new_new_segment(update, 1.0, gst.FORMAT_TIME,
                                      startTime, endTime, 0)
 
-def highlight(area, button, palette):
+def highlight(area, button, palette, outOfBand=True):
     """Create and return a new highlight event based on the specified
     highlight area, button number, and color palette."""
     (sx, sy, ex, ey) = area
@@ -71,7 +74,7 @@ def highlight(area, button, palette):
     st.set_value('ex', ex)
     st.set_value('ey', ey)
 
-    return createCustom(st)
+    return createCustom(st, outOfBand)
 
 def highlightReset():
     """Create and return a new highlight reset event."""

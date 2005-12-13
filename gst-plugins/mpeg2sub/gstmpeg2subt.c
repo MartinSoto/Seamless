@@ -383,6 +383,7 @@ gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event)
       ret = gst_pad_push_event (mpeg2subt->srcpad, event);
       break;
     case GST_EVENT_CUSTOM_DOWNSTREAM:
+    case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
       gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, FALSE);
       gst_event_unref (event);
       break;
@@ -986,6 +987,7 @@ gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
       gst_mpeg2subt_flush_subtitle (mpeg2subt);
       break;
     case GST_EVENT_CUSTOM_DOWNSTREAM:
+    case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
       GST_LOG_OBJECT (mpeg2subt,
 	  "DVD event on subtitle pad with timestamp %llu",
 	  GST_EVENT_TIMESTAMP (event));
