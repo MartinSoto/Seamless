@@ -1,5 +1,13 @@
 2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_chain_video, gst_mpeg2subt_chain_subtitle): 
+	Add a lock to mutually exclude the chain operations for the sink
+	pads.
+
+2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_getcaps) 
 	(gst_mpeg2subt_setcaps, gst_mpeg2subt_chain_video) 
 	(gst_mpeg2subt_event_video, gst_mpeg2subt_src_event) 

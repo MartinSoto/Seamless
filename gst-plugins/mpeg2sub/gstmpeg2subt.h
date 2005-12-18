@@ -111,6 +111,9 @@ struct _GstMpeg2Subt {
 
   gint in_width, in_height;
   gint current_button;
+
+  GMutex *chain_lock;		/* Lock to mutually exclude the chain
+				   operations for the sink pads. */
 };
 
 struct _GstMpeg2SubtClass {
