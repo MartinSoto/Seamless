@@ -48,6 +48,7 @@ static GstElementDetails dvdblocksrc_details = GST_ELEMENT_DETAILS (
 enum {
   VOBU_READ_SIGNAL,
   VOBU_HEADER_SIGNAL,
+  DO_SEEK_SIGNAL,
   LAST_SIGNAL,
 };
 
@@ -113,6 +114,11 @@ dvdblocksrc_open_file (DVDBlockSrc *src);
 static void
 dvdblocksrc_close_file (DVDBlockSrc *src);
 
+static gboolean
+dvdblocksrc_is_seekable (GstBaseSrc *src);
+static gboolean
+dvdblocksrc_do_seek (GstBaseSrc *src, GstSegment *segment);
+
 
 static guint dvdblocksrc_signals[LAST_SIGNAL] = { 0 };
 
@@ -161,6 +167,15 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
         gst_marshal_VOID__BOXED,
         G_TYPE_NONE,
         1, GST_TYPE_BUFFER);
+  dvdblocksrc_signals[DO_SEEK_SIGNAL] =
+    g_signal_new ("do-seek",
+        G_TYPE_FROM_CLASS (klass),
+        G_SIGNAL_RUN_LAST,
+        G_STRUCT_OFFSET (DVDBlockSrcClass, do_seek),
+        NULL, NULL,
+        g_cclosure_marshal_VOID__BOXED,
+        G_TYPE_NONE,
+        1, GST_TYPE_SEGMENT);
 
   gobject_class->set_property = dvdblocksrc_set_property;
   gobject_class->get_property = dvdblocksrc_get_property;
@@ -186,6 +201,8 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
           -1, G_MAXINT, -1, G_PARAM_READWRITE));
 
   gstbasesrc_class->stop = dvdblocksrc_stop;
+  gstbasesrc_class->is_seekable = dvdblocksrc_is_seekable;
+  gstbasesrc_class->do_seek = dvdblocksrc_do_seek;
 
   gstpush_src_class->create = dvdblocksrc_create;
 }
@@ -208,6 +225,8 @@ dvdblocksrc_init (DVDBlockSrc * src, DVDBlockSrcClass * klass)
 
   src->reader = NULL;
   src->file = NULL;
+
+  gst_base_src_set_format (GST_BASE_SRC (src), GST_FORMAT_TIME);
 }
 
 
@@ -488,6 +507,23 @@ dvdblocksrc_close_file (DVDBlockSrc *src)
   src->file = NULL;
   src->open_title_num = -1;
   src->open_domain = -1;
+}
+
+
+static gboolean
+dvdblocksrc_is_seekable (GstBaseSrc *src)
+{
+  return TRUE;
+}
+
+
+static gboolean
+dvdblocksrc_do_seek (GstBaseSrc *src, GstSegment *segment)
+{
+  g_signal_emit (G_OBJECT (src),
+        dvdblocksrc_signals[DO_SEEK_SIGNAL], 0);
+
+  return TRUE;
 }
 
 

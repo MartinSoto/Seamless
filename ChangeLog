@@ -1,3 +1,13 @@
+2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.c: 
+	(dvdblocksrc_class_init, dvdblocksrc_init) 
+	(dvdblocksrc_is_seekable, dvdblocksrc_do_seek): Add basic seeking
+	functionality by firing a signal when a seek is requested. The
+	success/failure status of the seek operation cannot still be
+	returned from the signal, since a custom marshaler is needed for
+	that purpose.
+
 2005-12-14  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/pipeline.py (SoftwareVideo.__init__): Increase video
