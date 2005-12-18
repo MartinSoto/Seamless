@@ -117,9 +117,12 @@ class Manager(SignalHolder):
 
                  'pendingCmds',
                  'interactiveCount',
+                 'vobuReadReturn',
 
                  'segmentStart',
-                 'segmentStop')
+                 'segmentStop',
+
+                 'flushing')
 
 
     def __init__(self, machine, pipeline):
@@ -128,6 +131,9 @@ class Manager(SignalHolder):
 
         self.src = pipeline.getBlockSource()
         self.srcPad = self.src.get_pad('src')
+
+        # Connect the bus message handler to the pipeline's bus.
+        self.pipeline.get_bus().add_watch(self.busMsgReceived)
 
         self.mainItr = iter(self.machine)
 
@@ -162,6 +168,8 @@ class Manager(SignalHolder):
         self.segmentStart = None
         self.segmentStop = None
 
+        self.flushing = False
+
     def sendEvent(self, event):
         """Send `event` down the pipeline."""
         self.srcPad.push_event(event)
@@ -188,11 +196,14 @@ class Manager(SignalHolder):
     def vobuRead(self, src):
         """Invoked by the source element after reading a complete
         VOBU."""
+        gst.debug("Vobu read")
 
-        # FIXME: Instead of polling here, some form of thread
-        # synchronization should be used.
-        while src.get_property('vobu-start') == -1:
-            try:
+        # Commands expecting this method to return set vobuReadReturn
+        # to True.
+        self.vobuReadReturn = False
+
+        try:
+            while not self.vobuReadReturn:
                 if self.pendingCmds == []:
                     cmds = self.collectCmds()
                 else:
@@ -201,22 +212,28 @@ class Manager(SignalHolder):
 
                 if cmds == []:
                     # Time to stop the pipeline.
-                    # FIXME check if this works properly.
-                    #self.src.set_eos()
-                    self.sendEvent(events.eos())
-                    return
+                    break
 
-                for cmd in cmds:
+                while cmds:
                     # Execute the command on the pipeline.
-                    cmd(self)
-            except:
-                # We had an exception in the playback code.
-                traceback.print_exc()
-                sys.exit(1)
+                    gst.debug("Running command %s" % str(cmds[0]))
+                    cmds[0](self)
+                    cmds[0:1] = []
+
+                    if self.vobuReadReturn:
+                        self.pendingCmds = cmds
+                        break
+        except:
+            # We had an exception in the playback code.
+            traceback.print_exc()
+            sys.exit(1)
+
+        gst.debug("VOBU read end")
 
     @synchronized
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
+        gst.debug("Vobu header")
 
         # Release the lock set by the playVobu operation.
         self.lock.release()
@@ -256,6 +273,34 @@ class Manager(SignalHolder):
         # FIXME: This should be done later in the game, namely, when
         # the packet actually reaches the subtitle element.
         self.machine.callIterator(self.machine.setButtonNav(nav))
+
+
+
+    #
+    # Bus Message Handling
+    #
+
+    def busMsgReceived(self, bus, msg):
+        if msg.type & gst.MESSAGE_APPLICATION and \
+               msg.structure.has_name('seamless.Flush'):
+            self.lock.acquire()
+
+            self.pipeline.set_state(gst.STATE_PAUSED)
+
+            self.pipeline.getVideoSink().seek(1.0, gst.FORMAT_TIME,
+                                              gst.SEEK_FLAG_FLUSH,
+                                              gst.SEEK_TYPE_CUR, 0,
+                                              gst.SEEK_TYPE_NONE, -1)
+            self.pipeline.set_new_stream_time(0L)
+
+            self.pipeline.set_state(gst.STATE_PLAYING)
+            
+            self.flushing = False
+            gst.debug("flush completed")
+
+            self.lock.release()
+
+        return True
 
 
     #
@@ -306,7 +351,10 @@ class Manager(SignalHolder):
         # `EndInteractive` objects and check it in `collectCmds` to
         # make sure that we are reacting to the right `EndInteractive`
         # command.
-        
+
+        if self.flushing:
+            return
+
         def interactiveWrapper(count):
             """Call the iterator and send an `EndInteractive`
             operation at the end."""
@@ -315,6 +363,8 @@ class Manager(SignalHolder):
             end = self.EndInteractive()
             end.count = count
             yield end
+
+        gst.debug("run interactive")
 
         self.interactiveCount += 1
 
@@ -334,8 +384,11 @@ class Manager(SignalHolder):
             # We reached a VOBU playback operation while doing the
             # interactive operation. Flush and go on.
             self.cancelVobu()
-            cmds[0:0] = [Manager.flush]
+            cmds[0:0] = [self.__class__.flush,
+                         self.__class__.resendSubpictureClut]
             self.pendingCmds = cmds
+
+        gst.debug("end run interactive")
 
 
     #
@@ -345,6 +398,8 @@ class Manager(SignalHolder):
     def playVobu(self, domain, titleNr, sectorNr):
         """Set the source element to play the VOBU corresponding to
         'domain', 'titleNr', and 'sectorNr'."""
+        gst.debug("play vobu")
+
         self.src.set_property('domain', domain)
         self.src.set_property('title', titleNr)
         self.src.set_property('vobu-start', sectorNr)
@@ -354,18 +409,23 @@ class Manager(SignalHolder):
         # devastation.
         self.lock.acquire()
 
+        self.vobuReadReturn = True
+
     def cancelVobu(self):
         """Cancel the playback of the current VOBU.
 
         This forces the source to immediatly ask for more work by
         firing the `vobu-read` singnal."""
-        #FIXME: Reimplement in some way.
-        pass
+        gst.debug("cancel VOBU")
+
+        #self.src.set_property('cancel-vobu', True)
 
     def setAspectRatio(self, aspectRatio):
         """Set the display aspect ratio to `aspectRatio`.
 
         Emits the aspectRatioChanged signal."""
+        gst.debug("set aspect ratio")
+
         if aspectRatio == machine.ASPECT_RATIO_4_3:
            self.aspectRatioChanged(4.0/3)
         elif aspectRatio == machine.ASPECT_RATIO_16_9:
@@ -376,6 +436,8 @@ class Manager(SignalHolder):
 
     def setAudio(self, phys):
         """Set the physical audio stream to 'phys'."""
+        gst.debug("set audio")
+
         if self.audio == phys:
             return
         self.audio = phys
@@ -403,15 +465,28 @@ class Manager(SignalHolder):
         """Set the subpicture color lookup table to 'clut'.
 
         'clut' is a 16-position array."""
+        gst.debug("set subpicture CLUT")
+
         if self.clut == clut:
             return
         self.clut = clut
 
         self.sendEvent(events.subpictureClut(self.clut))
 
+    def resendSubpictureClut(self):
+        """Resend the subpicture color lookup table down the pipeline.
+
+        This is needed after a flush."""
+        gst.debug("resend subpicture CLUT")
+
+        if self.clut != None:
+            self.sendEvent(events.subpictureClut(self.clut))
+
     def highlight(self, area, button, palette):
         """Highlight the specified area, corresponding to the
         specified button number and using the specified palette."""
+        gst.debug("highlight")
+
         if (area, button, palette) == \
            (self.area, self.button, self.palette):
             return
@@ -432,36 +507,43 @@ class Manager(SignalHolder):
 
     def stillFrame(self):
         """Tell the pipeline that a still frame was sent."""
-        self.sendEvent(events.eos())
+        gst.debug("still frame")
+
+        self.sendEvent(events.stillFrame())
 
     def flush(self):
         """Flush the pipeline."""
-        #self.sendEvent(events.flush_start())
-        #self.sendEvent(events.flush_stop())
-
+        gst.debug("flush")
+            
         # A flush erases the CLUT. Restore it.
-        self.sendEvent(events.subpictureClut(self.clut))
+        #self.sendEvent(events.subpictureClut(self.clut))
 
         # Reset the highlight state.
         self.area = None
         self.button = None
         self.palette = None
 
+        self.segmentStart = None
+        self.segmentStop = None
+
+        self.flushing = True
+
+        msg = gst.message_new_application(self.src,
+                                          gst.Structure('seamless.Flush'))
+        self.pipeline.get_bus().post(msg)
+
+        self.vobuReadReturn = True
+
     def pause(self):
         """Pause the pipeline for a short time (currently 0.1s).
 
         Warning: This method temporarily releases the object's lock"""
-        #self.sendEvent(events.filler())
+        gst.debug("pause")
 
         # We don't want to keep the lock while sleeping.
         self.lock.release()
         time.sleep(0.1)
         self.lock.acquire()
-
-    def eos(self):
-        """Signal the end of stream (EOS) to the pipeline."""
-        print >> sys.stderr, "+++ Sending EOS"
-        self.sendEvent(events.eos())
 
 
     #

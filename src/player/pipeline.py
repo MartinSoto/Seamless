@@ -219,6 +219,9 @@ class SoftwareVideo(Bin):
         self.makeSubelem('mpeg2subt')
         self.makeSubelem('ffmpegcolorspace')
         self.makeSubelem('videoscale')
+        self.makeSubelem('queue', 'frame-queue',
+                         max_size_buffers=3, max_size_bytes=0,
+                         max_size_time=0)
         self.makeSubelem(options['videoSink'], 'videosink',
                          force_aspect_ratio=True,
                          pixel_aspect_ratio=options['pixelAspect'])
@@ -227,7 +230,8 @@ class SoftwareVideo(Bin):
         self.linkPads('video-queue', 'src', 'mpeg2subt', 'video')
         self.link('mpeg2subt', 'ffmpegcolorspace')
         self.link('ffmpegcolorspace', 'videoscale')
-        self.link('videoscale', 'videosink')
+        self.link('videoscale', 'frame-queue')
+        self.link('frame-queue', 'videosink')
 
         self.ghostify('mpeg2dec', 'sink', 'video')
         self.ghostify('mpeg2subt', 'subtitle', 'subtitle')

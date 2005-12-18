@@ -1,3 +1,29 @@
+2005-12-19  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__): Added vobuReadReturn
+	and flushing.
+
+	(Manager.__init__, Manager.vobuRead, Manager.busMsgReceived) 
+	(Manager.runInteractive, Manager.playVobu, Manager.cancelVobu) 
+	(Manager.resendSubpictureClut, Manager.flush) 
+	(Manager.eos): Implement flushing by seeking, as suggested by Wim
+	Taymans. The flush operation (running from the streaming thread)
+	posts a message to the bus that instructs the application thread
+	to do a flushing seek. The current implementation actually ignores
+	the seek position.
+	(Manager.stillFrame): Send an actual still frame event, so that
+	dvddemux can send an EOS down the audio pipeline. Otherwise the
+	pipeline blocks when an still frame directly follows a flush,
+	because it is not possible to preroll without audio.
+
+	* src/machine/machine.py (CellPlayer.playFromVobu): Return the
+	still frame command before pausing for a still frame.
+
+	* src/player/pipeline.py (SoftwareVideo.__init__): Add a
+	three-frame queue before the videosink. This queue helps
+	preventing deadlocks caused by still frame updates happening
+	before preroll.
+
 2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_getcaps) 

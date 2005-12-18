@@ -1580,6 +1580,8 @@ class CellPlayer(object):
         if self.cell.stillTime > 0:
             # We have a still frame.
 
+            yield cmds.StillFrame()
+
             if self.cell.stillTime == 0xff:
                 # Unlimited wait time. Loop "infinitely" until a
                 # restart operation takes this method out of the
