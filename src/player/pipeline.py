@@ -139,7 +139,8 @@ class SoftwareAudio(Bin):
 
         self.makeSubelem('a52dec')
         self.makeSubelem('audioconvert')
-        self.makeSubelem('queue')
+        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=0,
+                         max_size_time=gst.SECOND)
         self.makeSubelem(options['audioSink'], 'audiosink')
         
         self.link('a52dec', 'audioconvert')
@@ -213,7 +214,8 @@ class SoftwareVideo(Bin):
 
         self.makeSubelem('mpeg2dec')
         self.makeSubelem('queue', 'video-queue',
-                         max_size_bytes=1024 * 1024 * 32)
+                         max_size_buffers=0, max_size_bytes=0,
+                         max_size_time=gst.SECOND)
         self.makeSubelem('mpeg2subt')
         self.makeSubelem('ffmpegcolorspace')
         self.makeSubelem('videoscale')

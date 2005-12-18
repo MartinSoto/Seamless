@@ -1,5 +1,11 @@
 2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py (SoftwareAudio.__init__) 
+	(SoftwareVideo.__init__): Guarantee that the queues can hold a
+	complete second of material.
+
+2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/dvdblock/dvdblocksrc.h: 
 	* gst-plugins/dvdblock/dvdblocksrc.c: 
 	(dvdblocksrc_class_init, dvdblocksrc_init) 
