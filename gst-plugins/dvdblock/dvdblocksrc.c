@@ -58,6 +58,7 @@ enum {
   PROP_TITLE,
   PROP_DOMAIN,
   PROP_VOBU_START,
+  PROP_CANCEL_VOBU,
 };
 
 
@@ -199,6 +200,10 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
           "file (as specified by 'title' and 'domain') to "
           "start of next VOBU to read",
           -1, G_MAXINT, -1, G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class, PROP_CANCEL_VOBU,
+      g_param_spec_boolean ("cancel-vobu", "cancel-vobu",
+          "When set to true, cancel playback of the current VOBU",
+          FALSE, G_PARAM_READWRITE));
 
   gstbasesrc_class->stop = dvdblocksrc_stop;
   gstbasesrc_class->is_seekable = dvdblocksrc_is_seekable;
@@ -225,6 +230,8 @@ dvdblocksrc_init (DVDBlockSrc * src, DVDBlockSrcClass * klass)
 
   src->reader = NULL;
   src->file = NULL;
+
+  src->cancel_lock = g_mutex_new ();
 
   gst_base_src_set_format (GST_BASE_SRC (src), GST_FORMAT_TIME);
 }
@@ -283,6 +290,18 @@ dvdblocksrc_set_property (GObject *object, guint prop_id,
     case PROP_VOBU_START:
       src->vobu_start = g_value_get_int (value);
       break;
+    case PROP_CANCEL_VOBU:
+      /* The cancel operation cannot be executed while 'create' is
+	 running. */
+      g_mutex_lock (src->cancel_lock);
+
+      if (g_value_get_boolean (value)) {
+	src->vobu_start = -1;
+	src->block_count = 0;
+      }
+
+      g_mutex_unlock (src->cancel_lock);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -312,6 +331,9 @@ dvdblocksrc_get_property (GObject *object, guint prop_id,
       break;
     case PROP_VOBU_START:
       g_value_set_int (value, src->vobu_start);
+      break;
+    case PROP_CANCEL_VOBU:
+      g_value_set_boolean (value, FALSE);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -357,11 +379,13 @@ static GstFlowReturn
 dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
 {
   DVDBlockSrc *src = DVDBLOCKSRC (psrc);
-
   GstBuffer *buf = NULL;
   int block_count;
+  GstFlowReturn res = GST_FLOW_OK;
 
   GST_INFO_OBJECT (src, "entering create");
+
+  g_mutex_lock (src->cancel_lock);
 
   if (src->block_count == 0 && src->vobu_start == -1) {
     /* No more work to do. */
@@ -372,8 +396,12 @@ dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
         dvdblocksrc_signals[VOBU_READ_SIGNAL], 0);
 
     if (src->vobu_start == -1) {
-      /* We didn't get any more work. */
-      return GST_FLOW_ERROR;
+      /* We didn't get any more work, tell the base class to send an
+	 EOS. */
+      GST_DEBUG_OBJECT (psrc, "Sending EOS");
+
+      res = GST_FLOW_UNEXPECTED;
+      goto done;
     }
   }
 
@@ -394,7 +422,8 @@ dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
           ("Block, title %d, domain %d, offset %d is not a VOBU header",
            src->title_num, src->domain, src->block_offset - 1),
           NULL);
-      return GST_FLOW_ERROR;
+      res = GST_FLOW_ERROR;
+      goto done;
     }
 
     /* Set the number of blocks to read. */
@@ -420,7 +449,10 @@ dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
   *outbuf = buf;
 
   GST_INFO_OBJECT (src, "leaving create normally");
-  return GST_FLOW_OK;
+
+ done:
+  g_mutex_unlock (src->cancel_lock);
+  return res;
 }
 
 

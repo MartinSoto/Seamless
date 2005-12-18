@@ -75,6 +75,8 @@ struct _DVDBlockSrc {
   dvd_file_t *file;	/* The current DVD file object. */
 
   GstPad *src;		/* The source pad. */
+
+  GMutex *cancel_lock;	/* Lock to exclude the cancel VOBU operation. */
 };
 
 

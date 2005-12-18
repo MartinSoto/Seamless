@@ -1,5 +1,15 @@
 2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/dvdblock/dvdblocksrc.h: 
+	* gst-plugins/dvdblock/dvdblocksrc.c: 
+	(dvdblocksrc_class_init, dvdblocksrc_init) 
+	(dvdblocksrc_set_property, dvdblocksrc_get_property) 
+	(dvdblocksrc_create): 
+	Re-add the cancel-vobu property for canceling the playback of the
+	current VOBU. This time, it is thread safe.
+
+2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/dvdblock/dvdblocksrc.c: 
 	(dvdblocksrc_class_init, dvdblocksrc_init) 
 	(dvdblocksrc_is_seekable, dvdblocksrc_do_seek): Add basic seeking
