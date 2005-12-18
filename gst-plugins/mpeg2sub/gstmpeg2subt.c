@@ -254,8 +254,6 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt, GstMpeg2SubtClass * gclass)
   memset (mpeg2subt->subtitle_alpha, 0, sizeof (mpeg2subt->subtitle_alpha));
   memset (mpeg2subt->menu_alpha, 0, sizeof (mpeg2subt->menu_alpha));
   memset (mpeg2subt->out_buffers, 0, sizeof (mpeg2subt->out_buffers));
-
-  mpeg2subt->chain_lock = g_mutex_new ();
 }
 
 static void
@@ -359,8 +357,6 @@ gst_mpeg2subt_chain_video (GstPad * pad, GstBuffer * buffer)
   glong size;
   GstBuffer *out_buf;
 
-  g_mutex_lock (mpeg2subt->chain_lock);
-
   data = GST_BUFFER_DATA (buffer);
   size = GST_BUFFER_SIZE (buffer);
 
@@ -384,7 +380,6 @@ gst_mpeg2subt_chain_video (GstPad * pad, GstBuffer * buffer)
   res = gst_pad_push (mpeg2subt->srcpad, out_buf);
 
   gst_object_unref (GST_OBJECT (mpeg2subt));
-  g_mutex_unlock (mpeg2subt->chain_lock);
   return res;
 }
 
@@ -963,8 +958,6 @@ gst_mpeg2subt_chain_subtitle (GstPad * pad, GstBuffer * buffer)
   guchar *data;
   glong size = 0;
 
-  g_mutex_lock (mpeg2subt->chain_lock);
-
   /* deal with partial frame from previous buffer */
   if (mpeg2subt->partialbuf) {
     GstBuffer *merge;
@@ -1004,7 +997,6 @@ gst_mpeg2subt_chain_subtitle (GstPad * pad, GstBuffer * buffer)
   res = gst_mpeg2subt_update_still_frame (mpeg2subt);
 
   gst_object_unref (GST_OBJECT (mpeg2subt));
-  g_mutex_unlock (mpeg2subt->chain_lock);
   return res;
 }
 

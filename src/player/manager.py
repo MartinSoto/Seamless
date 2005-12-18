@@ -436,8 +436,8 @@ class Manager(SignalHolder):
 
     def flush(self):
         """Flush the pipeline."""
-        self.sendEvent(events.flush_start())
-        self.sendEvent(events.flush_stop())
+        #self.sendEvent(events.flush_start())
+        #self.sendEvent(events.flush_stop())
 
         # A flush erases the CLUT. Restore it.
         self.sendEvent(events.subpictureClut(self.clut))
