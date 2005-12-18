@@ -1,5 +1,7 @@
 INCLUDES = $(PYTHON_INCLUDES)
 
+AM_CFLAGS=
+
 pypkgdir = $(pkglibdir)/python/dvdread
 
 pypkg_LTLIBRARIES = _dvdreadmodule.la

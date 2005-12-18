@@ -111,9 +111,12 @@ dnl Check for Pyrex
 AC_PATH_PROG(PYREXC, pyrexc, NOT_FOUND)
 AC_SUBST(PYREXC)
 
-dnl Be clean and use pure Gtk+-2.0
-EXTRA_CFLAGS="-Wall -Werror -DGTK_DISABLE_DEPRECATED=1 -DG_DISABLE_DEPRECATED=1 -DGDK_DISABLE_DEPRECATED=1 -DGDK_PIXBUF_DISABLE_DEPRECATED=1 -DGNOME_DISABLE_DEPRECATED=1 -DGST_DISABLE_DEPRECATED=1"
-AC_SUBST(EXTRA_CFLAGS)
+CFLAGS="-g -O2"
+AC_SUBST(CFLAGS)
+
+dnl Make warnings into errors. Use latest glib and GStreamer API.
+AM_CFLAGS="-Wall -Werror -DG_DISABLE_DEPRECATED=1 -DGST_DISABLE_DEPRECATED=1"
+AC_SUBST([AM_CFLAGS])
 
 AC_OUTPUT([
   Makefile
@@ -124,12 +127,10 @@ AC_OUTPUT([
   gst-plugins/dvdblock/Makefile
   gst-plugins/iec958/Makefile
   gst-plugins/mpeg2sub/Makefile
-  gst-plugins/robustclock/Makefile
   src/Makefile
   src/dvdread/Makefile
   src/machine/Makefile
   src/player/Makefile
-  src/wrapclock/Makefile
 ])
 
 echo

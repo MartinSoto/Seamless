@@ -4,6 +4,5 @@ else
 ALSASPDIF_DIR=
 endif
 
-#SUBDIRS=$(ALSASPDIF_DIR) capspipe dvdblock iec958 \
-#	 mpeg2sub robustclock
+#SUBDIRS=$(ALSASPDIF_DIR) capspipe iec958
 SUBDIRS=dvdblock mpeg2sub

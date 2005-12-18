@@ -146,7 +146,7 @@ static void gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt,
     GstBuffer * buf);
 static void gst_mpeg2subt_flush_video (GstMpeg2Subt * mpeg2subt);
 static void gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt);
-static void gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt,
+static gboolean gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt,
     GstEvent * event, gboolean from_sub_pad);
 static void gst_mpeg2subt_finalize (GObject * gobject);
 static void gst_mpeg2subt_set_property (GObject * object, guint prop_id,
@@ -155,7 +155,7 @@ static void gst_mpeg2subt_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 static void gst_mpeg2subt_setup_palette (GstMpeg2Subt * mpeg2subt);
 static void gst_mpeg2subt_setup_highlight_palette (GstMpeg2Subt * mpeg2subt);
-static void gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt);
+static GstFlowReturn gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt);
 
 
 /*static guint gst_mpeg2subt_signals[LAST_SIGNAL] = { 0 };*/
@@ -282,6 +282,7 @@ static GstCaps *
 gst_mpeg2subt_getcaps (GstPad * pad)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+  GstCaps *res;
   GstPad *otherpad;
   GstCaps *caps;
 
@@ -297,18 +298,21 @@ gst_mpeg2subt_getcaps (GstPad * pad)
     templ = gst_pad_get_pad_template_caps (otherpad);
     temp = gst_caps_intersect (caps, templ);
     gst_caps_unref (caps);
-    return temp;
+    res =  temp;
   } else {
-    return gst_caps_copy (gst_pad_get_pad_template_caps (pad));
+    res = gst_caps_copy (gst_pad_get_pad_template_caps (pad));
   }
+
+  gst_object_unref (GST_OBJECT (mpeg2subt));
+  return res;
 }
 
 static gboolean
 gst_mpeg2subt_setcaps (GstPad * pad, GstCaps * caps)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+  gboolean res =  TRUE;
   GstPad *otherpad;
-  gboolean ret;
   GstStructure *structure;
   gint width, height;
   gint i;
@@ -317,14 +321,16 @@ gst_mpeg2subt_setcaps (GstPad * pad, GstCaps * caps)
       (pad == mpeg2subt->srcpad) ? mpeg2subt->videopad : mpeg2subt->srcpad;
 
   if (!gst_pad_set_caps (otherpad, caps)) {
-    return FALSE;
+    res = FALSE;
+    goto done;
   }
 
   structure = gst_caps_get_structure (caps, 0);
 
   if (!gst_structure_get_int (structure, "width", &width) ||
       !gst_structure_get_int (structure, "height", &height)) {
-    return FALSE;
+    res = FALSE;
+    goto done;
   }
 
   mpeg2subt->in_width = width;
@@ -337,13 +343,16 @@ gst_mpeg2subt_setcaps (GstPad * pad, GstCaps * caps)
     mpeg2subt->out_buffers[i] = g_malloc (sizeof (guint16) * width);
   }
 
-  return TRUE;
+ done:
+  gst_object_unref (GST_OBJECT (mpeg2subt));
+  return res;
 }
 
 static GstFlowReturn
 gst_mpeg2subt_chain_video (GstPad * pad, GstBuffer * buffer)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+  GstFlowReturn res;
   guchar *data;
   glong size;
   GstBuffer *out_buf;
@@ -368,39 +377,47 @@ gst_mpeg2subt_chain_video (GstPad * pad, GstBuffer * buffer)
   GST_LOG_OBJECT (mpeg2subt, "Pushing frame with timestamp %"
       GST_TIME_FORMAT, GST_BUFFER_TIMESTAMP (out_buf));
 
-  return gst_pad_push (mpeg2subt->srcpad, out_buf);
+  res = gst_pad_push (mpeg2subt->srcpad, out_buf);
+
+  gst_object_unref (GST_OBJECT (mpeg2subt));
+  return res;
 }
 
 static gboolean
 gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event)
 {
-  gboolean ret = TRUE;
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+  gboolean res = TRUE;
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_FLUSH_START:
       gst_mpeg2subt_flush_video (mpeg2subt);
-      ret = gst_pad_push_event (mpeg2subt->srcpad, event);
+      res = gst_pad_push_event (mpeg2subt->srcpad, event);
       break;
     case GST_EVENT_CUSTOM_DOWNSTREAM:
     case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
-      gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, FALSE);
+      res = gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, FALSE);
       gst_event_unref (event);
       break;
     default:
-      ret = gst_pad_event_default (mpeg2subt->videopad, event);
+      res = gst_pad_event_default (mpeg2subt->videopad, event);
       break;
   }
 
-  return ret;
+  gst_object_unref (GST_OBJECT (mpeg2subt));
+  return res;
 }
 
 static gboolean
 gst_mpeg2subt_src_event (GstPad * pad, GstEvent * event)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+  gboolean res = TRUE;
 
-  return gst_pad_send_event (GST_PAD_PEER (mpeg2subt->videopad), event);
+  res = gst_pad_send_event (GST_PAD_PEER (mpeg2subt->videopad), event);
+
+  gst_object_unref (GST_OBJECT (mpeg2subt));
+  return res;  
 }
 
 /* Execute the current command block. */
@@ -550,8 +567,8 @@ gst_mpeg2subt_next_block (GstMpeg2Subt * mpeg2subt)
     next_cmds = contents + GST_READ_UINT16_BE (mpeg2subt->cur_cmds + 2);
 
     /* next_cmds should still fall in the packet. */
-    g_return_if_fail (contents < next_cmds &&
-		      next_cmds < contents + GST_READ_UINT16_BE (contents));
+    g_return_val_if_fail (contents < next_cmds &&
+	next_cmds < contents + GST_READ_UINT16_BE (contents), FALSE);
 
     if (next_cmds != mpeg2subt->cur_cmds) {
       /* Just move to the next block. */
@@ -691,13 +708,12 @@ static void
 gst_draw_rle_line (GstMpeg2Subt * mpeg2subt, guchar * buffer,
 		   RLE_state * state)
 {
-  gint length, segment_length, colourid;
+  gint length, colourid;
   gint right = mpeg2subt->right + 1;
   YUVA_val *normal_colour_entry;
   YUVA_val *highlight_colour_entry;
   guint code;
   gint x, x_final;
-  gboolean in_clip = FALSE;
   guchar *target_Y;
   guint16 *target_U;
   guint16 *target_V;
@@ -822,7 +838,6 @@ gst_merge_uv_data (GstMpeg2Subt * mpeg2subt, guchar * buffer,
 static void
 gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt, GstBuffer * buf)
 {
-  gint width = mpeg2subt->right - mpeg2subt->left + 1;
   gint Y_stride;
   gint UV_stride;
 
@@ -852,6 +867,7 @@ gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt, GstBuffer * buf)
   state.aligned = 1;
   state.offset[0] = mpeg2subt->offset[0];
   state.offset[1] = mpeg2subt->offset[1];
+  state.next = 0;
 
   /* Determine the highlight region. */
   if (mpeg2subt->forced_display) {
@@ -903,13 +919,14 @@ gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt, GstBuffer * buf)
   }
 }
 
-static void
+static GstFlowReturn
 gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt)
 {
   GstBuffer *out_buf;
+  gboolean res = GST_FLOW_OK;
 
   if (mpeg2subt->last_frame == NULL) {
-    return;
+    return res;
   }
 
   gst_mpeg2subt_update (mpeg2subt,
@@ -926,14 +943,17 @@ gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt)
 
     GST_INFO_OBJECT (mpeg2subt, "Pushing frame with timestamp %0.3fs",
         (double) GST_BUFFER_TIMESTAMP (out_buf) / GST_SECOND);
-    gst_pad_push (mpeg2subt->srcpad, out_buf);
+    res = gst_pad_push (mpeg2subt->srcpad, out_buf);
   }
+
+  return res;
 }
 
 static GstFlowReturn
 gst_mpeg2subt_chain_subtitle (GstPad * pad, GstBuffer * buffer)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+  GstFlowReturn res = GST_FLOW_OK;
   guint16 packet_size;
   guchar *data;
   glong size = 0;
@@ -974,13 +994,17 @@ gst_mpeg2subt_chain_subtitle (GstPad * pad, GstBuffer * buffer)
     }
   }
 
-  gst_mpeg2subt_update_still_frame (mpeg2subt);
+  res = gst_mpeg2subt_update_still_frame (mpeg2subt);
+
+  gst_object_unref (GST_OBJECT (mpeg2subt));
+  return res;
 }
 
 static gboolean
 gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
+  gboolean res = TRUE;
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_FLUSH_START:
@@ -991,14 +1015,17 @@ gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
       GST_LOG_OBJECT (mpeg2subt,
 	  "DVD event on subtitle pad with timestamp %llu",
 	  GST_EVENT_TIMESTAMP (event));
-      gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, TRUE);
+      res = gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, TRUE);
       break;
     default:
       GST_LOG_OBJECT (mpeg2subt, "Got event of type %d on subtitle pad",
 	  GST_EVENT_TYPE (event));
       break;
   }
+
   gst_event_unref (event);
+  gst_object_unref (GST_OBJECT (mpeg2subt));
+  return res;
 }
 
 static void
@@ -1043,17 +1070,18 @@ gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt)
   memset (mpeg2subt->menu_alpha, 0, sizeof (mpeg2subt->menu_alpha));
 }
 
-static void
+static gboolean
 gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     gboolean from_sub_pad)
 {
+  gboolean res = TRUE;
   const GstStructure *structure;
   const gchar *event_type;
 
   structure = gst_event_get_structure (event);
 
   event_type = gst_structure_get_string (structure, "event");
-  g_return_if_fail (event_type != NULL);
+  g_return_val_if_fail (event_type != NULL, FALSE);
 
   if (from_sub_pad && !strcmp (event_type, "dvd-spu-highlight")) {
     gint button;
@@ -1068,7 +1096,8 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
         !gst_structure_get_int (structure, "ex", &ex) ||
         !gst_structure_get_int (structure, "ey", &ey)) {
       GST_ERROR ("Invalid dvd-spu-highlight event received");
-      return;
+      res = FALSE;
+      goto done;
     }
     mpeg2subt->current_button = button;
     mpeg2subt->clip_left = sx;
@@ -1086,7 +1115,10 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
 		      "New button activated clip=(%d,%d) to "
 		      "(%d,%d) palette 0x%x", sx, sy, ex, ey, palette);
 
-    gst_mpeg2subt_update_still_frame (mpeg2subt);
+    if (gst_mpeg2subt_update_still_frame (mpeg2subt) != GST_FLOW_OK) {
+      res = FALSE;
+      goto done;
+    }
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-clut-change")) {
     /* Take a copy of the colour table */
     gchar name[16];
@@ -1098,12 +1130,16 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
       sprintf (name, "clut%02d", i);
       if (!gst_structure_get_int (structure, name, &value)) {
         GST_ERROR ("dvd-spu-clut-change event did not contain %s field", name);
-        break;
+	res = FALSE;
+        goto done;
       }
       mpeg2subt->current_clut[i] = (guint32) (value);
     }
 
-    gst_mpeg2subt_update_still_frame (mpeg2subt);
+    if (gst_mpeg2subt_update_still_frame (mpeg2subt) != GST_FLOW_OK) {
+      res = FALSE;
+      goto done;
+    }
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-reset-highlight")) {
     /* Turn off forced highlight display */
     mpeg2subt->current_button = 0;
@@ -1112,7 +1148,10 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     mpeg2subt->clip_right = mpeg2subt->right;
     mpeg2subt->clip_bottom = mpeg2subt->bottom;
     GST_LOG_OBJECT (mpeg2subt, "Clearing button state");
-    gst_mpeg2subt_update_still_frame (mpeg2subt);
+    if (gst_mpeg2subt_update_still_frame (mpeg2subt) != GST_FLOW_OK) {
+      res = FALSE;
+      goto done;
+    }
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-hide")) {
     mpeg2subt->hide = TRUE;
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-show")) {
@@ -1125,6 +1164,9 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     /*GST_LOG_OBJECT (mpeg2subt, "Ignoring DVD event %s from %s pad",
       event_type, from_sub_pad ? "sub" : "video");*/
   }
+
+ done:
+  return res;
 }
 
 static void

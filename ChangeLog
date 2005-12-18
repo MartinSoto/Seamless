@@ -1,5 +1,34 @@
 2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_getcaps) 
+	(gst_mpeg2subt_setcaps, gst_mpeg2subt_chain_video) 
+	(gst_mpeg2subt_event_video, gst_mpeg2subt_src_event) 
+	(gst_mpeg2subt_next_block, gst_draw_rle_line) 
+	(gst_mpeg2subt_merge_title, gst_mpeg2subt_update_still_frame) 
+	(gst_mpeg2subt_chain_subtitle, gst_mpeg2subt_event_subtitle) 
+	(gst_mpeg2subt_handle_dvd_event):
+	Make it compile with strict warnings. Check the return values of
+	gst_pad_push and gst_pad_push_event and pass them around as
+	necessary.
+
+	* gst-plugins/robustclock:
+	* src/wrapclock:
+	* src/Makefile.am (SUBDIRS): 
+	* gst-plugins/Makefile.am (SUBDIRS): 
+	Erased. Not necessary anymore with GStreamer 0.10.
+
+	* src/dvdread/Makefile.am (AM_CFLAGS): 
+	* gst-plugins/mpeg2sub/Makefile.am (libgstmpeg2subt_la_CFLAGS): 
+	* gst-plugins/iec958/Makefile.am (libiec958_la_CFLAGS): 
+	* gst-plugins/dvdblock/Makefile.am (libdvdblock_la_CFLAGS): 
+	* gst-plugins/capspipe/Makefile.am (libcapspipe_la_CFLAGS): 
+	* gst-plugins/alsaspdif/Makefile.am (libalsaspdif_la_CFLAGS): 
+	Use AM_CFLAGS properly all around.
+
+	* configure.ac (CFLAGS, AM_CFLAGS): Define properly.
+
+2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/pipeline.py (SoftwareAudio.__init__) 
 	(SoftwareVideo.__init__): Guarantee that the queues can hold a
 	complete second of material.
