@@ -254,6 +254,8 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt, GstMpeg2SubtClass * gclass)
   memset (mpeg2subt->subtitle_alpha, 0, sizeof (mpeg2subt->subtitle_alpha));
   memset (mpeg2subt->menu_alpha, 0, sizeof (mpeg2subt->menu_alpha));
   memset (mpeg2subt->out_buffers, 0, sizeof (mpeg2subt->out_buffers));
+
+  g_static_mutex_init (&(mpeg2subt->data_lock));
 }
 
 static void
@@ -261,6 +263,8 @@ gst_mpeg2subt_finalize (GObject * gobject)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gobject);
   gint i;
+
+  g_static_mutex_free (&(mpeg2subt->data_lock));
 
   for (i = 0; i < 3; i++) {
     if (mpeg2subt->out_buffers[i])
@@ -617,6 +621,8 @@ gst_mpeg2subt_next_block (GstMpeg2Subt * mpeg2subt)
 static void
 gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt, GstClockTime time)
 {
+  g_static_mutex_lock (&(mpeg2subt->data_lock));
+
   if (time == GST_CLOCK_TIME_NONE) {
     return;
   }
@@ -632,6 +638,8 @@ gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt, GstClockTime time)
     gst_mpeg2subt_execute_block (mpeg2subt);
     gst_mpeg2subt_next_block (mpeg2subt);
   }
+
+  g_static_mutex_unlock (&(mpeg2subt->data_lock));
 }
 
 inline int
@@ -989,7 +997,10 @@ gst_mpeg2subt_chain_subtitle (GstPad * pad, GstBuffer * buffer)
       GST_LOG_OBJECT (mpeg2subt, "Subtitle packet size %d, current size %ld",
 	  packet_size, size);
 
+      g_static_mutex_lock (&(mpeg2subt->data_lock));
       g_queue_push_tail (mpeg2subt->subt_queue, mpeg2subt->partialbuf);
+      g_static_mutex_unlock (&(mpeg2subt->data_lock));
+
       mpeg2subt->partialbuf = NULL;
     }
   }
@@ -1048,9 +1059,12 @@ gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt)
     gst_buffer_unref (mpeg2subt->partialbuf);
     mpeg2subt->partialbuf = NULL;
   }
+
+  g_static_mutex_lock (&(mpeg2subt->data_lock));
   while (!g_queue_is_empty (mpeg2subt->subt_queue)) {
     gst_buffer_unref (GST_BUFFER (g_queue_pop_head (mpeg2subt->subt_queue)));
   }
+  g_static_mutex_unlock (&(mpeg2subt->data_lock));
 
   mpeg2subt->cur_cmds = NULL;
   mpeg2subt->cur_cmds_buf = NULL;

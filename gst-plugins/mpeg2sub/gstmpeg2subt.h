@@ -111,6 +111,9 @@ struct _GstMpeg2Subt {
 
   gint in_width, in_height;
   gint current_button;
+
+  GStaticMutex data_lock;	/* A lock to protect the element's
+				   internal data structures. */
 };
 
 struct _GstMpeg2SubtClass {
