@@ -255,7 +255,7 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt, GstMpeg2SubtClass * gclass)
   memset (mpeg2subt->menu_alpha, 0, sizeof (mpeg2subt->menu_alpha));
   memset (mpeg2subt->out_buffers, 0, sizeof (mpeg2subt->out_buffers));
 
-  g_static_mutex_init (&(mpeg2subt->data_lock));
+  g_static_mutex_init (&(mpeg2subt->lock));
 }
 
 static void
@@ -264,7 +264,7 @@ gst_mpeg2subt_finalize (GObject * gobject)
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gobject);
   gint i;
 
-  g_static_mutex_free (&(mpeg2subt->data_lock));
+  g_static_mutex_free (&(mpeg2subt->lock));
 
   for (i = 0; i < 3; i++) {
     if (mpeg2subt->out_buffers[i])
@@ -361,6 +361,8 @@ gst_mpeg2subt_chain_video (GstPad * pad, GstBuffer * buffer)
   glong size;
   GstBuffer *out_buf;
 
+  GST_MPEG2SUBT_LOCK (mpeg2subt);
+
   data = GST_BUFFER_DATA (buffer);
   size = GST_BUFFER_SIZE (buffer);
 
@@ -381,9 +383,12 @@ gst_mpeg2subt_chain_video (GstPad * pad, GstBuffer * buffer)
   GST_LOG_OBJECT (mpeg2subt, "Pushing frame with timestamp %"
       GST_TIME_FORMAT, GST_BUFFER_TIMESTAMP (out_buf));
 
+  GST_MPEG2SUBT_UNLOCK (mpeg2subt);
   res = gst_pad_push (mpeg2subt->srcpad, out_buf);
+  GST_MPEG2SUBT_LOCK (mpeg2subt);
 
   gst_object_unref (GST_OBJECT (mpeg2subt));
+  GST_MPEG2SUBT_UNLOCK (mpeg2subt);
   return res;
 }
 
@@ -393,10 +398,14 @@ gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event)
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
   gboolean res = TRUE;
 
+  GST_MPEG2SUBT_LOCK (mpeg2subt);
+
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_FLUSH_START:
       gst_mpeg2subt_flush_video (mpeg2subt);
+      GST_MPEG2SUBT_UNLOCK (mpeg2subt);
       res = gst_pad_push_event (mpeg2subt->srcpad, event);
+      GST_MPEG2SUBT_LOCK (mpeg2subt);
       break;
     case GST_EVENT_CUSTOM_DOWNSTREAM:
     case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
@@ -409,6 +418,7 @@ gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event)
   }
 
   gst_object_unref (GST_OBJECT (mpeg2subt));
+  GST_MPEG2SUBT_UNLOCK (mpeg2subt);
   return res;
 }
 
@@ -621,8 +631,6 @@ gst_mpeg2subt_next_block (GstMpeg2Subt * mpeg2subt)
 static void
 gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt, GstClockTime time)
 {
-  g_static_mutex_lock (&(mpeg2subt->data_lock));
-
   if (time == GST_CLOCK_TIME_NONE) {
     return;
   }
@@ -638,8 +646,6 @@ gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt, GstClockTime time)
     gst_mpeg2subt_execute_block (mpeg2subt);
     gst_mpeg2subt_next_block (mpeg2subt);
   }
-
-  g_static_mutex_unlock (&(mpeg2subt->data_lock));
 }
 
 inline int
@@ -951,7 +957,11 @@ gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt)
 
     GST_INFO_OBJECT (mpeg2subt, "Pushing frame with timestamp %0.3fs",
         (double) GST_BUFFER_TIMESTAMP (out_buf) / GST_SECOND);
+
+    GST_MPEG2SUBT_UNLOCK (mpeg2subt);
     res = gst_pad_push (mpeg2subt->srcpad, out_buf);
+    GST_MPEG2SUBT_LOCK (mpeg2subt);
+
   }
 
   return res;
@@ -965,6 +975,8 @@ gst_mpeg2subt_chain_subtitle (GstPad * pad, GstBuffer * buffer)
   guint16 packet_size;
   guchar *data;
   glong size = 0;
+
+  GST_MPEG2SUBT_LOCK (mpeg2subt);
 
   /* deal with partial frame from previous buffer */
   if (mpeg2subt->partialbuf) {
@@ -997,9 +1009,7 @@ gst_mpeg2subt_chain_subtitle (GstPad * pad, GstBuffer * buffer)
       GST_LOG_OBJECT (mpeg2subt, "Subtitle packet size %d, current size %ld",
 	  packet_size, size);
 
-      g_static_mutex_lock (&(mpeg2subt->data_lock));
       g_queue_push_tail (mpeg2subt->subt_queue, mpeg2subt->partialbuf);
-      g_static_mutex_unlock (&(mpeg2subt->data_lock));
 
       mpeg2subt->partialbuf = NULL;
     }
@@ -1008,6 +1018,7 @@ gst_mpeg2subt_chain_subtitle (GstPad * pad, GstBuffer * buffer)
   res = gst_mpeg2subt_update_still_frame (mpeg2subt);
 
   gst_object_unref (GST_OBJECT (mpeg2subt));
+  GST_MPEG2SUBT_UNLOCK (mpeg2subt);
   return res;
 }
 
@@ -1016,6 +1027,8 @@ gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
 {
   GstMpeg2Subt *mpeg2subt = GST_MPEG2SUBT (gst_pad_get_parent (pad));
   gboolean res = TRUE;
+
+  GST_MPEG2SUBT_LOCK (mpeg2subt);
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_FLUSH_START:
@@ -1036,6 +1049,7 @@ gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
 
   gst_event_unref (event);
   gst_object_unref (GST_OBJECT (mpeg2subt));
+  GST_MPEG2SUBT_UNLOCK (mpeg2subt);
   return res;
 }
 
@@ -1060,11 +1074,9 @@ gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt)
     mpeg2subt->partialbuf = NULL;
   }
 
-  g_static_mutex_lock (&(mpeg2subt->data_lock));
   while (!g_queue_is_empty (mpeg2subt->subt_queue)) {
     gst_buffer_unref (GST_BUFFER (g_queue_pop_head (mpeg2subt->subt_queue)));
   }
-  g_static_mutex_unlock (&(mpeg2subt->data_lock));
 
   mpeg2subt->cur_cmds = NULL;
   mpeg2subt->cur_cmds_buf = NULL;

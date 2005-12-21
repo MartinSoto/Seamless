@@ -1,3 +1,19 @@
+2005-12-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (GST_MPEG2SUBT_LOCK) 
+	(GST_MPEG2SUBT_UNLOCK): 
+	New macros for acquiring and realising the object's data lock.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_finalize, gst_mpeg2subt_chain_video) 
+	(gst_mpeg2subt_event_video, gst_mpeg2subt_update) 
+	(gst_mpeg2subt_update_still_frame, gst_mpeg2subt_chain_subtitle) 
+	(gst_mpeg2subt_event_subtitle, gst_mpeg2subt_flush_subtitle): 
+	Lock when entering any of the external extry points, and release
+	it temporarily for pushing to the pipeline. This should fix the
+	crashes caused by improper mutual exclusion while accesing the
+	internal data stuctures.
+
 2005-12-19  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 

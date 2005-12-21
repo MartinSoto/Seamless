@@ -41,6 +41,12 @@ extern "C" {
 #define GST_IS_MPEG2SUBT_CLASS(obj) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_MPEG2SUBT))
 
+/* Lock and unlock the object. */
+#define GST_MPEG2SUBT_LOCK(mpeg2subt) \
+  (g_static_mutex_lock (&((mpeg2subt)->lock)))
+#define GST_MPEG2SUBT_UNLOCK(mpeg2subt) \
+  (g_static_mutex_unlock (&((mpeg2subt)->lock)))
+
 typedef struct _GstMpeg2Subt GstMpeg2Subt;
 typedef struct _GstMpeg2SubtClass GstMpeg2SubtClass;
 
@@ -112,7 +118,7 @@ struct _GstMpeg2Subt {
   gint in_width, in_height;
   gint current_button;
 
-  GStaticMutex data_lock;	/* A lock to protect the element's
+  GStaticMutex lock;		/* A lock to protect the element's
 				   internal data structures. */
 };
 
