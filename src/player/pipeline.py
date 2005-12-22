@@ -106,6 +106,17 @@ class Bin(gst.Bin):
 
         elem1.link_pads(padName1, elem2, padName2)
 
+    #
+    # Flush handling
+    #
+
+    def prepareFlush(self):
+        pass
+
+    def closeFlush(self):
+        pass
+
+
 
 class SoftwareAudio(Bin):
     """An audio playback element that uses software decoders for AC3
@@ -195,32 +206,25 @@ class SoftwareVideo(Bin):
     __slots__ = ()
 
     def __init__(self, options, name='videodec'):
-#         super(SoftwareVideo, self).__init__(name, """
-#         (
-#           mpeg2dec name=mpeg2dec !
-#             {
-#               seamless-queue !
-#                 .video seamless-mpeg2subt name=mpeg2subt !
-#                 ffmpegcolorspace !
-#                 videoscale !
-#                 seamless-queue max-size-buffers=3 name=videoqueue !
-#                 { %(videoSink)s name=videosink }
-
-#               seamless-queue name=subtitle ! mpeg2subt.subtitle
-#             }
-#         )
-#         """ % options)
         super(SoftwareVideo, self).__init__(name)
 
         self.makeSubelem('mpeg2dec')
         self.makeSubelem('queue', 'video-queue',
                          max_size_buffers=0, max_size_bytes=0,
                          max_size_time=gst.SECOND)
+
+        # In order to guarantee quick interactive response, buffering
+        # between the subtitle decoder and the video sink should be as
+        # limited as possible.
         self.makeSubelem('mpeg2subt')
         self.makeSubelem('ffmpegcolorspace')
         self.makeSubelem('videoscale')
+
+        # A (usually) one-frame queue whose size is increased before
+        # flushing and reduced again short thereafter. See "flush
+        # handling" for details.
         self.makeSubelem('queue', 'frame-queue',
-                         max_size_buffers=3, max_size_bytes=0,
+                         max_size_buffers=1, max_size_bytes=0,
                          max_size_time=0)
         self.makeSubelem(options['videoSink'], 'videosink',
                          force_aspect_ratio=True,
@@ -235,6 +239,33 @@ class SoftwareVideo(Bin):
 
         self.ghostify('mpeg2dec', 'sink', 'video')
         self.ghostify('mpeg2subt', 'subtitle', 'subtitle')
+
+    #
+    # Flush handling
+    #
+
+    def prepareFlush(self):
+        """Prepare the video bin for a flush operation."""
+        # When entering a menu, it is often the case that highlights
+        # are changed by the DVD machine many times in a short
+        # progresion. Each one of these changes forces the subtitle
+        # decoder to produce a new frame. When the DVD enters the menu
+        # directly after a flush, these video frames can cause a
+        # pipeline deadlock because they often arrive before any audio
+        # has been sent, but the lack of audio means that the pipeline
+        # is still prerolling and cannot process more video.
+
+        # We increase the size of the frame queue to allow for enough
+        # frames to be queued that prerolling is possible and playback
+        # can continue.
+        self.get_by_name('frame-queue').set_property('max-size-buffers', 15)
+
+    def closeFlush(self):
+        """Prepare the video bin for running after a flush."""
+        # Reduce the size of the frame queue to one frame, to increase
+        # interactive responsiveness.
+        self.get_by_name('frame-queue').set_property('max-size-buffers', 1)
+
 
 
 class BackPlayer(Bin):
@@ -264,8 +295,8 @@ class Pipeline(gst.Pipeline):
     """The GStreamer pipeline used to play DVDs."""
 
     __slots__ = ('backPlayer',
-                 'audioSink', 
-                 'videoSink',
+                 'audioBin',
+                 'videoBin',
                  'syncHandlers')
 
     def __init__(self, options, name="dvdplayer"):
@@ -277,29 +308,21 @@ class Pipeline(gst.Pipeline):
         self.backPlayer = BackPlayer(options)
         self.add(self.backPlayer)
 
-#         self.videoSink = MySink()
-#         self.add(self.videoSink)
-#         self.backPlayer.link_pads('video', self.videoSink, 'sink')
-
         # The video playback element.
-        self.videoSink = SoftwareVideo(options)
-        self.add(self.videoSink)
-
-#         self.audioSink = gst.element_factory_make('filesink', 'audiosink')
-#         self.audioSink.set_property('location', 'sound.out')
-#         self.audioSink = MySink()
+        self.videoBin = SoftwareVideo(options)
+        self.add(self.videoBin)
 
         # The audio playback element.
         if options.spdifCard:
-            self.audioSink = SpdifAudio(options)
+            self.audioBin = SpdifAudio(options)
         else:
-            self.audioSink = SoftwareAudio(options)
-        self.add(self.audioSink)
+            self.audioBin = SoftwareAudio(options)
+        self.add(self.audioBin)
 
         # All together now.
-        self.backPlayer.link_pads('video', self.videoSink, 'video')
-        self.backPlayer.link_pads('subtitle', self.videoSink, 'subtitle')
-        self.backPlayer.link_pads('audio', self.audioSink, 'sink')
+        self.backPlayer.link_pads('video', self.videoBin, 'video')
+        self.backPlayer.link_pads('subtitle', self.videoBin, 'subtitle')
+        self.backPlayer.link_pads('audio', self.audioBin, 'sink')
 
         # A list of functions to synchronously handle bus messages.
         self.syncHandlers = []
@@ -339,7 +362,22 @@ class Pipeline(gst.Pipeline):
         return self.backPlayer.getBlockSource()
 
     def getVideoSink(self):
-        return self.videoSink.get_by_name('videosink')
+        return self.videoBin.get_by_name('videosink')
+
+
+    #
+    # Flush handling
+    #
+
+    def prepareFlush(self):
+        """Prepare the pipeline for a flush operation."""
+        self.videoBin.prepareFlush()
+        self.audioBin.prepareFlush()
+
+    def closeFlush(self):
+        """Prepare the pipeline for running after a flush."""
+        self.videoBin.closeFlush()
+        self.audioBin.closeFlush()
 
 
     #

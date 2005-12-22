@@ -132,8 +132,8 @@ class Manager(SignalHolder):
         self.src = pipeline.getBlockSource()
         self.srcPad = self.src.get_pad('src')
 
-        # Connect the bus message handler to the pipeline's bus.
-        self.pipeline.get_bus().add_watch(self.busMsgReceived)
+        # A bus message handler for the flush operation.
+        self.pipeline.get_bus().add_watch(self.flushMsgHandler)
 
         self.mainItr = iter(self.machine)
 
@@ -280,25 +280,52 @@ class Manager(SignalHolder):
     # Bus Message Handling
     #
 
-    def busMsgReceived(self, bus, msg):
+    def flushMsgHandler(self, bus, msg):
+        """Implements pipeline flushing by sending a flushing seek
+        event from the application thread."""
+
+        # Flush is started by a seamless.Flush bus message. We pause
+        # the pipeline, send a seek event, and set the pipeline into
+        # motion again.
         if msg.type & gst.MESSAGE_APPLICATION and \
                msg.structure.has_name('seamless.Flush'):
-            self.lock.acquire()
-
+            # Flush message received, start flushing.
             self.pipeline.set_state(gst.STATE_PAUSED)
 
-            self.pipeline.getVideoSink().seek(1.0, gst.FORMAT_TIME,
-                                              gst.SEEK_FLAG_FLUSH,
-                                              gst.SEEK_TYPE_CUR, 0,
-                                              gst.SEEK_TYPE_NONE, -1)
-            self.pipeline.set_new_stream_time(0L)
+        elif self.flushing and \
+                 msg.type & gst.MESSAGE_STATE_CHANGED and \
+                 msg.src == self.pipeline:
+            (old, new, pending) =  msg.parse_state_changed()
 
-            self.pipeline.set_state(gst.STATE_PLAYING)
+            if new == gst.STATE_PAUSED and \
+                   pending == gst.STATE_VOID_PENDING:
+                # The pipeline is paused.
+
+                self.pipeline.prepareFlush()
+
+                # Send the seek event and from a single sink element
+                # to guarantee that it arrives only once to the
+                # source.
+                self.pipeline.getVideoSink().seek(1.0, gst.FORMAT_TIME,
+                                                  gst.SEEK_FLAG_FLUSH,
+                                                  gst.SEEK_TYPE_CUR, 0,
+                                                  gst.SEEK_TYPE_NONE, -1)
+
+                # Set the stream time to guarantee audio/video
+                # synchronization.
+                self.pipeline.set_new_stream_time(0L)
+
+                # Go back to playing.
+                self.pipeline.set_state(gst.STATE_PLAYING)
+
+            elif new == gst.STATE_PLAYING and \
+                     pending == gst.STATE_VOID_PENDING:
+                # We are playing again, complete the flush operation.
+
+                self.pipeline.closeFlush()
             
-            self.flushing = False
-            gst.debug("flush completed")
-
-            self.lock.release()
+                self.flushing = False
+                gst.debug("flush completed")
 
         return True
 

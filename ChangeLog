@@ -1,5 +1,22 @@
 2005-12-22  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py (Bin.prepareFlush, Bin.closeFlush) 
+	(SoftwareVideo.__init__, SoftwareVideo.prepareFlush) 
+	(SoftwareVideo.closeFlush, Pipeline.__slots__, Pipeline.__init__) 
+	(Pipeline.prepareFlush, Pipeline.closeFlush): Rename pipeline
+	audio and video components to audioBin and videoBin. Add
+	operations prepareFlush and closeFlush to be invoked before and
+	after a flush. In softwareVideo, they increse and shorten the
+	length of the frame-queue, to prevent pipeline deadlocks after
+	flushing.
+
+	* src/player/manager.py (Manager.__init__) 
+	(Manager.flushMsgHandler): Message handler renamed to
+	flushMsgHandler, documented and converted to use the
+	prepare/closeFlush operations in the pipeline.
+
+2005-12-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.h (GST_MPEG2SUBT_LOCK) 
 	(GST_MPEG2SUBT_UNLOCK): 
 	New macros for acquiring and realising the object's data lock.
