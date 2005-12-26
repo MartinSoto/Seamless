@@ -21,57 +21,13 @@ import time
 import gobject
 
 import gst
-import gst.interfaces
 
 # Load private GStreamer plugins.
 import loadplugins
 
-import dvdread
-import machine
-# import wrapclock
-
-
-class MySink(gst.Element):
-
-    _sinkpadtemplate = gst.PadTemplate ("sinkpadtemplate",
-                                        gst.PAD_SINK,
-                                        gst.PAD_ALWAYS,
-                                        gst.caps_new_any())
-
-    def __init__(self):
-        gst.Element.__init__(self)
-        gst.info('creating sinkpad')
-        self.sinkpad = gst.Pad(self._sinkpadtemplate, "sink")
-        gst.info('adding sinkpad to self')
-        self.add_pad(self.sinkpad)
-
-        gst.info('setting chain/event functions')
-        self.sinkpad.set_chain_function(self.chainfunc)
-        self.sinkpad.set_event_function(self.eventfunc)
-        
-    def chainfunc(self, pad, buffer):
-        if buffer.timestamp != gst.CLOCK_TIME_NONE:
-            self.info("%s timestamp: %0.3fs" % (pad,
-                                                float(buffer.timestamp) /
-                                                gst.SECOND))
-        return gst.FLOW_OK
-
-    def eventfunc(self, pad, event):
-        if event.type == gst.EVENT_NEWSEGMENT:
-            (update, rate, format, start, stop, position) = \
-                     event.parse_new_segment()
-            self.info("%s event: %r: start=%0.3fs, stop=%0.3fs" % \
-                      (pad, event.type, float(start) / gst.SECOND,
-                       float(stop) / gst.SECOND))
-        else:
-            self.info("%s event: %r" % (pad, event.type))
-        return True
-
-gobject.type_register(MySink)
-
 
 class Bin(gst.Bin):
-    """An enhanced GStgreamer bin."""
+    """An enhanced GStreamer bin."""
 
     __slots__ = ()
 
@@ -115,7 +71,6 @@ class Bin(gst.Bin):
 
     def closeFlush(self):
         pass
-
 
 
 class SoftwareAudio(Bin):
@@ -188,15 +143,42 @@ class SpdifAudio(Bin):
 #             audioscale ! capsaggreg.sink%d
 #         )
 #         """)
-        super(SpdifAudio, self).__init__(name, """( fakesink name=capselect )""")
-        audioElem = self.get_by_name('audiosink')
+        super(SpdifAudio, self).__init__(name)
 
-#         # Can gstparse set property values with spaces?
-#         audioElem.set_property('device',
-#             'spdif:{AES0 0x0 AES1 0x82 AES2 0x0 AES3 0x2 CARD %(spdifCard)s}' %
-#             options)
+        # The capsfilter elements are necessary to work around a bug
+        # in (apparently) alsasink.
+
+        self.makeSubelem('ac3iec958', raw_audio=True)
+        self.makeSubelem('capsfilter', 'capsfilter1',
+                         caps=gst.Caps('audio/x-raw-int,'
+                                       'endianness = (int) 4321,'
+                                       'signed = (boolean) true,'
+                                       'width = (int) 16,'
+                                       'depth = (int) 16,'
+                                       'rate = (int) 48000,'
+                                       'channels = (int) 2'))
+        self.makeSubelem('audioconvert')
+        self.makeSubelem('capsfilter', 'capsfilter2',
+                         caps=gst.Caps('audio/x-raw-int,'
+                                       'endianness = (int) 1234,'
+                                       'signed = (boolean) true,'
+                                       'width = (int) 16,'
+                                       'depth = (int) 16,'
+                                       'rate = (int) 48000,'
+                                       'channels = (int) 2'))
+        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=0,
+                         max_size_time=gst.SECOND)
+        self.makeSubelem(options['audioSink'], 'audiosink',
+                         device='spdif:{AES0 0x0 AES1 0x82 AES2 0x0 '
+                         'AES3 0x2 CARD %(spdifCard)s}' % options)
         
-        self.ghostify('capsselect', 'sink')
+        self.link('ac3iec958', 'capsfilter1')
+        self.link('capsfilter1', 'audioconvert')
+        self.link('audioconvert', 'capsfilter2')
+        self.link('capsfilter2', 'queue')
+        self.link('queue', 'audiosink')
+
+        self.ghostify('ac3iec958', 'sink')
 
 
 class SoftwareVideo(Bin):

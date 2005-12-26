@@ -1,3 +1,16 @@
+2005-12-26  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/iec958: Erased. This plugin is now available from
+	gst-plugins-ugly.
+
+	* src/player/pipeline.py (SpdifAudio.__init__): Reenable direct
+	AC3 playback to external decoder.
+
+	* src/player/pipeline.py (MySink): Erase (had been introduced for
+	debugging.)
+
+	* src/player/pipeline.py: Clean up import statements.
+
 2005-12-22  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/pipeline.py (Bin.prepareFlush, Bin.closeFlush) 
