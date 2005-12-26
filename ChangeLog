@@ -1,3 +1,9 @@
+2005-12-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SpdifAudio.__init__): Limit the SP/DIF
+	audio queue by size, as a workaround for an apparent bug that
+	causes it, under certain conditions, to swallow unlimited material.
+
 2005-12-26  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/iec958: Erased. This plugin is now available from

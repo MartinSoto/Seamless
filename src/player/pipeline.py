@@ -166,7 +166,10 @@ class SpdifAudio(Bin):
                                        'depth = (int) 16,'
                                        'rate = (int) 48000,'
                                        'channels = (int) 2'))
-        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=0,
+        # Apparently, this queue can get confused and accept too much
+        # material if limited only by time. Fortunately, we can also
+        # limit it to 1s material by size.
+        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=192000,
                          max_size_time=gst.SECOND)
         self.makeSubelem(options['audioSink'], 'audiosink',
                          device='spdif:{AES0 0x0 AES1 0x82 AES2 0x0 '
