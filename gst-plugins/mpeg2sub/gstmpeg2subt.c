@@ -1173,6 +1173,7 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     mpeg2subt->clip_top = mpeg2subt->top;
     mpeg2subt->clip_right = mpeg2subt->right;
     mpeg2subt->clip_bottom = mpeg2subt->bottom;
+    gst_mpeg2subt_flush_subtitle (mpeg2subt);
     GST_LOG_OBJECT (mpeg2subt, "Clearing button state");
     if (gst_mpeg2subt_update_still_frame (mpeg2subt) != GST_FLOW_OK) {
       res = FALSE;

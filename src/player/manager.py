@@ -107,6 +107,7 @@ class Manager(SignalHolder):
                  'mainItr',
                  'lock',
 
+                 'lastDomain',
                  'audio',
                  'subpicture',
                  'subpictureHide',
@@ -145,6 +146,7 @@ class Manager(SignalHolder):
         self.src.connect('vobu-header', self.vobuHeader)
 
         # Initialize the manager state variables:
+        self.lastDomain = None
         self.audio = None
         self.subpicture = None
         self.subpicture = False
@@ -426,6 +428,10 @@ class Manager(SignalHolder):
         """Set the source element to play the VOBU corresponding to
         'domain', 'titleNr', and 'sectorNr'."""
         gst.debug("play vobu")
+
+        if self.lastDomain != domain:
+            self.lastDomain = domain
+            self.resetHighlight()
 
         self.src.set_property('domain', domain)
         self.src.set_property('title', titleNr)

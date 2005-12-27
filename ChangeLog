@@ -1,5 +1,14 @@
 2005-12-27  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.playVobu): Reset the highlight when changing domains.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_dvd_event): Completely flush the subtitles
+	when a reset-highlight event arrives.
+
+2005-12-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/pipeline.py (SpdifAudio.__init__): Limit the SP/DIF
 	audio queue by size, as a workaround for an apparent bug that
 	causes it, under certain conditions, to swallow unlimited material.
