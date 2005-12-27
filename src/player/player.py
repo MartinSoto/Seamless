@@ -57,6 +57,19 @@ class DVDPlayer(SignalHolder):
 
 
     #
+    # Player Configuration
+    #
+
+    def setRegion(self, region):
+        """Set the player's region."""
+        self.machine.setRegion(region)
+
+    def getRegion(self):
+        """Return the player's region code."""
+        return self.machine.getRegion()
+        
+
+    #
     # Basic Playback Control
     #
 

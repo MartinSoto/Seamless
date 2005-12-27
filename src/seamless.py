@@ -95,6 +95,27 @@ def main():
     optParser.add_option("--lirc", dest="lirc",
                          action="store_true",
                          help="enable lirc remote control support")
+    optParser.add_option("--region", dest="region",
+                         metavar="REGION",
+                         help="Set player's region to REGION. Possible "
+                         "regions are: "
+                         "0: Region free (not accepted by some DVDs); "
+                         "1: U.S., Canada, U.S. Territories; "
+                         "2: Japan, Europe, South Africa, and Middle "
+                         "East (including Egypt); "
+                         "3: Southeast Asia and East Asia (including "
+                         "Hong Kong); "
+                         "4: Australia, New Zealand, Pacific Islands, "
+                         "Central America, Mexico, South America, "
+                         "and the Caribbean; "
+                         "5: Eastern Europe (Former Soviet Union), "
+                         "Indian subcontinent, Africa, North Korea, "
+                         "and Mongolia; "
+                         "6: China; "
+                         "7: Reserved; "
+                         "8: Special international venues (airplanes, "
+                         "cruise ships, etc.)",
+                         default=0)
     optParser.add_option("--audio-sink", dest="audioSink",
                          metavar="SINK",
                          help="audio sink is SINK",
@@ -117,13 +138,6 @@ def main():
                          metavar="ASPECT",
                          help="set pixel aspect ratio to ASPECT (default 1/1)",
                          default="1/1")    
-    optParser.add_option("--clock", dest="clockType",
-                         metavar="TYPE",
-                         help="'robust' to use the special robust clock"
-                         " (default), 'audiosink' to use the audio sink"
-                         " clock or 'system' to use the system clock ",
-                         default="robust",
-                         choices = ('robust', 'audiosink', 'system'))
     (options, args) = optParser.parse_args()
     options = DictOptions(options)
 

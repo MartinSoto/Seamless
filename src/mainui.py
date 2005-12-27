@@ -81,9 +81,12 @@ class MainUserInterface(object):
         self.window.set_default_size(int(rootWidth * 0.75),
                                      int(rootHeight * 0.75))
 
-        # Set the proper full screen mode.
+        # Set the full screen mode.
         self.fullScreen = self.options.fullScreen
         self.performFullScreen()
+
+        # Set the region.
+        self.player.setRegion(int(self.options.region))
 
         # Show the actual windows.
         self.video.show()
