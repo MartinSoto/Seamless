@@ -4,5 +4,5 @@ else
 ALSASPDIF_DIR=
 endif
 
-#SUBDIRS=$(ALSASPDIF_DIR) capspipe iec958
-SUBDIRS=dvdblock mpeg2sub
+#SUBDIRS=$(ALSASPDIF_DIR)
+SUBDIRS=capspipe dvdblock mpeg2sub

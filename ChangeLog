@@ -1,5 +1,17 @@
 2005-12-27  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py (SpdifAudio.__init__) 
+	(SoftwareAudio.__init__): Reenable support for LPCM audio.
+
+	* gst-plugins/capspipe/capspipeinit.c: 
+	* gst-plugins/capspipe/capsselect.c: 
+	* gst-plugins/capspipe/capsaggreg.h: 
+	* gst-plugins/capspipe/capsaggreg.c: 
+	* gst-plugins/Makefile.am (SUBDIRS): 
+	Port capspipe to GStreamer 0.10.
+
+2005-12-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
 	(Manager.playVobu): Reset the highlight when changing domains.
 

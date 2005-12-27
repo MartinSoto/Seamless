@@ -39,6 +39,12 @@ G_BEGIN_DECLS
 #define GST_IS_CAPSAGGREG_CLASS(obj) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_CAPSAGGREG))
 
+/* Lock and unlock the object. */
+#define GST_CAPSAGGREG_LOCK(capsaggreg) \
+  (g_mutex_lock ((capsaggreg)->lock))
+#define GST_CAPSAGGREG_UNLOCK(capsaggreg) \
+  (g_mutex_unlock ((capsaggreg)->lock))
+
 
 typedef struct _CapsAggreg CapsAggreg;
 typedef struct _CapsAggregClass CapsAggregClass;
@@ -58,6 +64,11 @@ struct _CapsAggreg {
 
   GstPad *cur_sink;	/* The sink pad we are currently reading
                            from. */
+
+  GMutex *lock;		/* A lock to protect the cur_sink attribute. */
+  GCond *no_current;	/* A condition variable to wait until there's
+			   no current sink anymore (this happens when
+			   a stop event arrives.) */
 };
 
 

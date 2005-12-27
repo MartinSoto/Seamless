@@ -28,15 +28,15 @@
 
 
 static gboolean
-plugin_init (GstPlugin *plugin)
+plugin_init (GstPlugin * plugin)
 {
   if (!gst_element_register (plugin, "capsselect", GST_RANK_NONE,
-                             GST_TYPE_CAPSSELECT)) {
+          GST_TYPE_CAPSSELECT)) {
     return FALSE;
   }
 
   if (!gst_element_register (plugin, "capsaggreg", GST_RANK_NONE,
-                             GST_TYPE_CAPSAGGREG)) {
+          GST_TYPE_CAPSAGGREG)) {
     return FALSE;
   }
 
@@ -44,14 +44,8 @@ plugin_init (GstPlugin *plugin)
 }
 
 
-GST_PLUGIN_DEFINE (
-  GST_VERSION_MAJOR,
-  GST_VERSION_MINOR,
-  "capspipe",
-  "Route buffers based on capabilities",
-  plugin_init,
-  VERSION,
-  "LGPL",
-  PACKAGE,
-  "http://seamless.sourceforge.net"
-)
+GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
+    GST_VERSION_MINOR,
+    "capspipe",
+    "Route buffers based on capabilities",
+    plugin_init, VERSION, "LGPL", PACKAGE, "http://seamless.sourceforge.net")

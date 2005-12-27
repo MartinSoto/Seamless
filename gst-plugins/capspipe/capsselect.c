@@ -47,77 +47,68 @@ static GstElementDetails capsselect_details = {
   "Select one output based on capabilities",
   "Generic",
   "Automatically select the output pad based on the capabilities set for "
-  "the input pad.",
+      "the input pad.",
   "Martin Soto <martinsoto@users.sourceforge.net>"
 };
 
 
 /* CapsSelect signals and args */
-enum {
+enum
+{
   LAST_SIGNAL,
 };
 
-enum {
+enum
+{
   ARG_0,
   ARG_SOURCE_CNT,
 };
 
 
 static GstStaticPadTemplate capsselect_sink_template =
-GST_STATIC_PAD_TEMPLATE (
-  "sink",
-  GST_PAD_SINK,
-  GST_PAD_ALWAYS,
-  GST_STATIC_CAPS_ANY
-);
+GST_STATIC_PAD_TEMPLATE ("sink",
+    GST_PAD_SINK,
+    GST_PAD_ALWAYS,
+    GST_STATIC_CAPS_ANY);
 
 static GstStaticPadTemplate capsselect_src_template =
-GST_STATIC_PAD_TEMPLATE (
-  "src%d",
-  GST_PAD_SRC,
-  GST_PAD_REQUEST,
-  GST_STATIC_CAPS_ANY
-);
+GST_STATIC_PAD_TEMPLATE ("src%d",
+    GST_PAD_SRC,
+    GST_PAD_REQUEST,
+    GST_STATIC_CAPS_ANY);
 
 
-static void	capsselect_base_init	(gpointer g_class);
-static void	capsselect_class_init   (CapsSelectClass *klass);
-static void	capsselect_init		(CapsSelect *capsselect);
-static void	capsselect_finalize	(GObject *object);
+static void capsselect_base_init (gpointer g_class);
+static void capsselect_class_init (CapsSelectClass * klass);
+static void capsselect_init (CapsSelect * capsselect);
+static void capsselect_finalize (GObject * object);
 
-static void	capsselect_set_property	(GObject *object,
-                                         guint prop_id, 
-                                         const GValue *value,
-                                         GParamSpec *pspec);
-static void	capsselect_get_property	(GObject *object,
-                                         guint prop_id, 
-                                         GValue *value,
-                                         GParamSpec *pspec);
+static void capsselect_set_property (GObject * object,
+    guint prop_id, const GValue * value, GParamSpec * pspec);
+static void capsselect_get_property (GObject * object,
+    guint prop_id, GValue * value, GParamSpec * pspec);
 
-static GstPad*	capsselect_request_new_pad
-					(GstElement *element,
-                                         GstPadTemplate *templ,
-                                         const gchar *unused);
+static GstPad *capsselect_request_new_pad
+    (GstElement * element, GstPadTemplate * templ, const gchar * unused);
 
-static void	capsselect_update_current
-					(CapsSelect *capsselect);
-static GstPadLinkReturn
-		capsselect_sink_link	(GstPad *pad, const GstCaps *caps);
-static void	capsselect_sink_unlink	(GstPad *pad);
-static GstCaps *capsselect_sink_getcaps (GstPad *pad);
-static void	capsselect_src_linked	(GstPad *pad);
-static void	capsselect_src_unlinked	(GstPad *pad);
+static void capsselect_update_current (CapsSelect * capsselect);
+static void capsselect_sink_unlink (GstPad * pad);
+static gboolean capsselect_sink_setcaps (GstPad * pad, GstCaps * caps);
+static GstCaps *capsselect_sink_getcaps (GstPad * pad);
+static void capsselect_src_linked (GstPad * pad);
+static void capsselect_src_unlinked (GstPad * pad);
 
-static void	capsselect_handle_event (GstPad *pad, GstEvent *event);
-static void	capsselect_chain	(GstPad *pad, GstData *data);
+static gboolean capsselect_event (GstPad * pad, GstEvent * event);
+static GstFlowReturn capsselect_chain (GstPad * pad, GstBuffer * data);
 
 
 static GstElementClass *parent_class = NULL;
+
 /* static guint capsselect_signals[LAST_SIGNAL] = { 0 }; */
 
 
 GType
-capsselect_get_type (void) 
+capsselect_get_type (void)
 {
   static GType capsselect_type = 0;
 
@@ -126,19 +117,18 @@ capsselect_get_type (void)
       sizeof (CapsSelectClass),
       capsselect_base_init,
       NULL,
-      (GClassInitFunc)capsselect_class_init,
+      (GClassInitFunc) capsselect_class_init,
       NULL,
       NULL,
       sizeof (CapsSelect),
       0,
-      (GInstanceInitFunc)capsselect_init,
+      (GInstanceInitFunc) capsselect_init,
     };
     capsselect_type = g_type_register_static (GST_TYPE_ELEMENT,
-                                              "CapsSelect",
-                                              &capsselect_info, 0);
+        "CapsSelect", &capsselect_info, 0);
   }
   GST_DEBUG_CATEGORY_INIT (capsselect_debug, "capsselect", 0,
-                           "caps selector element");
+      "caps selector element");
 
   return capsselect_type;
 }
@@ -148,7 +138,7 @@ static void
 capsselect_base_init (gpointer g_class)
 {
   GstElementClass *element_class = GST_ELEMENT_CLASS (g_class);
-  
+
   gst_element_class_set_details (element_class, &capsselect_details);
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&capsselect_sink_template));
@@ -158,44 +148,43 @@ capsselect_base_init (gpointer g_class)
 
 
 static void
-capsselect_class_init (CapsSelectClass *klass) 
+capsselect_class_init (CapsSelectClass * klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
 
-  gobject_class = (GObjectClass*)klass;
-  gstelement_class = (GstElementClass*)klass;
+  gobject_class = (GObjectClass *) klass;
+  gstelement_class = (GstElementClass *) klass;
 
   parent_class = g_type_class_ref (GST_TYPE_ELEMENT);
-
-  g_object_class_install_property (gobject_class, ARG_SOURCE_CNT,
-    g_param_spec_int ("source-count", "source-count",
-                      "Count of source pads in this element",
-                      0, G_MAXINT, 0, G_PARAM_READABLE));
 
   gobject_class->set_property = capsselect_set_property;
   gobject_class->get_property = capsselect_get_property;
   gobject_class->finalize = capsselect_finalize;
 
+  g_object_class_install_property (gobject_class, ARG_SOURCE_CNT,
+      g_param_spec_int ("source-count", "source-count",
+          "Count of source pads in this element",
+          0, G_MAXINT, 0, G_PARAM_READABLE));
+
   gstelement_class->request_new_pad = capsselect_request_new_pad;
 }
 
 
-static void 
-capsselect_init (CapsSelect *capsselect) 
+static void
+capsselect_init (CapsSelect * capsselect)
 {
-  GST_FLAG_SET (capsselect, GST_ELEMENT_EVENT_AWARE);
-
-  capsselect->sink = gst_pad_new_from_template (
-                     gst_static_pad_template_get (&capsselect_sink_template),
-                     "sink");
+  capsselect->sink =
+      gst_pad_new_from_template (gst_static_pad_template_get
+      (&capsselect_sink_template), "sink");
   gst_element_add_pad (GST_ELEMENT (capsselect), capsselect->sink);
-  gst_pad_set_link_function (capsselect->sink, capsselect_sink_link);
   gst_pad_set_unlink_function (capsselect->sink, capsselect_sink_unlink);
+  gst_pad_set_setcaps_function (capsselect->sink, capsselect_sink_setcaps);
   gst_pad_set_getcaps_function (capsselect->sink, capsselect_sink_getcaps);
+  gst_pad_set_event_function (capsselect->sink, capsselect_event);
   gst_pad_set_chain_function (capsselect->sink, capsselect_chain);
 
-  capsselect->srcs = g_array_new (FALSE, FALSE, sizeof(GstPad *));
+  capsselect->srcs = g_array_new (FALSE, FALSE, sizeof (GstPad *));
 
   /* No output pad to start with. */
   capsselect->cur_src = NULL;
@@ -206,7 +195,7 @@ capsselect_init (CapsSelect *capsselect)
 
 
 static void
-capsselect_finalize (GObject *object)
+capsselect_finalize (GObject * object)
 {
   CapsSelect *capsselect = CAPSSELECT (object);
 
@@ -215,8 +204,8 @@ capsselect_finalize (GObject *object)
 
 
 static void
-capsselect_set_property (GObject *object, guint prop_id,
-                         const GValue *value, GParamSpec *pspec)
+capsselect_set_property (GObject * object, guint prop_id,
+    const GValue * value, GParamSpec * pspec)
 {
   CapsSelect *capsselect;
 
@@ -229,66 +218,68 @@ capsselect_set_property (GObject *object, guint prop_id,
 }
 
 
-static void   
-capsselect_get_property (GObject *object, guint prop_id,
-                         GValue *value, GParamSpec *pspec)
+static void
+capsselect_get_property (GObject * object, guint prop_id,
+    GValue * value, GParamSpec * pspec)
 {
   CapsSelect *capsselect;
- 
+
   g_return_if_fail (GST_IS_CAPSSELECT (object));
- 
+
   capsselect = CAPSSELECT (object);
-  
+
   switch (prop_id) {
-  case ARG_SOURCE_CNT:
-    g_value_set_int (value, capsselect->srcs->len);
-    break;
-  default:
-    G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-    break;
+    case ARG_SOURCE_CNT:
+      g_value_set_int (value, capsselect->srcs->len);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
   }
 }
 
 
-static GstPad*
-capsselect_request_new_pad (GstElement *element,
-                            GstPadTemplate *templ,
-                            const gchar *unused) 
+static GstPad *
+capsselect_request_new_pad (GstElement * element,
+    GstPadTemplate * templ, const gchar * unused)
 {
   CapsSelect *capsselect;
   char *name;
   GstPad *src;
-  
+
   /* Only source pads can be requested. */
   if (templ->direction != GST_PAD_SRC) {
     GST_WARNING ("non source pad requested");
     return NULL;
   }
-  
+
   capsselect = CAPSSELECT (element);
-  
+
   name = g_strdup_printf ("src%d", capsselect->srcs->len);
   src = gst_pad_new_from_template (templ, name);
   g_free (name);
-  
-  g_signal_connect (src, "linked",
-                    G_CALLBACK (capsselect_src_linked), NULL);
+
+  g_signal_connect (src, "linked", G_CALLBACK (capsselect_src_linked), NULL);
   g_signal_connect (src, "unlinked",
-                    G_CALLBACK (capsselect_src_unlinked), NULL);
+      G_CALLBACK (capsselect_src_unlinked), NULL);
   gst_element_add_pad (GST_ELEMENT (capsselect), src);
-  
+
   g_array_append_val (capsselect->srcs, src);
-  
+
+  GST_DEBUG_OBJECT (capsselect, "created new request pad '%s'",
+      GST_PAD_NAME (src));
+
   return src;
 }
 
 
 static void
-capsselect_update_current (CapsSelect *capsselect)
+capsselect_update_current (CapsSelect * capsselect)
 {
   int i;
-  GstPad *src;
-  GstPadLinkReturn ret;
+  GstPad *src, *peer;
+
+  GST_DEBUG_OBJECT (capsselect, "Updating current source");
 
   capsselect->cur_src = NULL;
 
@@ -298,15 +289,17 @@ capsselect_update_current (CapsSelect *capsselect)
 
   i = 0;
   while (i < capsselect->srcs->len) {
-    src = g_array_index(capsselect->srcs, GstPad *, i);
+    src = g_array_index (capsselect->srcs, GstPad *, i);
+    peer = gst_pad_get_peer (src);
 
-    ret = gst_pad_try_set_caps (src, capsselect->cur_caps);
-    if (GST_PAD_LINK_SUCCESSFUL (ret)) {
+    if (peer != NULL && gst_pad_accept_caps (peer, capsselect->cur_caps)) {
       GST_DEBUG_OBJECT (capsselect, "Setting current source to '%s'",
-			GST_PAD_NAME(src));
+          GST_PAD_NAME (src));
       capsselect->cur_src = src;
       return;
     }
+
+    gst_object_unref (peer);
 
     i++;
   }
@@ -315,25 +308,8 @@ capsselect_update_current (CapsSelect *capsselect)
 }
 
 
-static GstPadLinkReturn
-capsselect_sink_link (GstPad *pad, const GstCaps *caps)
-{
-  CapsSelect *capsselect = CAPSSELECT (gst_pad_get_parent (pad));
-
-  DEBUG_CAPS (capsselect, "linking sink pad with caps: %s", caps);
-
-  /* Store this caps. */
-  gst_caps_replace (&capsselect->cur_caps, gst_caps_copy (caps));
-
-  capsselect_update_current (capsselect);
-
-  /* We allow linking regardless of the caps. */
-  return GST_PAD_LINK_OK;
-}
-
-
 static void
-capsselect_sink_unlink (GstPad *pad)
+capsselect_sink_unlink (GstPad * pad)
 {
   CapsSelect *capsselect = CAPSSELECT (gst_pad_get_parent (pad));
 
@@ -341,67 +317,86 @@ capsselect_sink_unlink (GstPad *pad)
 
   capsselect->cur_src = NULL;
   if (capsselect->cur_caps != NULL) {
-    gst_caps_free (capsselect->cur_caps);
+    gst_caps_unref (capsselect->cur_caps);
   }
   capsselect->cur_caps = NULL;
 }
 
 
+static gboolean
+capsselect_sink_setcaps (GstPad * pad, GstCaps * caps)
+{
+  CapsSelect *capsselect = CAPSSELECT (gst_pad_get_parent (pad));
+
+  DEBUG_CAPS (capsselect, "setcaps: %s", caps);
+
+  /* Store this caps. */
+  gst_caps_replace (&capsselect->cur_caps, caps);
+
+  capsselect_update_current (capsselect);
+
+  /* Allow linking regardless of the caps. */
+  return TRUE;
+}
+
+
 static GstCaps *
-capsselect_sink_getcaps (GstPad *pad)
+capsselect_sink_getcaps (GstPad * pad)
 {
   //CapsSelect *capsselect = CAPSSELECT (gst_pad_get_parent (pad));
 
-  return gst_caps_new_any();
+  return gst_caps_new_any ();
 }
 
 
 static void
-capsselect_src_linked (GstPad *pad)
+capsselect_src_linked (GstPad * pad)
 {
   CapsSelect *capsselect = CAPSSELECT (gst_pad_get_parent (pad));
 
-  GST_DEBUG_OBJECT (capsselect, "linking pad '%s'", GST_PAD_NAME(pad));
+  GST_DEBUG_OBJECT (capsselect, "linking pad '%s'", GST_PAD_NAME (pad));
   capsselect_update_current (capsselect);
 }
 
 
 static void
-capsselect_src_unlinked (GstPad *pad)
+capsselect_src_unlinked (GstPad * pad)
 {
   CapsSelect *capsselect = CAPSSELECT (gst_pad_get_parent (pad));
 
-  GST_DEBUG_OBJECT (capsselect, "unlinking pad '%s'", GST_PAD_NAME(pad));
+  GST_DEBUG_OBJECT (capsselect, "unlinking pad '%s'", GST_PAD_NAME (pad));
   capsselect_update_current (capsselect);
 }
 
 
-static void
-capsselect_handle_event (GstPad *pad, GstEvent *event)
+static gboolean
+capsselect_event (GstPad * pad, GstEvent * event)
 {
   CapsSelect *capsselect = CAPSSELECT (gst_pad_get_parent (pad));
   GstEventType type;
+  gboolean res = TRUE;
 
   type = event ? GST_EVENT_TYPE (event) : GST_EVENT_UNKNOWN;
 
   switch (type) {
-  case GST_EVENT_EOS:
-    gst_pad_event_default (pad, event);
-    return;
-  default:
-    break;
+    case GST_EVENT_EOS:
+      res = gst_pad_event_default (pad, event);
+      goto done;
+    default:
+      break;
   }
 
   if (capsselect->cur_src == NULL) {
-    /* No current source pad, discard the buffer. */
+    /* No current source pad, discard the event. */
     GST_LOG_OBJECT (capsselect, "dropping event");
-    gst_buffer_unref (GST_BUFFER (event));
-  }
-  else {
-    gst_pad_push (capsselect->cur_src, GST_DATA (event));
+    gst_event_unref (event);
+  } else {
+    res = gst_pad_push_event (capsselect->cur_src, event);
   }
 
-  return;
+ done:
+  gst_object_unref (capsselect);
+  return res;
 }
 
 
@@ -415,22 +410,21 @@ make_private_event (const gchar * event_name)
 
   structure = gst_structure_new ("application/x-gst-capspipe",
       "event", G_TYPE_STRING, event_name, NULL);
-  event = gst_event_new (GST_EVENT_ANY);
-  event->event_data.structure.structure = structure;
+  event = gst_event_new_custom (GST_EVENT_CUSTOM_DOWNSTREAM, structure);
 
   return event;
 }
 
 
-static void 
-capsselect_chain (GstPad *pad, GstData *data)
+static GstFlowReturn
+capsselect_chain (GstPad * pad, GstBuffer * buf)
 {
-  GstBuffer *buf = GST_BUFFER (data);
   CapsSelect *capsselect;
+  GstFlowReturn res = GST_FLOW_OK;
 
-  g_return_if_fail (pad != NULL);
-  g_return_if_fail (GST_IS_PAD (pad));
-  g_return_if_fail (buf != NULL);
+  g_return_val_if_fail (pad != NULL, GST_FLOW_ERROR);
+  g_return_val_if_fail (GST_IS_PAD (pad), GST_FLOW_ERROR);
+  g_return_val_if_fail (buf != NULL, GST_FLOW_ERROR);
 
   capsselect = CAPSSELECT (gst_pad_get_parent (pad));
 
@@ -438,28 +432,31 @@ capsselect_chain (GstPad *pad, GstData *data)
     /* We just had a current pad change. Send a stop to the old pad
        and a start to the new pad. */
     if (capsselect->prev_src != NULL) {
-      gst_pad_push (capsselect->prev_src,
-		    GST_DATA (make_private_event ("stop")));
+      if (!gst_pad_push_event (capsselect->prev_src,
+	      make_private_event ("stop"))) {
+	res = GST_FLOW_ERROR;
+	goto done;
+      }
     }
     if (capsselect->cur_src != NULL) {
-      gst_pad_push (capsselect->cur_src,
-		    GST_DATA (make_private_event ("start")));
+      if (!gst_pad_push_event (capsselect->cur_src,
+	      make_private_event ("start"))) {
+	res = GST_FLOW_ERROR;
+	goto done;
+      }
     }
   }
   capsselect->prev_src = capsselect->cur_src;
-
-  if (GST_IS_EVENT (buf)) {
-    capsselect_handle_event (pad, GST_EVENT (buf));
-    return;
-  }
 
   if (capsselect->cur_src == NULL) {
     /* No current source pad, discard the buffer. */
     GST_LOG ("dropping buffer");
     gst_buffer_unref (buf);
+  } else {
+    res = gst_pad_push (capsselect->cur_src, buf);
   }
-  else {
-    gst_pad_push (capsselect->cur_src, data);
-  }
-}
 
+ done:
+  gst_object_unref (capsselect);
+  return res;
+}

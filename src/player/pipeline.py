@@ -80,40 +80,40 @@ class SoftwareAudio(Bin):
     __slots__ = ('clock')
 
     def __init__(self, options, name='audiodec'):
-#         super(SoftwareAudio, self).__init__(name, """
-#         (
-#           capsselect name=capsselect !
-#             seamless-a52dec !
-#             audioconvert !
-#             audioscale !
-#             capsaggreg name=capsaggreg !
-#             seamless-queue name=audioqueue !
-#             { %(audioSink)s name=audiosink }
-
-#           capsselect.src%%d !
-#             dvdlpcmdec !
-#             audioconvert !
-#             audioscale ! capsaggreg.sink%%d
-
-#           capsselect.src%%d !
-#             dtsdec !
-#             audioconvert !
-#             audioscale ! capsaggreg.sink%%d
-#         )
-#         """ % options)
         super(SoftwareAudio, self).__init__(name)
 
+        self.makeSubelem('capsselect')
+
+        # The AC3 decoding pipeline.
         self.makeSubelem('a52dec')
-        self.makeSubelem('audioconvert')
+        self.makeSubelem('audioconvert', 'audioconvert1')
+        self.makeSubelem('audioresample', 'audioresample1')
+        
+        # The LPCM decoding pipeline.
+        self.makeSubelem('dvdlpcmdec')
+        self.makeSubelem('audioconvert', 'audioconvert2')
+        self.makeSubelem('audioresample', 'audioresample2')
+        
+        self.makeSubelem('capsaggreg')
+
         self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=0,
                          max_size_time=gst.SECOND)
         self.makeSubelem(options['audioSink'], 'audiosink')
-        
-        self.link('a52dec', 'audioconvert')
-        self.link('audioconvert', 'queue')
+
+        self.linkPads('capsselect', 'src%d', 'a52dec', 'sink')
+        self.link('a52dec', 'audioconvert1')
+        self.link('audioconvert1', 'audioresample1')
+        self.linkPads('audioresample1', 'src', 'capsaggreg', 'sink%d')
+
+        self.linkPads('capsselect', 'src%d', 'dvdlpcmdec', 'sink')
+        self.link('dvdlpcmdec', 'audioconvert2')
+        self.link('audioconvert2', 'audioresample2')
+        self.linkPads('audioresample2', 'src', 'capsaggreg', 'sink%d')
+
+        self.link('capsaggreg', 'queue')
         self.link('queue', 'audiosink')
 
-        self.ghostify('a52dec', 'sink')
+        self.ghostify('capsselect', 'sink')
 
 
 class SpdifAudio(Bin):
@@ -124,30 +124,12 @@ class SpdifAudio(Bin):
     __slots__ = ('clock')
 
     def __init__(self, options, name='audiodec'):
-#         super(SpdifAudio, self).__init__(name, """
-#         (
-#           capsselect name=capsselect !
-#             ac3iec958 !
-#             capsaggreg name=capsaggreg !
-#             seamless-queue max-size-bytes=40000 !
-#             { alsasink name=audiosink }
-
-#           capsselect.src%d !
-#             dvdlpcmdec !
-#             audioconvert !
-#             audioscale ! capsaggreg.sink%d
-
-#           capsselect.src%d !
-#             dtsdec !
-#             audioconvert !
-#             audioscale ! capsaggreg.sink%d
-#         )
-#         """)
         super(SpdifAudio, self).__init__(name)
 
-        # The capsfilter elements are necessary to work around a bug
-        # in (apparently) alsasink.
+        self.makeSubelem('capsselect')
 
+        # The AC3 decoding pipeline. The capsfilter elements are
+        # necessary to work around a bug in (apparently) alsasink.
         self.makeSubelem('ac3iec958', raw_audio=True)
         self.makeSubelem('capsfilter', 'capsfilter1',
                          caps=gst.Caps('audio/x-raw-int,'
@@ -157,7 +139,7 @@ class SpdifAudio(Bin):
                                        'depth = (int) 16,'
                                        'rate = (int) 48000,'
                                        'channels = (int) 2'))
-        self.makeSubelem('audioconvert')
+        self.makeSubelem('audioconvert', 'audioconvert1')
         self.makeSubelem('capsfilter', 'capsfilter2',
                          caps=gst.Caps('audio/x-raw-int,'
                                        'endianness = (int) 1234,'
@@ -166,6 +148,14 @@ class SpdifAudio(Bin):
                                        'depth = (int) 16,'
                                        'rate = (int) 48000,'
                                        'channels = (int) 2'))
+        
+        # The LPCM decoding pipeline.
+        self.makeSubelem('dvdlpcmdec')
+        self.makeSubelem('audioconvert', 'audioconvert2')
+        self.makeSubelem('audioresample', 'audioresample2')
+        
+        self.makeSubelem('capsaggreg')
+
         # Apparently, this queue can get confused and accept too much
         # material if limited only by time. Fortunately, we can also
         # limit it to 1s material by size.
@@ -174,14 +164,22 @@ class SpdifAudio(Bin):
         self.makeSubelem(options['audioSink'], 'audiosink',
                          device='spdif:{AES0 0x0 AES1 0x82 AES2 0x0 '
                          'AES3 0x2 CARD %(spdifCard)s}' % options)
-        
+
+        self.linkPads('capsselect', 'src%d', 'ac3iec958', 'sink')
         self.link('ac3iec958', 'capsfilter1')
-        self.link('capsfilter1', 'audioconvert')
-        self.link('audioconvert', 'capsfilter2')
-        self.link('capsfilter2', 'queue')
+        self.link('capsfilter1', 'audioconvert1')
+        self.link('audioconvert1', 'capsfilter2')
+        self.linkPads('capsfilter2', 'src', 'capsaggreg', 'sink%d')
+
+        self.linkPads('capsselect', 'src%d', 'dvdlpcmdec', 'sink')
+        self.link('dvdlpcmdec', 'audioconvert2')
+        self.link('audioconvert2', 'audioresample2')
+        self.linkPads('audioresample2', 'src', 'capsaggreg', 'sink%d')
+
+        self.link('capsaggreg', 'queue')
         self.link('queue', 'audiosink')
 
-        self.ghostify('ac3iec958', 'sink')
+        self.ghostify('capsselect', 'sink')
 
 
 class SoftwareVideo(Bin):
