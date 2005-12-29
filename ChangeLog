@@ -1,3 +1,14 @@
+2005-12-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.c
+	(dvdblocksrc_create, dvdblocksrc_do_seek): Fix debugging.
+
+	* gst-plugins/capspipe/capsselect.c (capsselect_event): 
+	Forward FLUSH events to all pads.
+
+	* gst-plugins/capspipe/capsaggreg.c (capsaggreg_event): 
+	Forward FLUSH events regardless of which pad they came from.
+
 2005-12-28  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/seamless.py (main): 

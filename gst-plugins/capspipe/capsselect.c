@@ -370,6 +370,29 @@ capsselect_src_unlinked (GstPad * pad)
 
 
 static gboolean
+capsselect_forward_event (CapsSelect * capsselect, GstEvent * event)
+{
+  int i;
+  GstPad *src;
+  gboolean res = TRUE;
+
+  i = 0;
+  while (i < capsselect->srcs->len) {
+    src = g_array_index (capsselect->srcs, GstPad *, i);
+
+    gst_event_ref (event);
+    res = res && gst_pad_push_event (src, event);
+
+    i++;
+  }
+
+  gst_event_unref (event);
+
+  return res;
+}
+
+
+static gboolean
 capsselect_event (GstPad * pad, GstEvent * event)
 {
   CapsSelect *capsselect = CAPSSELECT (gst_pad_get_parent (pad));
@@ -379,8 +402,10 @@ capsselect_event (GstPad * pad, GstEvent * event)
   type = event ? GST_EVENT_TYPE (event) : GST_EVENT_UNKNOWN;
 
   switch (type) {
+    case GST_EVENT_FLUSH_START:
+    case GST_EVENT_FLUSH_STOP:
     case GST_EVENT_EOS:
-      res = gst_pad_event_default (pad, event);
+      res = capsselect_forward_event (capsselect, event);
       goto done;
     default:
       break;

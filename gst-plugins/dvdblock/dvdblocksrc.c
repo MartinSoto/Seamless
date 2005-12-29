@@ -383,7 +383,7 @@ dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
   int block_count;
   GstFlowReturn res = GST_FLOW_OK;
 
-  GST_INFO_OBJECT (src, "entering create");
+  GST_LOG_OBJECT (src, "entering create");
 
   g_mutex_lock (src->cancel_lock);
 
@@ -448,7 +448,7 @@ dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
 
   *outbuf = buf;
 
-  GST_INFO_OBJECT (src, "leaving create normally");
+  GST_LOG_OBJECT (src, "leaving create normally");
 
  done:
   g_mutex_unlock (src->cancel_lock);
@@ -552,6 +552,8 @@ dvdblocksrc_is_seekable (GstBaseSrc *src)
 static gboolean
 dvdblocksrc_do_seek (GstBaseSrc *src, GstSegment *segment)
 {
+  GST_DEBUG_OBJECT (src, "doing seek");
+
   g_signal_emit (G_OBJECT (src),
         dvdblocksrc_signals[DO_SEEK_SIGNAL], 0);
 

@@ -348,6 +348,8 @@ capsaggreg_event (GstPad * pad, GstEvent * event)
       break;
     }
 
+    case GST_EVENT_FLUSH_START:
+    case GST_EVENT_FLUSH_STOP:
     case GST_EVENT_EOS:
       res = gst_pad_event_default (pad, event);
       break;
