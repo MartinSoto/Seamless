@@ -608,9 +608,6 @@ class Manager(SignalHolder):
 
         self.sendEvent(events.stillFrame())
 
-        # Some still frames
-        self.shutdownAudio()
-
     def flush(self):
         """Flush the pipeline."""
         gst.debug("flush")
