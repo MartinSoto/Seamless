@@ -30,13 +30,10 @@ def createCustom(st, outOfBand=False):
     else:
         return gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM, st)
 
-def audio(physical):
-    """Create and return a new audio event for the specified physical
-    stream."""
-    st = gst.Structure('application/x-gst-dvd')
-    st.set_value('event', 'dvd-audio-stream-change')
-    st.set_value('physical', physical, 'int')
-    return createCustom(st)
+
+#
+# Standard GStreamer Events
+#
 
 def eos():
     """Create and return an end of stream (EOS) event."""
@@ -59,6 +56,36 @@ def newsegment(update, startTime, endTime):
     and end times. Times are specified in nanoseconds."""
     return gst.event_new_new_segment(update, 1.0, gst.FORMAT_TIME,
                                      startTime, endTime, 0)
+
+
+#
+# Audio DVD Events
+#
+
+def audio(physical):
+    """Create and return a new audio event for the specified physical
+    stream."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-audio-stream-change')
+    st.set_value('physical', physical, 'int')
+    return createCustom(st)
+
+def audioShutdown():
+    """Create and return an audio shutdown event."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-audio-shutdown')
+    return createCustom(st)
+
+def audioRestart():
+    """Create and return an audio restart event."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-audio-restart')
+    return createCustom(st)
+
+
+#
+# Subpicture DVD Events
+#
 
 def highlight(area, button, palette, outOfBand=True):
     """Create and return a new highlight event based on the specified

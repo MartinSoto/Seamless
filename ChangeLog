@@ -1,3 +1,23 @@
+2005-12-30  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/events.py (audioShutdown, audioRestart): 
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.vobuHeader, Manager.flush, Manager.shutdownAudio)
+	(Manager.restartAudio): Use the async fields in the
+	DSI NAV packet, together with the new "audio-shutdown"
+	and "audio-restart" DVD events to shutdown and restart the
+	audio pipeline as necessary. This fixes a lot of glitches with
+	still frames and DVD menus otherwise not having sound, that used
+	to hang the pipeline when prerolling after a flush.
+
+	* src/player/manager.py (Manager.vobuRead, Manager.vobuRead)
+	(Manager.vobuRead, Manager.vobuHeader, Manager.vobuHeader)
+	(Manager.vobuHeader): Move frequent debug messages to the "LOG"
+	level.
+
+	* src/dvdread/_dvdread.pyx (getFirstAudioOffset) 
+	(getFirstSubpictureOffset): New operations.
+
 2005-12-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/dvdblock/dvdblocksrc.c

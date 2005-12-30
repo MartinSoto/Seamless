@@ -1,6 +1,10 @@
 -*- Text -*-
 
-- Support angles.
+- Implement timeout when pipeline doesn't go to PLAY.
+
+- Reemplement DVD aspect ratio handling.
+
+- Support angles. (partially fixed?)
 
 - Some menu subpictures get displayed too early (Matrix PAL). Why?
 
@@ -15,9 +19,7 @@
 - Trap the stop (^Z) signal and stop the clock while the program is
   suspended.
 
-- Check for DVD I/O errors when starting and retry if necessary.
-
-- Implement free changing of sutitles
+- Implement free changing of subtitles
 
 - Add __richcmp__ to dvdread wrappers as necessary.
 
@@ -35,18 +37,4 @@
   available.
 
 - Correct improper highlight handling in DVDs with letterboxed +
-  widescreen support.
-
-
-Particular DVDs
----------------
-
-- The Others: Main menu doesn't show the highlight.
-
-- Lola rennt: No highlight in some menus, e.g., Extras.
-
-- Lord of the Rings, The Two Towers: No character voices (only
-  background sounds and music) when playing with the a52dec
-  element. Apparently it cannot handle Dolby Digital EX sound
-  properly. This DVD works fine with the external decoder.
-
+  widescreen support. (fixed?)

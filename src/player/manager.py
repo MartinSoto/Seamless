@@ -108,13 +108,15 @@ class Manager(SignalHolder):
                  'lock',
 
                  'lastDomain',
-                 'audio',
                  'subpicture',
                  'subpictureHide',
                  'clut',
                  'area',
                  'button',
                  'palette',
+
+                 'audio',
+                 'audioShutdown',
 
                  'pendingCmds',
                  'interactiveCount',
@@ -145,9 +147,12 @@ class Manager(SignalHolder):
         self.src.connect('vobu-read', self.vobuRead)
         self.src.connect('vobu-header', self.vobuHeader)
 
-        # Initialize the manager state variables:
+        # The audio state:
+        self.audio = -1
+        self.audioShutdown = False
+
+        # The subpicture state:
         self.lastDomain = None
-        self.audio = None
         self.subpicture = None
         self.subpicture = False
         self.clut = None
@@ -198,7 +203,7 @@ class Manager(SignalHolder):
     def vobuRead(self, src):
         """Invoked by the source element after reading a complete
         VOBU."""
-        gst.debug("Vobu read")
+        gst.log("Vobu read")
 
         # Commands expecting this method to return set vobuReadReturn
         # to True.
@@ -218,7 +223,7 @@ class Manager(SignalHolder):
 
                 while cmds:
                     # Execute the command on the pipeline.
-                    gst.debug("Running command %s" % str(cmds[0]))
+                    gst.log("Running command %s" % str(cmds[0]))
                     cmds[0](self)
                     cmds[0:1] = []
 
@@ -230,12 +235,12 @@ class Manager(SignalHolder):
             traceback.print_exc()
             sys.exit(1)
 
-        gst.debug("VOBU read end")
+        gst.log("VOBU read end")
 
     @synchronized
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
-        gst.debug("Vobu header")
+        gst.log("Vobu header")
 
         # Release the lock set by the playVobu operation.
         self.lock.release()
@@ -263,19 +268,32 @@ class Manager(SignalHolder):
             self.segmentStart = start
             self.segmentStop = stop
             update = False
-            gst.debug('New current segment')
+            gst.log('New current segment')
         else:
             # We have an update:
             self.segmentStop = stop
             update = True
-            gst.debug('Current segment update')
+            gst.log('Current segment update')
         self.sendEvent(events.newsegment(update, self.segmentStart,
                                          self.segmentStop))
+
+        # Check for audio shutdown.
+        if self.audio != -1:
+            print "Offset: ", nav.getFirstAudioOffset(self.audio + 1)
+            if not self.audioShutdown and \
+               (nav.getFirstAudioOffset(self.audio + 1) == 0x0000 or
+                nav.getFirstAudioOffset(self.audio + 1) == 0x3fff):
+                self.shutdownAudio()
+            elif self.audioShutdown and \
+                 nav.getFirstAudioOffset(self.audio + 1) != 0x0000 and \
+                 nav.getFirstAudioOffset(self.audio + 1) != 0x3fff:
+                self.restartAudio()
+        else:
+            print "Beware!"
 
         # FIXME: This should be done later in the game, namely, when
         # the packet actually reaches the subtitle element.
         self.machine.callIterator(self.machine.setButtonNav(nav))
-
 
 
     #
@@ -427,7 +445,7 @@ class Manager(SignalHolder):
     def playVobu(self, domain, titleNr, sectorNr):
         """Set the source element to play the VOBU corresponding to
         'domain', 'titleNr', and 'sectorNr'."""
-        gst.debug("play vobu")
+        gst.log("play vobu")
 
         if self.lastDomain != domain:
             self.lastDomain = domain
@@ -476,6 +494,18 @@ class Manager(SignalHolder):
         self.audio = phys
 
         self.sendEvent(events.audio(self.audio))
+
+    def shutdownAudio(self):
+        """Shutdown the audio pipeline."""
+        gst.debug('Shutting down audio')
+        self.audioShutdown = True
+        self.sendEvent(events.audioShutdown())
+
+    def restartAudio(self):
+        """Restart the audio pipeline."""
+        gst.debug('Restarting audio')
+        self.audioShutdown = False
+        self.sendEvent(events.audioRestart())
 
     def setSubpicture(self, phys, hide):
         """Set the physical subpicture stream to `phys`.
@@ -544,6 +574,9 @@ class Manager(SignalHolder):
 
         self.sendEvent(events.stillFrame())
 
+        # Some still frames
+        self.shutdownAudio()
+
     def flush(self):
         """Flush the pipeline."""
         gst.debug("flush")
@@ -559,6 +592,8 @@ class Manager(SignalHolder):
         self.segmentStart = None
         self.segmentStop = None
 
+        self.audioShutdown = False
+
         self.flushing = True
 
         msg = gst.message_new_application(self.src,
@@ -571,7 +606,7 @@ class Manager(SignalHolder):
         """Pause the pipeline for a short time (currently 0.1s).
 
         Warning: This method temporarily releases the object's lock"""
-        gst.debug("pause")
+        gst.log("pause")
 
         # We don't want to keep the lock while sleeping.
         self.lock.release()

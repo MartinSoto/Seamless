@@ -1480,3 +1480,20 @@ cdef class NavPacket:
             raise IndexError, "Angle number out of range"
 
         return self.dsi.sml_agli.data[angleNr - 1].size
+
+
+    #
+    # Audio and Subpicture Streams
+    #
+
+    def getFirstAudioOffset(self, int streamNr):
+        if streamNr < 1 or streamNr > 8:
+            raise IndexError, "audio stream number out of range"
+
+        return self.dsi.synci.a_synca[streamNr - 1]
+
+    def getFirstSubpictureOffset(self, int streamNr):
+        if streamNr < 1 or streamNr > 32:
+            raise IndexError, "subpicture stream number out of range"
+
+        return self.dsi.synci.sp_synca[streamNr - 1]
