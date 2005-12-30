@@ -1,40 +1,70 @@
 -*- Text -*-
 
-- Implement timeout when pipeline doesn't go to PLAY.
+Player Operation
+----------------
 
-- Reemplement DVD aspect ratio handling.
+- Implement a pause operation.
 
-- Support angles. (partially fixed?)
+- Revise the implementation of the chapter backward operation,
+  to make it behave like a typical player, i.e., backward goes to the
+  beginning of the current chapter, except when closely following
+  another backward.
 
-- Some menu subpictures get displayed too early (Matrix PAL). Why?
-
-- Implement support for other sound types.
-
-- Implement the cell time as still time thing. Monsters Inc seems to
-  use that in the warnings before the film.
-
-- Honor prohibited operations when it makes sense, or ignore them
-  smartly.
+- Revise the chapter forward operation such that it jumps to the end
+  of the current chapter instead of to the beginning of the next
+  one. That way the final code gets executed anyway.
 
 - Trap the stop (^Z) signal and stop the clock while the program is
   suspended.
 
 - Implement free changing of subtitles
 
-- Add __richcmp__ to dvdread wrappers as necessary.
+- Implement backwards and fast playing.
 
-- Implement backwards playing.
+- Implement auto NTSC/PAL mode.
 
-- Implement proper VOBU jumping, using the jump fields in nav packets.
+- Implement exact seeking using the jump fields in nav packets.
+
+
+Robustness
+----------
+
+- Implement timeout when pipeline doesn't go to PLAY.
+
+
+DVD (Mis)Features
+-----------------
+
+- Reemplement DVD aspect ratio handling.
+
+- Support angles. (partially complete?)
+
+- Some menu subpictures get displayed too early. Why?
+
+- Implement support for DTS.
+
+- Implement the cell time as still time thing.
+
+- Honor prohibited operations when it makes sense, or ignore them
+  smartly.
+
+- Correct improper highlight handling in DVDs with letterboxed +
+  widescreen support. (fixed?)
 
 - Handle button nav packets properly with respect to time.
 
-- Create a Pyrex wrapper for lirc.
 
-- Implement auto NTSC/PAL mode.
+Internals
+---------
+
+- Add __richcmp__ to dvdread wrappers as necessary.
+
+
+Remote
+------
+
+- Create a Pyrex wrapper for lirc.
 
 - LIRC component fails miserably when no LIRC kernel modules are
   available.
 
-- Correct improper highlight handling in DVDs with letterboxed +
-  widescreen support. (fixed?)

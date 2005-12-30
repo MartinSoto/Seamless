@@ -60,6 +60,32 @@ def synchronized(method):
     return wrapper
 
 
+class PushBackIterator(object):
+    """An iterator that returns values from a basis iterable object,
+    but allows for pushing back additional values. Pushed back values
+    will be returned first in LIFO order, before further values from
+    the basis iterator are returned."""
+
+    __slots__ = ('basis', 'pushedBack')
+
+    def __init__(self, basisIterable):
+        self.basis = iter(basisIterable)
+        self.pushedBack = []
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if len(self.pushedBack) == 0:
+            return self.basis.next()
+        else:
+            return self.pushedBack.pop()
+
+    def push(self, value):
+        """Push back 'value' into the iterator"""
+        self.pushedBack.append(value)
+
+
 class Manager(SignalHolder):
     """The object in charge of managing the interaction between the
     machine and the playback pipeline.
@@ -118,7 +144,6 @@ class Manager(SignalHolder):
                  'audio',
                  'audioShutdown',
 
-                 'pendingCmds',
                  'interactiveCount',
                  'vobuReadReturn',
 
@@ -135,13 +160,14 @@ class Manager(SignalHolder):
         self.src = pipeline.getBlockSource()
         self.srcPad = self.src.get_pad('src')
 
-        # A bus message handler for the flush operation.
-        self.pipeline.get_bus().add_watch(self.flushMsgHandler)
-
-        self.mainItr = iter(self.machine)
+        # Wrap the machine's main iterator in a push back iterator.
+        self.mainItr = PushBackIterator(iter(self.machine))
 
         # The synchronized method lock.
         self.lock = threading.RLock()
+
+        # A bus message handler for the flush operation.
+        self.pipeline.get_bus().add_watch(self.flushMsgHandler)
 
         # Connect our signals to the source object.
         self.src.connect('vobu-read', self.vobuRead)
@@ -159,10 +185,6 @@ class Manager(SignalHolder):
         self.area = None
         self.button = None
         self.palette = None
-
-        # A list of machine commands that where already read from the
-        # machine, but haven't yet been executed.
-        self.pendingCmds = []
 
         # A counter that increments itself whenever an interactive
         # operation is executed. It is used to deal with call/resume
@@ -186,19 +208,6 @@ class Manager(SignalHolder):
     # Source Signal Handling
     #
 
-    def collectCmds(self):
-        """Collect commands."""
-        events = []
-        for cmd in self.mainItr:
-            events.append(cmd)
-            if isinstance(cmd, machine.PlayVobu) or \
-               isinstance(cmd, machine.Pause) or \
-               (isinstance(cmd, self.EndInteractive) and
-                cmd.count == self.interactiveCount):
-                return events
-
-        return events
-
     @synchronized
     def vobuRead(self, src):
         """Invoked by the source element after reading a complete
@@ -210,26 +219,13 @@ class Manager(SignalHolder):
         self.vobuReadReturn = False
 
         try:
-            while not self.vobuReadReturn:
-                if self.pendingCmds == []:
-                    cmds = self.collectCmds()
-                else:
-                    cmds = self.pendingCmds
-                    self.pendingCmds = []
+            for cmd in self.mainItr:
+                # Execute the command.
+                gst.log("Running command %s" % str(cmd))
+                cmd(self)
 
-                if cmds == []:
-                    # Time to stop the pipeline.
+                if self.vobuReadReturn:
                     break
-
-                while cmds:
-                    # Execute the command on the pipeline.
-                    gst.log("Running command %s" % str(cmds[0]))
-                    cmds[0](self)
-                    cmds[0:1] = []
-
-                    if self.vobuReadReturn:
-                        self.pendingCmds = cmds
-                        break
         except:
             # We had an exception in the playback code.
             traceback.print_exc()
@@ -279,7 +275,6 @@ class Manager(SignalHolder):
 
         # Check for audio shutdown.
         if self.audio != -1:
-            print "Offset: ", nav.getFirstAudioOffset(self.audio + 1)
             if not self.audioShutdown and \
                (nav.getFirstAudioOffset(self.audio + 1) == 0x0000 or
                 nav.getFirstAudioOffset(self.audio + 1) == 0x3fff):
@@ -361,6 +356,21 @@ class Manager(SignalHolder):
         __slots__ = ('count')
 
 
+    def collectCmds(self):
+        """Collect commands for the machine iterator until a PlayVobu,
+        Pause or EndInteractive command arrives, and return them in a
+        list."""
+        cmds = []
+        for cmd in self.mainItr:
+            cmds.append(cmd)
+            if isinstance(cmd, machine.PlayVobu) or \
+               isinstance(cmd, machine.Pause) or \
+               (isinstance(cmd, self.EndInteractive) and
+                cmd.count == self.interactiveCount):
+                return cmds
+
+        return cmds
+
     @synchronized
     def runInteractive(self, itr):
         """Run `itr` interactively.
@@ -431,9 +441,13 @@ class Manager(SignalHolder):
             # We reached a VOBU playback operation while doing the
             # interactive operation. Flush and go on.
             self.cancelVobu()
-            cmds[0:0] = [self.__class__.flush,
-                         self.__class__.resendSubpictureClut]
-            self.pendingCmds = cmds
+
+            # Push back the collected commands so that they get
+            # executed.
+            for cmd in reversed(cmds):
+                self.mainItr.push(cmd)
+
+            self.mainItr.push(self.__class__.flush)
 
         gst.debug("end run interactive")
 
@@ -581,9 +595,6 @@ class Manager(SignalHolder):
         """Flush the pipeline."""
         gst.debug("flush")
             
-        # A flush erases the CLUT. Restore it.
-        #self.sendEvent(events.subpictureClut(self.clut))
-
         # Reset the highlight state.
         self.area = None
         self.button = None
@@ -596,6 +607,11 @@ class Manager(SignalHolder):
 
         self.flushing = True
 
+        # A flush erases the CLUT. Push back a command to restore it
+        # as soon as the flush is completed.
+        self.mainItr.push(self.__class__.resendSubpictureClut)
+
+        # Start the actual flush operation.
         msg = gst.message_new_application(self.src,
                                           gst.Structure('seamless.Flush'))
         self.pipeline.get_bus().post(msg)
