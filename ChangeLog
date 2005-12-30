@@ -1,5 +1,12 @@
 2005-12-30  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.playVobu, Manager.stillFrame, Manager.flush): Flush the
+	pipeline after timed still frames. This guarantees proper A/V sync
+	for the material following the still.
+
+2005-12-30  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (PushBackIterator, Manager.__slots__)
 	(Manager.__init__, Manager.vobuRead, Manager.collectCmds)
 	(Manager.runInteractive, Manager.flush): Implement a generic

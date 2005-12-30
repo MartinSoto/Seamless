@@ -150,7 +150,9 @@ class Manager(SignalHolder):
                  'segmentStart',
                  'segmentStop',
 
-                 'flushing')
+                 'flushing',
+
+                 'showingStill')
 
 
     def __init__(self, machine, pipeline):
@@ -197,7 +199,11 @@ class Manager(SignalHolder):
         self.segmentStart = None
         self.segmentStop = None
 
+        # True if we are in the middle of a flush operation.
         self.flushing = False
+
+        # True if we are currently showing a still frame.
+        self.showingStill = False
 
     def sendEvent(self, event):
         """Send `event` down the pipeline."""
@@ -318,9 +324,8 @@ class Manager(SignalHolder):
 
                 self.pipeline.prepareFlush()
 
-                # Send the seek event and from a single sink element
-                # to guarantee that it arrives only once to the
-                # source.
+                # Send the seek event from a single sink element to
+                # guarantee that it arrives only once to the source.
                 self.pipeline.getVideoSink().seek(1.0, gst.FORMAT_TIME,
                                                   gst.SEEK_FLAG_FLUSH,
                                                   gst.SEEK_TYPE_CUR, 0,
@@ -461,6 +466,19 @@ class Manager(SignalHolder):
         'domain', 'titleNr', and 'sectorNr'."""
         gst.log("play vobu")
 
+        if self.showingStill:
+            # This is the first VOBU after a timed still. Since it is
+            # difficult to regain synchronization in this case, we
+            # just flush before playing the VOBU.
+            gst.debug("flushing after still")
+
+            # Queue a flush command and a PlayVobu so that a call to
+            # this procedure will be repeated with the same
+            # parameters. The flush clears the still frame.
+            self.mainItr.push(machine.PlayVobu(domain, titleNr, sectorNr))
+            self.mainItr.push(self.__class__.flush)
+            return
+
         if self.lastDomain != domain:
             self.lastDomain = domain
             self.resetHighlight()
@@ -570,8 +588,8 @@ class Manager(SignalHolder):
         (self.area, self.button, self.palette) = (area, button, palette)
 
         self.sendEvent(events.highlight(self.area,
-                                         self.button,
-                                         self.palette))
+                                        self.button,
+                                        self.palette))
 
     def resetHighlight(self):
         """Clear (reset) the highlighted area."""
@@ -585,6 +603,8 @@ class Manager(SignalHolder):
     def stillFrame(self):
         """Tell the pipeline that a still frame was sent."""
         gst.debug("still frame")
+
+        self.showingStill = True
 
         self.sendEvent(events.stillFrame())
 
@@ -606,6 +626,7 @@ class Manager(SignalHolder):
         self.audioShutdown = False
 
         self.flushing = True
+        self.showingStill = False
 
         # A flush erases the CLUT. Push back a command to restore it
         # as soon as the flush is completed.
