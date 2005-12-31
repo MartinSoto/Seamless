@@ -1,5 +1,19 @@
 2005-12-31  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/seamless/seamlessinit.c (plugin_init): 
+	* gst-plugins/seamless/dvdblocksrc.c (plugin_init): 
+	* gst-plugins/seamless/Makefile.am: 
+	* gst-plugins/Makefile.am (SUBDIRS): 
+	* configure.ac: 
+	dvdblock plugin renamed to seamless, in order to put other
+	seamless specific elements in it. init function split to a
+	separate file.
+	
+	* configure.ac: Erased spurious reference to iec958 plugin, which
+	had been deleted.
+	
+2005-12-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.flush): Erase spurious audio
 	shutdown call.
 

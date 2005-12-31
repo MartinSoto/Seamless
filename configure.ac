@@ -124,8 +124,7 @@ AC_OUTPUT([
   gst-plugins/Makefile
   gst-plugins/alsaspdif/Makefile
   gst-plugins/capspipe/Makefile
-  gst-plugins/dvdblock/Makefile
-  gst-plugins/iec958/Makefile
+  gst-plugins/seamless/Makefile
   gst-plugins/mpeg2sub/Makefile
   src/Makefile
   src/dvdread/Makefile

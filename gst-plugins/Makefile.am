@@ -5,4 +5,4 @@ ALSASPDIF_DIR=
 endif
 
 #SUBDIRS=$(ALSASPDIF_DIR)
-SUBDIRS=capspipe dvdblock mpeg2sub
+SUBDIRS=capspipe seamless mpeg2sub

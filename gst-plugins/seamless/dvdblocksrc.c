@@ -560,26 +560,3 @@ dvdblocksrc_do_seek (GstBaseSrc *src, GstSegment *segment)
   return TRUE;
 }
 
-
-static gboolean
-plugin_init (GstPlugin *plugin)
-{
-  if (!gst_element_register (plugin, "dvdblocksrc", GST_RANK_NONE,
-          GST_TYPE_DVDBLOCKSRC)) {
-    return FALSE;
-  }
-
-  return TRUE;
-}
-
-
-GST_PLUGIN_DEFINE (
-  GST_VERSION_MAJOR,
-  GST_VERSION_MINOR,
-  "dvdblock",
-  "Block based DVD reader based on libdvdread",
-  plugin_init,
-  VERSION,
-  "GPL",
-  PACKAGE,
-  "http://seamless.sourceforge.net");
