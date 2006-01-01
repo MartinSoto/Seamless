@@ -24,7 +24,6 @@ import sys
 import gst
 
 import itersched
-from sig import SignalHolder, signal
 
 import dvdread
 import events
@@ -86,7 +85,7 @@ class PushBackIterator(object):
         self.pushedBack.append(value)
 
 
-class Manager(SignalHolder):
+class Manager(object):
     """The object in charge of managing the interaction between the
     machine and the playback pipeline.
 
@@ -504,18 +503,8 @@ class Manager(SignalHolder):
         #self.src.set_property('cancel-vobu', True)
 
     def setAspectRatio(self, aspectRatio):
-        """Set the display aspect ratio to `aspectRatio`.
-
-        Emits the aspectRatioChanged signal."""
+        """Set the display aspect ratio to `aspectRatio`."""
         gst.debug("set aspect ratio")
-
-        if aspectRatio == machine.ASPECT_RATIO_4_3:
-           self.aspectRatioChanged(4.0/3)
-        elif aspectRatio == machine.ASPECT_RATIO_16_9:
-            self.aspectRatioChanged(16.0/9)
-        else:
-            assert 0, "Invalid aspect ratio value"
-        pass
 
     def setAudio(self, phys):
         """Set the physical audio stream to 'phys'."""
@@ -646,12 +635,3 @@ class Manager(SignalHolder):
         self.lock.release()
         time.sleep(0.1)
         self.lock.acquire()
-
-
-    #
-    # Signals
-    #
-
-    @signal
-    def aspectRatioChanged(self, newAspectRatio):
-        pass

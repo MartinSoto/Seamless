@@ -1,3 +1,13 @@
+2006-01-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/videowidget.py (VideoWidget.presetAspectRatio): 
+	* src/player/player.py (DVDPlayer.getDVDInfo)
+	(DVDPlayer.aspectRatioChanged): 
+	* src/player/manager.py (Manager, Manager.setAspectRatio) 
+	(Manager.aspectRatioChanged): 
+	* src/mainui.py (MainUserInterface.__init__):
+	Killed the remains of old aspect ratio setting infrastructure.
+
 2005-12-31  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/seamless/seamlessinit.c (plugin_init): 

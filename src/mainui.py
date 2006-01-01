@@ -67,11 +67,6 @@ class MainUserInterface(object):
         # problem.
         self.video.setOverlay(self.player.getVideoSink())
 
-        # Preset the aspect ratio when the player changes it.
-        self.player.aspectRatioChanged.connect(self.video.\
-                                               presetAspectRatio,
-                                               passInstance=False)
-
         # Give the window a decent minimum size.
         self.window.set_size_request(480, 360)
 

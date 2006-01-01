@@ -84,11 +84,6 @@ class VideoWidget(gtk.EventBox):
     def getOverlay(self):
         return self.overlay
 
-    def presetAspectRatio(self, presetAspect):
-        # FIXME: Reimplement this by altering the caps before the video
-        # sink.
-        pass
-
 
     #
     # Internal Operations

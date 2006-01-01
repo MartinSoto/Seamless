@@ -46,9 +46,6 @@ class DVDPlayer(SignalHolder):
         self.pipeline = pipeline.Pipeline(options)
         self.manager = manager.Manager(self.machine, self.pipeline)
 
-        self.manager.aspectRatioChanged.connect(self.aspectRatioChanged,
-                                                passInstance=False)
-
     def getDVDInfo(self):
         return self.info
 
@@ -250,14 +247,3 @@ class DVDPlayer(SignalHolder):
             return
 
         yield Call(self.machine.callMenu(dvdread.MENU_TYPE_ROOT, 0))
-
-
-    #
-    # Signals
-    #
-
-    @signal
-    def aspectRatioChanged(self, newAspectRatio):
-        pass
-
-    
