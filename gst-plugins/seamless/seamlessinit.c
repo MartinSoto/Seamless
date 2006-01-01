@@ -24,12 +24,17 @@
 #include "config.h"
 #endif
 
+#include "dvdaspect.h"
 #include "dvdblocksrc.h"
 
 
 static gboolean
 plugin_init (GstPlugin *plugin)
 {
+  if (!gst_element_register (plugin, "dvdaspect", GST_RANK_NONE,
+          GST_TYPE_DVDASPECT)) {
+    return FALSE;
+  }
   if (!gst_element_register (plugin, "dvdblocksrc", GST_RANK_NONE,
           GST_TYPE_DVDBLOCKSRC)) {
     return FALSE;

@@ -409,8 +409,10 @@ gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event)
       break;
     case GST_EVENT_CUSTOM_DOWNSTREAM:
     case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
-      res = gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, FALSE);
-      gst_event_unref (event);
+      if (!gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, FALSE)) {
+	return FALSE;
+      }
+      res = gst_pad_event_default (mpeg2subt->videopad, event);
       break;
     default:
       res = gst_pad_event_default (mpeg2subt->videopad, event);

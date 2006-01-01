@@ -1,5 +1,28 @@
 2006-01-01  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py (SoftwareVideo.__init__): 
+	Insert a dvdaspect element in the video pipeline.
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.setAspectRatio): Send video-aspect-set events when aspect
+	ratio is changed.
+
+	* src/player/events.py (audio): 
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_event_video):
+	Forward DVD events down the pipeline instead of simply unrefing
+	them.
+
+	* gst-plugins/seamless/seamlessinit.c (plugin_init): 
+	* gst-plugins/seamless/Makefile.am (libseamless_la_SOURCES): 
+	* gst-plugins/seamless/dvdaspect.c:
+	* gst-plugins/seamless/dvdaspect.h: 
+	New dvdaspect element, a filter that forces a certain aspect ratio
+	on the video frames it receives. The aspect ratio is controlled
+	using events.
+
+2006-01-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/videowidget.py (VideoWidget.presetAspectRatio): 
 	* src/player/player.py (DVDPlayer.getDVDInfo)
 	(DVDPlayer.aspectRatioChanged): 

@@ -202,6 +202,7 @@ class SoftwareVideo(Bin):
         self.makeSubelem('mpeg2subt')
         self.makeSubelem('ffmpegcolorspace')
         self.makeSubelem('videoscale')
+        self.makeSubelem('dvdaspect')
 
         # A (usually) one-frame queue whose size is increased before
         # flushing and reduced again short thereafter. See "flush
@@ -217,7 +218,8 @@ class SoftwareVideo(Bin):
         self.linkPads('video-queue', 'src', 'mpeg2subt', 'video')
         self.link('mpeg2subt', 'ffmpegcolorspace')
         self.link('ffmpegcolorspace', 'videoscale')
-        self.link('videoscale', 'frame-queue')
+        self.link('videoscale', 'dvdaspect')
+        self.link('dvdaspect', 'frame-queue')
         self.link('frame-queue', 'videosink')
 
         self.ghostify('mpeg2dec', 'sink', 'video')

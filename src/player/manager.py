@@ -132,6 +132,8 @@ class Manager(object):
                  'mainItr',
                  'lock',
 
+                 'aspectRatio',
+
                  'lastDomain',
                  'subpicture',
                  'subpictureHide',
@@ -174,9 +176,8 @@ class Manager(object):
         self.src.connect('vobu-read', self.vobuRead)
         self.src.connect('vobu-header', self.vobuHeader)
 
-        # The audio state:
-        self.audio = -1
-        self.audioShutdown = False
+        # The video state:
+        self.aspectRatio = (0, 0)
 
         # The subpicture state:
         self.lastDomain = None
@@ -186,6 +187,10 @@ class Manager(object):
         self.area = None
         self.button = None
         self.palette = None
+
+        # The audio state:
+        self.audio = -1
+        self.audioShutdown = False
 
         # A counter that increments itself whenever an interactive
         # operation is executed. It is used to deal with call/resume
@@ -505,6 +510,15 @@ class Manager(object):
     def setAspectRatio(self, aspectRatio):
         """Set the display aspect ratio to `aspectRatio`."""
         gst.debug("set aspect ratio")
+
+        if aspectRatio == machine.ASPECT_RATIO_4_3:
+            self.aspectRatio = (4, 3)
+        elif aspectRatio == machine.ASPECT_RATIO_16_9:
+            self.aspectRatio = (16, 9)
+        else:
+            assert 0, "Invalid aspect ratio value"
+
+        self.sendEvent(events.aspectRatioSet(*self.aspectRatio))
 
     def setAudio(self, phys):
         """Set the physical audio stream to 'phys'."""

@@ -62,6 +62,19 @@ def newsegment(update, startTime, endTime):
 # Audio DVD Events
 #
 
+def aspectRatioSet(ratio_n, ratio_d):
+    """Create and return a new video aspect ratio set event, using the
+    specified ratio numerator and denominator."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-video-aspect-set')
+    st.set_value('aspect-ratio', gst.Fraction(ratio_n, ratio_d))
+    return createCustom(st)
+
+
+#
+# Audio DVD Events
+#
+
 def audio(physical):
     """Create and return a new audio event for the specified physical
     stream."""
