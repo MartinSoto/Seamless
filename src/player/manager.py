@@ -571,15 +571,6 @@ class Manager(object):
 
         self.sendEvent(events.subpictureClut(self.clut))
 
-    def resendSubpictureClut(self):
-        """Resend the subpicture color lookup table down the pipeline.
-
-        This is needed after a flush."""
-        gst.debug("resend subpicture CLUT")
-
-        if self.clut != None:
-            self.sendEvent(events.subpictureClut(self.clut))
-
     def highlight(self, area, button, palette):
         """Highlight the specified area, corresponding to the
         specified button number and using the specified palette."""
@@ -627,10 +618,6 @@ class Manager(object):
 
         self.flushing = True
         self.showingStill = False
-
-        # A flush erases the CLUT. Push back a command to restore it
-        # as soon as the flush is completed.
-        self.mainItr.push(self.__class__.resendSubpictureClut)
 
         # Start the actual flush operation.
         msg = gst.message_new_application(self.src,

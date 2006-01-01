@@ -1091,7 +1091,8 @@ gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt)
   mpeg2subt->display = FALSE;
   mpeg2subt->forced_display = FALSE;
 
-  memset (mpeg2subt->current_clut, 0, 16 * sizeof (guint32));
+  /* Reset everything except for the CLUT, which is generally still
+     valid after seeking. */
   memset (mpeg2subt->subtitle_index, 0, sizeof (mpeg2subt->subtitle_index));
   memset (mpeg2subt->menu_index, 0, sizeof (mpeg2subt->menu_index));
   memset (mpeg2subt->subtitle_alpha, 0, sizeof (mpeg2subt->subtitle_alpha));

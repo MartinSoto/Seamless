@@ -1,5 +1,15 @@
 2006-01-01  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (Manager.resendSubpictureClut)
+	(Manager.flush): Erase code to resend the color lookup table after
+	every flush.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_flush_subtitle): Don't reset the color lookup table
+	when flushing.
+
+2006-01-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/pipeline.py (SoftwareVideo.__init__): 
 	Insert a dvdaspect element in the video pipeline.
 
