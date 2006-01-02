@@ -3,8 +3,6 @@
 Player Operation
 ----------------
 
-- Implement a pause operation.
-
 - Revise the implementation of the chapter backward operation,
   to make it behave like a typical player, i.e., backward goes to the
   beginning of the current chapter, except when closely following
@@ -25,6 +23,8 @@ Player Operation
 
 - Implement exact seeking using the jump fields in nav packets.
 
+- Implement a pause operation. (Done 2006-01-02)
+
 
 Robustness
 ----------
@@ -37,23 +37,21 @@ Robustness
 DVD (Mis)Features
 -----------------
 
-- Reemplement DVD aspect ratio handling.
+- Implement the cell time as still time thing.
 
-- Support angles. (partially complete?)
+- Handle button nav packets properly with respect to time.
 
 - Some menu subpictures get displayed too early. Why?
-
-- Implement support for DTS.
-
-- Implement the cell time as still time thing.
 
 - Honor prohibited operations when it makes sense, or ignore them
   smartly.
 
-- Correct improper highlight handling in DVDs with letterboxed +
-  widescreen support. (fixed?)
+- Implement support for non-seamless angles (AFAIK, I have no DVD
+  using them.)
 
-- Handle button nav packets properly with respect to time.
+- Implement support for DTS.
+
+- Reemplement DVD aspect ratio handling. (Done 2006-01-01)
 
 
 Internals

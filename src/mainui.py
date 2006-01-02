@@ -131,7 +131,9 @@ class MainUserInterface(object):
     def mainKeyPress(self, widget, event):
         keyName = gtk.gdk.keyval_name(event.keyval)
 
-        if keyName == 'Up':
+        if keyName == 'P' or keyName == 'p':
+            self.player.pause()
+        elif keyName == 'Up':
             self.player.up()
         elif keyName == 'Down':
             self.player.down()

@@ -16,8 +16,6 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-import time
-
 import gobject
 
 import gst
@@ -363,26 +361,3 @@ class Pipeline(gst.Pipeline):
         """Prepare the pipeline for running after a flush."""
         self.videoBin.closeFlush()
         self.audioBin.closeFlush()
-
-
-    #
-    # Playback Control
-    #
-
-    def start(self):
-        self.set_state(gst.STATE_PLAYING)
-
-    def forceStop(self):
-        self.set_state(gst.STATE_NULL)
-
-    def waitForStop(self):
-        """Wait for the pipeline to actually stop. If waiting time is
-        too long, just force a stop."""
-        maxIter = 40
-        while maxIter > 0 and self.get_state() == gst.STATE_PLAYING:
-            time.sleep(0.1)
-            maxIter -= 1
-
-        self.forceStop()
-
-

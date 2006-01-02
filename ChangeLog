@@ -1,3 +1,11 @@
+2006-01-02  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/player.py (DVDPlayer.pause, DVDPlayer.stop) 
+	(DVDPlayer.start): 
+	* src/player/pipeline.py (start, forceStop, waitForStop): 
+	* src/mainui.py (MainUserInterface.mainKeyPress): 
+	Implement a pause operation and make stop more robust.
+
 2006-01-01  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/manager.py (Manager.resendSubpictureClut)
