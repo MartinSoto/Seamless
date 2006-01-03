@@ -1,109 +1,132 @@
+-*- indented-text -*-
+
 Seamless
 ========
 
-Seamless is a simple DVD player for GNU/Linux systems.
+  Seamless is a software DVD player, a program that allows you to
+  watch DVD movies on your laptop or desktop computer. Seamless offers
+  support for menus, angles and many other popular DVD features, and
+  is able to play most commercial DVD movies available. Currently,
+  Seamless offers a simple graphical user interface, that can be
+  controlled with either the keyboard or a remote control. It includes
+  a full-screen mode that is adequate for comfortably watching movies
+  using your computer monitor or a external TV set.
 
-Seamless was written by Martin Soto <soto@freedesktop.org> and can be
-freely copied and distributed under the terms of the GNU General
-Public License. See the file COPYING in this directory for more
-details.
+  Seamless is available under the terms of the GNU General Public
+  License, which means you are free to download it, install it in as
+  many computers as you please, and even hand it all of your friends
+  and relatives (they'll surely love it!). Also, if you are so
+  inclined, you can study Seamless' program source code and modify it
+  to better fit your needs and desires. If you want to read the fine
+  print, you can take a look at the file named COPYING in this
+  directory, which not only contains the exact license conditions but
+  will give you a peek into the wonderful world of Free Software.
 
-Seamless in based on the great GStreamer media framework
-(http://gstreamer.freedesktop.org/).
+  Seamless was written by yours truly, Martin A. Soto
+  <soto@freedesktop.org>. It is based on the great GStreamer Media
+  Framework (http://gstreamer.freedesktop.org/).
+
+
+A Note to Casual Users
+----------------------
+
+  If you are just looking for a free movie player, and your personal
+  interests don't particularly lie in the computer or multimedia
+  realms, Seamless may be still too hard to install and too
+  uncomfortable to operate for your tastes. I'm trying to improve this
+  situation, but since I'm working on Seamless in my scarce free time,
+  I cannot make any hard commitments about when it'll be ready for
+  general consumption. Of course, you're still welcome to read on and
+  judge for yourself if the current state of Seamless is adequate for
+  your needs.
+
+
+Software and Hardware Requirements
+----------------------------------
+
+  Right now, and according to my knowledge, Seamless will only work
+  under the GNU/Linux operating system, running on Intel i386
+  compatible processors (AMD and Via should be fine, of course). In
+  its current state, it won't run on PowerPC (or any other big endian)
+  processors, but this may be easy to fix (see the developer's notes
+  below).
+
+  Since video decoding happens completely in software, a relatively
+  fast processor is necessary (according to my experience, 1.2 GHz or
+  faster should do). Having good support for the XVideo extension in
+  your video driver is also very helpful to achieve smooth playback.
 
 
 Compiling from the GNU Arch repository
 --------------------------------------
 
-Seamless is alpha software and still depends on the bleeding edge of
-the GStreamer technology. Unfortunately, compiling it right now is not
-the easiest of all tasks. The following compile instructions are
-intended for experts only. If you don't have a clue what they mean,
-Seamless isn't probably for you at this time (although I hope things
-will get easier soon).
+  Seamless is alpha software and still depends on the bleeding edge of
+  the GStreamer technology. Unfortunately, compiling it at the moment
+  is not the easiest of all tasks. The following compile instructions
+  are intended for people with some understanding of the GNU/Linux
+  development environment.
 
-You need to have the following packages installed:
+  You need to have the following packages installed:
 
-- Glib (http://www.gtk.org/) version 2.0 or newer.
+  - Python (http://www.python.org/) version 2.4 or newer. Make sure
+    the corresponding C development files (libraries, headers) are
+    also installed.
 
-- GStreamer, gst-plugins and gst-python from
-http://gstreamer.freedesktop.org/. Currently you need the CVS
-development versions of them all. Released versions won't work.
+  - GStreamer (http://gstreamer.freedesktop.org/) current version from
+    CVS. You need to check out and compile at least the gstreamer,
+    gst-plugins-base, gst-plugins-ugly and gst-python
+    modules. Released versions of these packages most probably won't
+    work.
 
-- Python (http://www.python.org/) version 2.3 or newer. Make sure the
-corresponding C development files (libraries, headers) are also
-installed.
+    When compiling the GStreamer plugins, check the configure script
+    output for the gst-plugin-* packages, to make sure that at least
+    alsa, xvimage, mpeg2dec and a52dec will be compiled. If configure
+    reports that a plugin won't be compiled, install the proper
+    dependencies.
 
-- PyGTK (http://www.pygtk.org/) version 2.4 or newer. The C
-development files are also necessary.
+  - PyGTK (http://www.pygtk.org/) version 2.8 or newer.
 
-- libdvdread
-(http://www.dtek.chalmers.se/groups/dvd/downloads.shtml). I'm using
-version 0.9.4.
+  - libdvdread
+    (http://www.dtek.chalmers.se/groups/dvd/downloads.shtml). I'm
+    using version 0.9.4.
 
-- Pyrex (http://nz.cosc.canterbury.ac.nz/~greg/python/Pyrex/). I'm
-using version 0.9.3.
+  - Pyrex (http://nz.cosc.canterbury.ac.nz/~greg/python/Pyrex/). I'm
+    using version 0.9.3.
 
-- The GNU autotools: Autoconf (http://www.gnu.org/software/autoconf/),
-version 2.59 or later, Automake (http://www.gnu.org/software/automake)
-version 1.7, and libtool (http://www.gnu.org/software/libtool/)
-version 1.5.6 or later.
+  - The GNU autotools: Autoconf
+    (http://www.gnu.org/software/autoconf/), version 2.59 or later,
+    Automake (http://www.gnu.org/software/automake) version 1.9, and
+    libtool (http://www.gnu.org/software/libtool/) version 1.5.6 or
+    later.
 
-Except for the GStreamer related packages, which currently must be the
-development versions and have to be downloaded and compiled manually,
-all other packages should be available from your favorite GNU/Linux
-distribution (I'm using Debian unstable here.)
+  Except for the GStreamer related packages, which currently must be
+  the development versions and have to be downloaded and compiled
+  manually, all other packages should be available from your favorite
+  GNU/Linux distribution (I'm using Ubuntu Breezy.)
 
-To actually compile, go through the following steps:
+  If you managed to get the dependencies right, compiling Seamless
+  itself is not that hard. Move to the seamless main directory and
+  type
 
-1. Compile GStreamer (module gstreamer) from CVS (go to
-http://gstreamer.freedesktop.org/dev/ for details). You can either
-install it, or use it directly from the compile directory if you used
-the --enable-plugin-builddir option to the configure script.
+    ./autogen.sh
+    make
 
-2. Compile gst-plugins just like you did for GStreamer.
-
-3. Compile gst-python, ditto.
-
-4. Put the pkgconfig directory(ies) for gstreamer and gst-plugins in
-your PKG_CONFIG_PATH variable.
-
-5. Move to the Seamless main directory and type
-
-  ./autogen.sh
-  make
-
-If everything went OK, you should be ready to run after this step.
+  If everything went OK, you should be ready to run after this step.
 
 
 Running Seamless
 ----------------
 
-Getting Seamless to work may require some understanding of the
-GStreamer technology. The following notes presuppose you are somewhat
-familiar with GStreamer and how it works.
+  To start the program, run the src/seamless.py script in the source
+  tree. The default configuration displays video through the XVideo
+  XServer extension, and plays audio through the first ALSA supported
+  sound card found. This should work out of the box in most systems
+  around.
 
-To start the program, run the src/seamless.py script in the source
-tree. The GStreamer pipeline is still sort of hard coded, but you can
-customize it somewhat using the command line options (--help to get a
-list). For example
+  In case you need to tweak this setup, you can run seamless with the
+  --help option to see a description of the available parameters.
 
-  src/seamless.py --video-sink='ffcolorspace ! videoscale ! ximagesink'
-
-uses the ximagesink video sink instead of the default xvimagesink,
-
-  src/seamless.py --audio-sink=osssink
-
-plays sound using the OSS sound driver (instead of the default ALSA)
-and
-
-  src/seamless.py --audio-sink='ac3iec958 ! alsaspdifsink' --audio-decode=hard
-
-selects the internal alsaspdifsink element, that is able to play to an
-external AC3 decoder (and for this reason does not require an internal
-AC3 decoder).
-
-Once playing usage is pretty simple so far:
+  Once playing, usage is pretty simple:
 
   - Use the arrow keys to move inside menus and the "Return" key to
     confirm.
@@ -113,13 +136,19 @@ Once playing usage is pretty simple so far:
 
   - PageUp and PageDown jump chapters back and forth.
 
-  - Shift + RightArrow and Shift + LeftArrow jump 10 seconds forward and
-backward, respectively.
+  - Shift + RightArrow and Shift + LeftArrow jump 10 seconds forward
+    and backward, respectively.
 
   - Clicking anywhere on the main window switches between normal and
     full screen mode.
 
+  - "P" pauses playback. Pressing "P" again restarts it.
+
+  - "F2" switches audio streams.
+
+  - "F3" switches angles.
+
   - Closing the window terminates the program.
 
 
--- Martin Soto <soto@freedesktop.org>, 2004/11/29
+-- Martin Soto <soto@freedesktop.org>, 2006-01-03

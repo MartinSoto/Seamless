@@ -1,3 +1,7 @@
+2006-01-03  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* README: Updated.
+
 2006-01-02  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/player.py (DVDPlayer.pause, DVDPlayer.stop) 
