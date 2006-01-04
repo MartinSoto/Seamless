@@ -55,7 +55,7 @@ def newsegment(update, startTime, endTime):
     """Create and return a newsegment event for the specified start
     and end times. Times are specified in nanoseconds."""
     return gst.event_new_new_segment(update, 1.0, gst.FORMAT_TIME,
-                                     startTime, endTime, 0)
+                                     startTime, endTime, startTime)
 
 
 #
