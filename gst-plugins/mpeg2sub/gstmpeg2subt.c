@@ -30,8 +30,14 @@ GST_DEBUG_CATEGORY_STATIC (mpeg2subt_debug);
 #define GST_CAT_DEFAULT (mpeg2subt_debug)
 
 
-/* Convert SPU decoder delays to GStramer time. */
+/* Convert SPU decoder delays to GStreamer time. */
 #define DELAY_TO_GST(delay) ((GST_MSECOND * 1024 * (delay)) / 90)
+
+
+/* Small numerical errors could happen when converting delays from
+   MPEG to GStreamer, so we allow for a small difference when
+   comparing values: */
+#define COMPARE_GAP ((2 * GST_SECOND) / 90)
 
 
 /* elementfactory information */
@@ -637,6 +643,9 @@ gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt, GstClockTime time)
     return;
   }
 
+  GST_LOG_OBJECT (mpeg2subt, "updating SPU commands, time: %Ld",
+      time);
+
   if (mpeg2subt->cur_cmds == NULL) {
     /* Try to advance once, just in case new SPU packets have arrived. */
     gst_mpeg2subt_next_block (mpeg2subt);
@@ -644,7 +653,7 @@ gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt, GstClockTime time)
 
   while (mpeg2subt->cur_cmds != NULL &&
 	 (mpeg2subt->cur_cmds_time == GST_CLOCK_TIME_NONE ||
-	  mpeg2subt->cur_cmds_time <= time)) {
+	  mpeg2subt->cur_cmds_time <= time + COMPARE_GAP)) {
     gst_mpeg2subt_execute_block (mpeg2subt);
     gst_mpeg2subt_next_block (mpeg2subt);
   }
@@ -954,8 +963,6 @@ gst_mpeg2subt_update_still_frame (GstMpeg2Subt * mpeg2subt)
     /* Force the video sink to show this frame instantly. */
     out_buf = gst_buffer_copy (mpeg2subt->last_frame);
     gst_mpeg2subt_merge_title (mpeg2subt, out_buf);
-
-    GST_BUFFER_TIMESTAMP (out_buf) = 0L;
 
     GST_INFO_OBJECT (mpeg2subt, "Pushing frame with timestamp %0.3fs",
         (double) GST_BUFFER_TIMESTAMP (out_buf) / GST_SECOND);

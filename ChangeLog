@@ -1,3 +1,15 @@
+2006-01-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (COMPARE_GAP)
+	(gst_mpeg2subt_update): Allow for an error gap when comparing
+	buffer and command block timestamps. Not doing that was causing
+	highlights not to be displayed on still frames in certain
+	situations.
+
+	(gst_buffer_copy): Send updated highlight frames with the same
+	timestamp of the last frame instead of 0. This way the timestamp
+	is guaranteed to lie in the current segment.
+
 2006-01-04  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/events.py (newsegment): Set the position to the same
