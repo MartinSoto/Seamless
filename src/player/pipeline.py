@@ -35,6 +35,18 @@ class Bin(gst.Bin):
 
         subelem = gst.element_factory_make(type, name)
 
+        self.addSubelem(subelem, **keywords)
+
+    def makeParsedSubelem(self, descr, name=None, **keywords):
+        if name == None:
+            name = type
+
+        subelem = gst.parse_launch(descr)
+        subelem.set_property('name', name)
+
+        self.addSubelem(subelem, **keywords)
+
+    def addSubelem(self, subelem, **keywords):
         for (prop, value) in keywords.items():
             subelem.set_property(prop, value)
 
@@ -96,7 +108,7 @@ class SoftwareAudio(Bin):
 
         self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=0,
                          max_size_time=gst.SECOND)
-        self.makeSubelem(options['audioSink'], 'audiosink')
+        self.makeParsedSubelem(options['audioSink'], 'audiosink')
 
         self.linkPads('capsselect', 'src%d', 'a52dec', 'sink')
         self.link('a52dec', 'audioconvert1')
@@ -208,9 +220,9 @@ class SoftwareVideo(Bin):
         self.makeSubelem('queue', 'frame-queue',
                          max_size_buffers=1, max_size_bytes=0,
                          max_size_time=0)
-        self.makeSubelem(options['videoSink'], 'videosink',
-                         force_aspect_ratio=True,
-                         pixel_aspect_ratio=options['pixelAspect'])
+        self.makeParsedSubelem(options['videoSink'], 'videosink',
+                               force_aspect_ratio=True,
+                               pixel_aspect_ratio=options['pixelAspect'])
 
         self.link('mpeg2dec', 'video-queue')
         self.linkPads('video-queue', 'src', 'mpeg2subt', 'video')
