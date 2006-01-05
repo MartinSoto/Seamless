@@ -1,70 +1,88 @@
 -*- Text -*-
 
+Numbers in () are priorities. Lower values represent higher
+priorities.
+
+
+User Interface
+--------------
+
+- (1) Add a menubar and a toolbar for normal operation.
+
+- (1) Autodetect DVD drives when possible, and start playback
+  automatically when a disc is inserted.
+
+- (1) Use default audio and video sinks defined in the Gnome multimedia
+  systems selector.
+
+- (2) Add a status display (current title/chaper, playing time, etc.)
+
+
 Player Operation
 ----------------
 
-- Revise the implementation of the chapter backward operation,
-  to make it behave like a typical player, i.e., backward goes to the
+- (1) Implement menu operation using the mouse pointer.
+
+- (3) Revise the implementation of the chapter backward operation, to
+  make it behave like a typical player, i.e., backward goes to the
   beginning of the current chapter, except when closely following
   another backward.
 
-- Revise the chapter forward operation such that it jumps to the end
-  of the current chapter instead of to the beginning of the next
+- (3) Revise the chapter forward operation such that it jumps to the
+  end of the current chapter instead of to the beginning of the next
   one. That way the final code gets executed anyway.
 
-- Trap the stop (^Z) signal and stop the clock while the program is
+- (2) Trap the stop (^Z) signal and stop the clock while the program is
   suspended.
 
-- Implement free changing of subtitles
+- (2) Implement free changing of subtitles
 
-- Implement backwards and fast playing.
+- (4) Implement backwards and fast playing.
 
-- Implement auto NTSC/PAL mode.
+- (4) Implement auto NTSC/PAL mode.
 
-- Implement exact seeking using the jump fields in nav packets.
-
-- Implement a pause operation. (Done 2006-01-02)
+- (4) Implement exact seeking using the jump fields in nav packets.
 
 
 Robustness
 ----------
 
-- Implement timeout when pipeline doesn't go to PLAY.
+- (1) Implement timeout when pipeline doesn't go to PLAY.
 
-- Add exception and error handling to the pipeline module.
+- (1) Add exception and error handling to the pipeline module.
 
 
 DVD (Mis)Features
 -----------------
 
-- Implement the cell time as still time thing.
+- (3) Implement highlights when selecting buttons
 
-- Handle button nav packets properly with respect to time.
+- (2) Handle button nav packets properly with respect to time.
 
-- Some menu subpictures get displayed too early. Why?
+  - Some menu subpictures get displayed too early.
 
-- Honor prohibited operations when it makes sense, or ignore them
+- (1) Implement the cell time as still time thing.
+
+- (2) Honor prohibited operations when it makes sense, or ignore them
   smartly.
 
-- Implement support for non-seamless angles (AFAIK, I have no DVD
+- (4) Implement support for non-seamless angles (AFAIK, I have no DVD
   using them.)
 
-- Implement support for DTS.
-
-- Reemplement DVD aspect ratio handling. (Done 2006-01-01)
+- (4) Implement support for DTS.
 
 
 Internals
 ---------
 
-- Add __richcmp__ to dvdread wrappers as necessary.
+- (5) Add __richcmp__ to dvdread wrappers as necessary.
 
 
 Remote
 ------
 
-- Create a Pyrex wrapper for lirc.
+- (5) Create a Pyrex wrapper for lirc.
 
-- LIRC component fails miserably when no LIRC kernel modules are
+- (5) LIRC component fails miserably when no LIRC kernel modules are
   available.
 
