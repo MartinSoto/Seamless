@@ -16,6 +16,10 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
+import time
+
+import gst
+
 import dvdread
 import machine
 import manager
@@ -46,9 +50,6 @@ class DVDPlayer(SignalHolder):
         self.pipeline = pipeline.Pipeline(options)
         self.manager = manager.Manager(self.machine, self.pipeline)
 
-        self.manager.aspectRatioChanged.connect(self.aspectRatioChanged,
-                                                passInstance=False)
-
     def getDVDInfo(self):
         return self.info
 
@@ -57,11 +58,33 @@ class DVDPlayer(SignalHolder):
 
 
     #
+    # Player Configuration
+    #
+
+    def setRegion(self, region):
+        """Set the player's region."""
+        self.machine.setRegion(region)
+
+    def getRegion(self):
+        """Return the player's region code."""
+        return self.machine.getRegion()
+        
+
+    #
     # Basic Playback Control
     #
 
     def start(self):
-        self.pipeline.start()
+        self.pipeline.set_state(gst.STATE_PLAYING)
+
+    def pause(self):
+        """Toggle between paused and playing."""
+        (status, state, pending) = self.pipeline.get_state()
+
+        if state == gst.STATE_PLAYING:
+            self.pipeline.set_state(gst.STATE_PAUSED)
+        elif state == gst.STATE_PAUSED:
+            self.pipeline.set_state(gst.STATE_PLAYING)
 
     @interactiveOp
     def stopMachine(self):
@@ -69,7 +92,17 @@ class DVDPlayer(SignalHolder):
 
     def stop(self):
         self.stopMachine()
-        self.pipeline.waitForStop()
+
+        # Wait for the pipeline to actually reach the paused state.
+        maxIter = 40
+        while maxIter > 0 and \
+                  self.pipeline.get_state() == gst.STATE_PLAYING:
+            time.sleep(0.1)
+            maxIter -= 1
+
+        # Shutdown the pipeline and confirm the state.
+        self.pipeline.set_state(gst.STATE_NULL)
+        self.pipeline.get_state()
 
 
     #
@@ -237,14 +270,3 @@ class DVDPlayer(SignalHolder):
             return
 
         yield Call(self.machine.callMenu(dvdread.MENU_TYPE_ROOT, 0))
-
-
-    #
-    # Signals
-    #
-
-    @signal
-    def aspectRatioChanged(self, newAspectRatio):
-        pass
-
-    

@@ -1,5 +1,5 @@
 /* Seamless DVD Player
- * Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+ * Copyright (C) 2005 Martin Soto <martinsoto@users.sourceforge.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -20,9 +20,8 @@
 #ifndef __DVDBLOCKSRC_H__
 #define __DVDBLOCKSRC_H__
 
-#include <glib.h>
-
 #include <gst/gst.h>
+#include <gst/base/gstpushsrc.h>
 
 #include <dvdread/dvd_reader.h>
 
@@ -54,7 +53,7 @@ typedef enum {
 
 
 struct _DVDBlockSrc {
-  GstElement element;
+  GstPushSrc element;
 
   gchar *location;	/* Path to the DVD location. */
   int title_num;	/* Title number as in libdvdread */
@@ -67,9 +66,6 @@ struct _DVDBlockSrc {
                            from file start). */
   int block_count;	/* Number of blocks yet to read. */
 
-  gboolean cancel_vobu;	/* If set to TRUE, cancel reading of the
-			   current VOBU. */
-
   gchar *open_location;	/* Path to the currently opened DVD location. */
   int open_title_num;	/* Title number of the currently opened file. */
   dvd_read_domain_t open_domain;
@@ -80,23 +76,22 @@ struct _DVDBlockSrc {
 
   GstPad *src;		/* The source pad. */
 
-  GAsyncQueue *event_queue;
-  			/* Queue of pending events. */
+  GMutex *cancel_lock;	/* Lock to exclude the cancel VOBU operation. */
 };
 
 
 struct _DVDBlockSrcClass {
-  GstElementClass parent_class;
+  GstPushSrcClass parent_class;
 
   /* Signals */
   void (*vobu_read)		(DVDBlockSrc * src);
   void (*vobu_header)		(DVDBlockSrc * src, GstBuffer * header);
-  void (*push_event)		(DVDBlockSrc * src, GstEvent * event);
-  void (*queue_event)		(DVDBlockSrc * src, GstEvent * event);
+  gboolean (*do_seek)		(GstBaseSrc *src, GstSegment *segment);
 };
 
 
-extern GType	dvdblocksrc_get_type		(void);
+extern GType
+dvdblocksrc_get_type (void);
 
 G_END_DECLS
 

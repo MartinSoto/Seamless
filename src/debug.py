@@ -19,6 +19,8 @@
 import code
 import threading
 
+import gst
+
 def debugConsole(player):
     """Start a debug Python console in the controlling terminal.
 
@@ -41,3 +43,20 @@ def debugConsoleAsync(player):
     guaranteed to be safe."""
     t = threading.Thread(None, debugConsole, 'Debug console', (player,))
     t.start()
+
+
+def enterLeave(func):
+    def wrapper(*args, **keywords):
+        gst.debug("Entering '%s'" % func.__name__)
+
+        value = func(*args, **keywords)
+
+        if value == None:
+            gst.debug("Leaving '%s'" % func.__name__)
+        else:
+            gst.debug("Leaving '%s' with value '%s'" % (func.__name__,
+                                                        str(value)))
+            return value
+
+    wrapper.__name__ = func.__name__
+    return wrapper

@@ -16,85 +16,117 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-import time
-
 import gobject
 
 import gst
-import gst.interfaces
 
 # Load private GStreamer plugins.
 import loadplugins
 
-import dvdread
-import machine
-import wrapclock
 
-
-class ParsedBin(gst.Bin):
-    """A GStgreamer bin whose contents are created by parsing a pipeline
-    specification."""
+class Bin(gst.Bin):
+    """An enhanced GStreamer bin."""
 
     __slots__ = ()
 
-    def __init__(self, name, pipelineSpec):
-        gst.Bin.__init__(self, name)
+    def makeSubelem(self, type, name=None, **keywords):
+        if name == None:
+            name = type
 
-        elem = gst.parse_launch(pipelineSpec)
-        if isinstance(elem, gst.Bin):
-            # Move all elements to this instance. Yes, this is sort of
-            # funny, but the GStreamer API doesn't offer anything
-            # better at the moment.
-            for subelem in elem.get_list():
-                elem.remove(subelem)
-                self.add(subelem)
-        else:
-            self.add(elem)
+        subelem = gst.element_factory_make(type, name)
+
+        self.addSubelem(subelem, **keywords)
+
+    def makeParsedSubelem(self, descr, name=None, **keywords):
+        if name == None:
+            name = type
+
+        subelem = gst.parse_launch(descr)
+        subelem.set_property('name', name)
+
+        self.addSubelem(subelem, **keywords)
+
+    def addSubelem(self, subelem, **keywords):
+        for (prop, value) in keywords.items():
+            subelem.set_property(prop, value)
+
+        self.add(subelem)
+
+        return subelem
 
     def ghostify(self, elemName, padName, ghostName=None):
         if not ghostName:
             ghostName = padName
-        self.add_ghost_pad(self.get_by_name(elemName).get_pad(padName),
-                           ghostName)
+        self.add_pad(gst.GhostPad(ghostName,
+                                  self.get_by_name(elemName).get_pad(padName)))
+
+    def link(self, elemName1, elemName2):
+        elem1 = self.get_by_name(elemName1)
+        elem2 = self.get_by_name(elemName2)
+
+        elem1.link(elem2)
+        
+    def linkPads(self, elemName1, padName1, elemName2, padName2):
+        elem1 = self.get_by_name(elemName1)
+        elem2 = self.get_by_name(elemName2)
+
+        elem1.link_pads(padName1, elem2, padName2)
+
+    #
+    # Flush handling
+    #
+
+    def prepareFlush(self):
+        pass
+
+    def closeFlush(self):
+        pass
 
 
-class SoftwareAudio(ParsedBin):
+class SoftwareAudio(Bin):
     """An audio playback element that uses software decoders for AC3
     and DTS."""
 
     __slots__ = ('clock')
 
     def __init__(self, options, name='audiodec'):
-        super(SoftwareAudio, self).__init__(name, """
-        (
-          capsselect name=capsselect !
-            seamless-a52dec !
-            audioconvert !
-            audioscale !
-            capsaggreg name=capsaggreg !
-            seamless-queue name=audioqueue !
-            { %(audioSink)s name=audiosink }
+        super(SoftwareAudio, self).__init__(name)
 
-          capsselect.src%%d !
-            dvdlpcmdec !
-            audioconvert !
-            audioscale ! capsaggreg.sink%%d
+        self.makeSubelem('capsselect')
 
-          capsselect.src%%d !
-            dtsdec !
-            audioconvert !
-            audioscale ! capsaggreg.sink%%d
-        )
-        """ % options)
+        # The AC3 decoding pipeline.
+        self.makeSubelem('a52dec')
+        self.makeSubelem('audioconvert', 'audioconvert1')
+        self.makeSubelem('audioresample', 'audioresample1')
+        
+        # The LPCM decoding pipeline.
+        self.makeSubelem('dvdlpcmdec')
+        self.makeSubelem('audioconvert', 'audioconvert2')
+        self.makeSubelem('audioresample', 'audioresample2')
+        
+        self.makeSubelem('capsaggreg')
+
+        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=0,
+                         max_size_time=gst.SECOND)
+        self.makeParsedSubelem(options['audioSink'], 'audiosink')
+
+        self.linkPads('capsselect', 'src%d', 'a52dec', 'sink')
+        self.link('a52dec', 'audioconvert1')
+        self.link('audioconvert1', 'audioresample1')
+        self.linkPads('audioresample1', 'src', 'capsaggreg', 'sink%d')
+
+        self.linkPads('capsselect', 'src%d', 'dvdlpcmdec', 'sink')
+        self.link('dvdlpcmdec', 'audioconvert2')
+        self.link('audioconvert2', 'audioresample2')
+        self.linkPads('audioresample2', 'src', 'capsaggreg', 'sink%d')
+
+        self.link('capsaggreg', 'queue')
+        self.link('queue', 'audiosink')
+
         self.ghostify('capsselect', 'sink')
 
-        self.clock = self.get_by_name('audiosink').get_clock()
 
-    def getClock(self):
-        return self.clock
-
-
-class SpdifAudio(ParsedBin):
+class SpdifAudio(Bin):
     """An audio playback element that feeds AC3 sound (DTS coming
     soon) to an external hardware decoder through an SP/DIF digital
     audio interface. The SP/DIF device is driven using ALSA."""
@@ -102,81 +134,149 @@ class SpdifAudio(ParsedBin):
     __slots__ = ('clock')
 
     def __init__(self, options, name='audiodec'):
-        super(SpdifAudio, self).__init__(name, """
-        (
-          capsselect name=capsselect !
-            ac3iec958 !
-            capsaggreg name=capsaggreg !
-            seamless-queue max-size-bytes=40000 !
-            { alsasink name=audiosink }
+        super(SpdifAudio, self).__init__(name)
 
-          capsselect.src%d !
-            dvdlpcmdec !
-            audioconvert !
-            audioscale ! capsaggreg.sink%d
+        self.makeSubelem('capsselect')
 
-          capsselect.src%d !
-            dtsdec !
-            audioconvert !
-            audioscale ! capsaggreg.sink%d
-        )
-        """)
-        audioElem = self.get_by_name('audiosink')
-
-        # Can gstparse set property values with spaces?
-        audioElem.set_property('device',
-            'spdif:{AES0 0x0 AES1 0x82 AES2 0x0 AES3 0x2 CARD %(spdifCard)s}' %
-            options)
+        # The AC3 decoding pipeline. The capsfilter elements are
+        # necessary to work around a bug in (apparently) alsasink.
+        self.makeSubelem('ac3iec958', raw_audio=True)
+        self.makeSubelem('capsfilter', 'capsfilter1',
+                         caps=gst.Caps('audio/x-raw-int,'
+                                       'endianness = (int) 4321,'
+                                       'signed = (boolean) true,'
+                                       'width = (int) 16,'
+                                       'depth = (int) 16,'
+                                       'rate = (int) 48000,'
+                                       'channels = (int) 2'))
+        self.makeSubelem('audioconvert', 'audioconvert1')
+        self.makeSubelem('capsfilter', 'capsfilter2',
+                         caps=gst.Caps('audio/x-raw-int,'
+                                       'endianness = (int) 1234,'
+                                       'signed = (boolean) true,'
+                                       'width = (int) 16,'
+                                       'depth = (int) 16,'
+                                       'rate = (int) 48000,'
+                                       'channels = (int) 2'))
         
+        # The LPCM decoding pipeline.
+        self.makeSubelem('dvdlpcmdec')
+        self.makeSubelem('audioconvert', 'audioconvert2')
+        self.makeSubelem('audioresample', 'audioresample2')
+        
+        self.makeSubelem('capsaggreg')
+
+        # Apparently, this queue can get confused and accept too much
+        # material if limited only by time. Fortunately, we can also
+        # limit it to 1s material by size.
+        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=192000,
+                         max_size_time=gst.SECOND)
+        self.makeSubelem(options['audioSink'], 'audiosink',
+                         device='spdif:{AES0 0x0 AES1 0x82 AES2 0x0 '
+                         'AES3 0x2 CARD %(spdifCard)s}' % options)
+
+        self.linkPads('capsselect', 'src%d', 'ac3iec958', 'sink')
+        self.link('ac3iec958', 'capsfilter1')
+        self.link('capsfilter1', 'audioconvert1')
+        self.link('audioconvert1', 'capsfilter2')
+        self.linkPads('capsfilter2', 'src', 'capsaggreg', 'sink%d')
+
+        self.linkPads('capsselect', 'src%d', 'dvdlpcmdec', 'sink')
+        self.link('dvdlpcmdec', 'audioconvert2')
+        self.link('audioconvert2', 'audioresample2')
+        self.linkPads('audioresample2', 'src', 'capsaggreg', 'sink%d')
+
+        self.link('capsaggreg', 'queue')
+        self.link('queue', 'audiosink')
+
         self.ghostify('capsselect', 'sink')
 
-        self.clock = audioElem.get_clock()
 
-    def getClock(self):
-        return self.clock
-
-
-class SoftwareVideo(ParsedBin):
+class SoftwareVideo(Bin):
     """A video playback element that decodes MPEG2 video using a
     software decoder."""
 
     __slots__ = ()
 
     def __init__(self, options, name='videodec'):
-        super(SoftwareVideo, self).__init__(name, """
-        (
-          mpeg2dec name=mpeg2dec !
-            {
-              seamless-queue !
-                .video seamless-mpeg2subt name=mpeg2subt !
-                ffmpegcolorspace !
-                videoscale !
-                seamless-queue max-size-buffers=3 name=videoqueue !
-                { %(videoSink)s name=videosink }
+        super(SoftwareVideo, self).__init__(name)
 
-              seamless-queue name=subtitle ! mpeg2subt.subtitle
-            }
-        )
-        """ % options)
+        self.makeSubelem('mpeg2dec')
+        self.makeSubelem('queue', 'video-queue',
+                         max_size_buffers=0, max_size_bytes=0,
+                         max_size_time=gst.SECOND)
+
+        # In order to guarantee quick interactive response, buffering
+        # between the subtitle decoder and the video sink should be as
+        # limited as possible.
+        self.makeSubelem('mpeg2subt')
+        self.makeSubelem('ffmpegcolorspace')
+        self.makeSubelem('videoscale')
+        self.makeSubelem('dvdaspect')
+
+        # A (usually) one-frame queue whose size is increased before
+        # flushing and reduced again short thereafter. See "flush
+        # handling" for details.
+        self.makeSubelem('queue', 'frame-queue',
+                         max_size_buffers=1, max_size_bytes=0,
+                         max_size_time=0)
+        self.makeParsedSubelem(options['videoSink'], 'videosink',
+                               force_aspect_ratio=True,
+                               pixel_aspect_ratio=options['pixelAspect'])
+
+        self.link('mpeg2dec', 'video-queue')
+        self.linkPads('video-queue', 'src', 'mpeg2subt', 'video')
+        self.link('mpeg2subt', 'ffmpegcolorspace')
+        self.link('ffmpegcolorspace', 'videoscale')
+        self.link('videoscale', 'dvdaspect')
+        self.link('dvdaspect', 'frame-queue')
+        self.link('frame-queue', 'videosink')
 
         self.ghostify('mpeg2dec', 'sink', 'video')
-        self.ghostify('subtitle', 'sink', 'subtitle')
+        self.ghostify('mpeg2subt', 'subtitle', 'subtitle')
+
+    #
+    # Flush handling
+    #
+
+    def prepareFlush(self):
+        """Prepare the video bin for a flush operation."""
+        # When entering a menu, it is often the case that highlights
+        # are changed by the DVD machine many times in a short
+        # progresion. Each one of these changes forces the subtitle
+        # decoder to produce a new frame. When the DVD enters the menu
+        # directly after a flush, these video frames can cause a
+        # pipeline deadlock because they often arrive before any audio
+        # has been sent, but the lack of audio means that the pipeline
+        # is still prerolling and cannot process more video.
+
+        # We increase the size of the frame queue to allow for enough
+        # frames to be queued that prerolling is possible and playback
+        # can continue.
+        self.get_by_name('frame-queue').set_property('max-size-buffers', 15)
+
+    def closeFlush(self):
+        """Prepare the video bin for running after a flush."""
+        # Reduce the size of the frame queue to one frame, to increase
+        # interactive responsiveness.
+        self.get_by_name('frame-queue').set_property('max-size-buffers', 1)
 
 
-class BackPlayer(ParsedBin):
+
+class BackPlayer(Bin):
     """The backend playback element that reads material from the DVD
     disk, demultiplexes it, and feeds to the front-end playback
-    elemens."""
+    elements."""
 
     __slots__ = ()
 
     def __init__(self, options, name='backplayer'):
-        super(BackPlayer, self).__init__(name, """
-        (
-          dvdblocksrc name=dvdblocksrc location=%(location)s !
-            seamless-dvddemux name=dvddemux
-        )
-        """ % options)
+        super(BackPlayer, self).__init__(name)
+
+        src = self.makeSubelem('dvdblocksrc', location=options['location'])
+        demux = self.makeSubelem('dvddemux')
+
+        self.link('dvdblocksrc', 'dvddemux')
 
         self.ghostify('dvddemux', 'current_video', 'video')
         self.ghostify('dvddemux', 'current_subpicture', 'subtitle')
@@ -186,16 +286,16 @@ class BackPlayer(ParsedBin):
         return self.get_by_name('dvdblocksrc')
 
 
-class Pipeline(gst.Thread):
+class Pipeline(gst.Pipeline):
     """The GStreamer pipeline used to play DVDs."""
 
     __slots__ = ('backPlayer',
-                 'audioSink', 
-                 'videoSink',
-                 'clock')
+                 'audioBin',
+                 'videoBin',
+                 'syncHandlers')
 
     def __init__(self, options, name="dvdplayer"):
-        gst.Thread.__init__(self, name)
+        super(Pipeline, self).__init__(name)
 
         # Build the pipeline.
 
@@ -204,32 +304,49 @@ class Pipeline(gst.Thread):
         self.add(self.backPlayer)
 
         # The video playback element.
-        self.videoSink = SoftwareVideo(options)
-        self.add(self.videoSink)
+        self.videoBin = SoftwareVideo(options)
+        self.add(self.videoBin)
 
         # The audio playback element.
         if options.spdifCard:
-            self.audioSink = SpdifAudio(options)
+            self.audioBin = SpdifAudio(options)
         else:
-            self.audioSink = SoftwareAudio(options)
-        self.add(self.audioSink)
+            self.audioBin = SoftwareAudio(options)
+        self.add(self.audioBin)
 
         # All together now.
-        self.backPlayer.link_pads('video', self.videoSink, 'video')
-        self.backPlayer.link_pads('subtitle', self.videoSink, 'subtitle')
-        self.backPlayer.link_pads('audio', self.audioSink, 'sink')
+        self.backPlayer.link_pads('video', self.videoBin, 'video')
+        self.backPlayer.link_pads('subtitle', self.videoBin, 'subtitle')
+        self.backPlayer.link_pads('audio', self.audioBin, 'sink')
 
-        # Set an appropriate clock for the pipeline.
-        if options.clockType == 'robust':
-            # Wrap the clock in a robust clock.
-            self.clock = wrapclock.wrap(self.audioSink.getClock())
-        elif options.clockType == 'audiosink':
-            self.clock = self.audioSink.getClock()
-        elif options.clockType == 'system':
-            self.clock = gst.system_clock_obtain()
-        else:
-            assert 0, 'Unexpected clock type'
-        self.use_clock(self.clock)
+        # A list of functions to synchronously handle bus messages.
+        self.syncHandlers = []
+
+        # Install a synchronous message handler to run the functions
+        # in self.syncHandlers.
+        self.get_bus().set_sync_handler(self.syncHandler)
+
+
+    #
+    # Bus Handling
+    #
+
+    def syncHandler(self, *args):
+        try:
+            for handler in self.syncHandlers:
+                ret = handler(*args)
+                if ret != None:
+                    return ret
+        except:
+            gst.warning('Handler raised exception')
+
+        return gst.BUS_PASS
+
+    def addSyncBusHandler(self, handler):
+        self.syncHandlers.append(handler)
+
+    def removeSyncBusHandler(self, handler):
+        self.syncHandlers.remove(handler)
 
 
     #
@@ -240,26 +357,19 @@ class Pipeline(gst.Thread):
         return self.backPlayer.getBlockSource()
 
     def getVideoSink(self):
-        return self.videoSink.get_by_name('videosink')
+        return self.videoBin.get_by_name('videosink')
 
 
     #
-    # Playback Control
+    # Flush handling
     #
 
-    def start(self):
-        self.set_state(gst.STATE_PLAYING)
+    def prepareFlush(self):
+        """Prepare the pipeline for a flush operation."""
+        self.videoBin.prepareFlush()
+        self.audioBin.prepareFlush()
 
-    def forceStop(self):
-        self.set_state(gst.STATE_NULL)
-
-    def waitForStop(self):
-        """Wait for the pipeline to actually stop. If waiting time is
-        too long, just force a stop."""
-        maxIter = 40
-        while maxIter > 0 and self.get_state() == gst.STATE_PLAYING:
-            time.sleep(0.1)
-            maxIter -= 1
-
-        self.forceStop()
-
+    def closeFlush(self):
+        """Prepare the pipeline for running after a flush."""
+        self.videoBin.closeFlush()
+        self.audioBin.closeFlush()

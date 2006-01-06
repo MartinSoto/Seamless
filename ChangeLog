@@ -1,3 +1,540 @@
+2006-01-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (Bin.makeParsedSubelem) 
+	(SoftwareAudio.__init__, SoftwareVideo.__init__): Interpret the
+	video and audiosink descriptions from the command line options as
+	parsable pipeline description, thus making it possible to set
+	element properties from the command line.
+
+2006-01-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (COMPARE_GAP)
+	(gst_mpeg2subt_update): Allow for an error gap when comparing
+	buffer and command block timestamps. Not doing that was causing
+	highlights not to be displayed on still frames in certain
+	situations.
+
+	(gst_buffer_copy): Send updated highlight frames with the same
+	timestamp of the last frame instead of 0. This way the timestamp
+	is guaranteed to lie in the current segment.
+
+2006-01-04  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/events.py (newsegment): Set the position to the same
+	value as the start time, as suggested by wtay.
+
+2006-01-03  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* README: Move contents to the webpage, and leave only a
+	reference here.
+
+2006-01-03  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* README: Updated.
+
+2006-01-02  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/player.py (DVDPlayer.pause, DVDPlayer.stop) 
+	(DVDPlayer.start): 
+	* src/player/pipeline.py (start, forceStop, waitForStop): 
+	* src/mainui.py (MainUserInterface.mainKeyPress): 
+	Implement a pause operation and make stop more robust.
+
+2006-01-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.resendSubpictureClut)
+	(Manager.flush): Erase code to resend the color lookup table after
+	every flush.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_flush_subtitle): Don't reset the color lookup table
+	when flushing.
+
+2006-01-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SoftwareVideo.__init__): 
+	Insert a dvdaspect element in the video pipeline.
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.setAspectRatio): Send video-aspect-set events when aspect
+	ratio is changed.
+
+	* src/player/events.py (audio): 
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_event_video):
+	Forward DVD events down the pipeline instead of simply unrefing
+	them.
+
+	* gst-plugins/seamless/seamlessinit.c (plugin_init): 
+	* gst-plugins/seamless/Makefile.am (libseamless_la_SOURCES): 
+	* gst-plugins/seamless/dvdaspect.c:
+	* gst-plugins/seamless/dvdaspect.h: 
+	New dvdaspect element, a filter that forces a certain aspect ratio
+	on the video frames it receives. The aspect ratio is controlled
+	using events.
+
+2006-01-01  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/videowidget.py (VideoWidget.presetAspectRatio): 
+	* src/player/player.py (DVDPlayer.getDVDInfo)
+	(DVDPlayer.aspectRatioChanged): 
+	* src/player/manager.py (Manager, Manager.setAspectRatio) 
+	(Manager.aspectRatioChanged): 
+	* src/mainui.py (MainUserInterface.__init__):
+	Killed the remains of old aspect ratio setting infrastructure.
+
+2005-12-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/seamless/seamlessinit.c (plugin_init): 
+	* gst-plugins/seamless/dvdblocksrc.c (plugin_init): 
+	* gst-plugins/seamless/Makefile.am: 
+	* gst-plugins/Makefile.am (SUBDIRS): 
+	* configure.ac: 
+	dvdblock plugin renamed to seamless, in order to put other
+	seamless specific elements in it. init function split to a
+	separate file.
+	
+	* configure.ac: Erased spurious reference to iec958 plugin, which
+	had been deleted.
+	
+2005-12-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.flush): Erase spurious audio
+	shutdown call.
+
+2005-12-30  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.playVobu, Manager.stillFrame, Manager.flush): Flush the
+	pipeline after timed still frames. This guarantees proper A/V sync
+	for the material following the still.
+
+2005-12-30  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (PushBackIterator, Manager.__slots__)
+	(Manager.__init__, Manager.vobuRead, Manager.collectCmds)
+	(Manager.runInteractive, Manager.flush): Implement a generic
+	iterator with push back functionality, and use it to simplify the
+	handling of collected commands. Now, instead of storing commands
+	in the pendingCmds attribute, they will be pushed back into the
+	stream. Restoring the CLUT after a flush will also be done this
+	way.
+
+2005-12-30  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/events.py (audioShutdown, audioRestart): 
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.vobuHeader, Manager.flush, Manager.shutdownAudio)
+	(Manager.restartAudio): Use the async fields in the
+	DSI NAV packet, together with the new "audio-shutdown"
+	and "audio-restart" DVD events to shutdown and restart the
+	audio pipeline as necessary. This fixes a lot of glitches with
+	still frames and DVD menus otherwise not having sound, that used
+	to hang the pipeline when prerolling after a flush.
+
+	* src/player/manager.py (Manager.vobuRead, Manager.vobuRead)
+	(Manager.vobuRead, Manager.vobuHeader, Manager.vobuHeader)
+	(Manager.vobuHeader): Move frequent debug messages to the "LOG"
+	level.
+
+	* src/dvdread/_dvdread.pyx (getFirstAudioOffset) 
+	(getFirstSubpictureOffset): New operations.
+
+2005-12-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.c
+	(dvdblocksrc_create, dvdblocksrc_do_seek): Fix debugging.
+
+	* gst-plugins/capspipe/capsselect.c (capsselect_event): 
+	Forward FLUSH events to all pads.
+
+	* gst-plugins/capspipe/capsaggreg.c (capsaggreg_event): 
+	Forward FLUSH events regardless of which pad they came from.
+
+2005-12-28  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/seamless.py (main): 
+	* src/player/player.py (DVDPlayer.getRegion, DVDPlayer.getRegion): 
+	* src/mainui.py (MainUserInterface.__init__): 
+	* src/machine/machine.py (VirtualMachine.setRegion) 
+	(VirtualMachine.getRegion): 
+	Make it possible to externally set the player's region. Add a
+	command line option for this purpose.
+
+2005-12-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SpdifAudio.__init__) 
+	(SoftwareAudio.__init__): Reenable support for LPCM audio.
+
+	* gst-plugins/capspipe/capspipeinit.c: 
+	* gst-plugins/capspipe/capsselect.c: 
+	* gst-plugins/capspipe/capsaggreg.h: 
+	* gst-plugins/capspipe/capsaggreg.c: 
+	* gst-plugins/Makefile.am (SUBDIRS): 
+	Port capspipe to GStreamer 0.10.
+
+2005-12-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.playVobu): Reset the highlight when changing domains.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_dvd_event): Completely flush the subtitles
+	when a reset-highlight event arrives.
+
+2005-12-27  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SpdifAudio.__init__): Limit the SP/DIF
+	audio queue by size, as a workaround for an apparent bug that
+	causes it, under certain conditions, to swallow unlimited material.
+
+2005-12-26  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/iec958: Erased. This plugin is now available from
+	gst-plugins-ugly.
+
+	* src/player/pipeline.py (SpdifAudio.__init__): Reenable direct
+	AC3 playback to external decoder.
+
+	* src/player/pipeline.py (MySink): Erase (had been introduced for
+	debugging.)
+
+	* src/player/pipeline.py: Clean up import statements.
+
+2005-12-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (Bin.prepareFlush, Bin.closeFlush) 
+	(SoftwareVideo.__init__, SoftwareVideo.prepareFlush) 
+	(SoftwareVideo.closeFlush, Pipeline.__slots__, Pipeline.__init__) 
+	(Pipeline.prepareFlush, Pipeline.closeFlush): Rename pipeline
+	audio and video components to audioBin and videoBin. Add
+	operations prepareFlush and closeFlush to be invoked before and
+	after a flush. In softwareVideo, they increse and shorten the
+	length of the frame-queue, to prevent pipeline deadlocks after
+	flushing.
+
+	* src/player/manager.py (Manager.__init__) 
+	(Manager.flushMsgHandler): Message handler renamed to
+	flushMsgHandler, documented and converted to use the
+	prepare/closeFlush operations in the pipeline.
+
+2005-12-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (GST_MPEG2SUBT_LOCK) 
+	(GST_MPEG2SUBT_UNLOCK): 
+	New macros for acquiring and realising the object's data lock.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_finalize, gst_mpeg2subt_chain_video) 
+	(gst_mpeg2subt_event_video, gst_mpeg2subt_update) 
+	(gst_mpeg2subt_update_still_frame, gst_mpeg2subt_chain_subtitle) 
+	(gst_mpeg2subt_event_subtitle, gst_mpeg2subt_flush_subtitle): 
+	Lock when entering any of the external extry points, and release
+	it temporarily for pushing to the pipeline. This should fix the
+	crashes caused by improper mutual exclusion while accesing the
+	internal data stuctures.
+
+2005-12-19  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h: 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_finalize, gst_mpeg2subt_update) 
+	(gst_mpeg2subt_chain_subtitle, gst_mpeg2subt_flush_subtitle): 
+	Add a lock to protect mpeg2subt's internal data structures from
+	concurrent access.
+
+2005-12-19  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__): Added vobuReadReturn
+	and flushing.
+
+	(Manager.__init__, Manager.vobuRead, Manager.busMsgReceived) 
+	(Manager.runInteractive, Manager.playVobu, Manager.cancelVobu) 
+	(Manager.resendSubpictureClut, Manager.flush) 
+	(Manager.eos): Implement flushing by seeking, as suggested by Wim
+	Taymans. The flush operation (running from the streaming thread)
+	posts a message to the bus that instructs the application thread
+	to do a flushing seek. The current implementation actually ignores
+	the seek position.
+	(Manager.stillFrame): Send an actual still frame event, so that
+	dvddemux can send an EOS down the audio pipeline. Otherwise the
+	pipeline blocks when an still frame directly follows a flush,
+	because it is not possible to preroll without audio.
+
+	* src/machine/machine.py (CellPlayer.playFromVobu): Return the
+	still frame command before pausing for a still frame.
+
+	* src/player/pipeline.py (SoftwareVideo.__init__): Add a
+	three-frame queue before the videosink. This queue helps
+	preventing deadlocks caused by still frame updates happening
+	before preroll.
+
+2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_getcaps) 
+	(gst_mpeg2subt_setcaps, gst_mpeg2subt_chain_video) 
+	(gst_mpeg2subt_event_video, gst_mpeg2subt_src_event) 
+	(gst_mpeg2subt_next_block, gst_draw_rle_line) 
+	(gst_mpeg2subt_merge_title, gst_mpeg2subt_update_still_frame) 
+	(gst_mpeg2subt_chain_subtitle, gst_mpeg2subt_event_subtitle) 
+	(gst_mpeg2subt_handle_dvd_event):
+	Make it compile with strict warnings. Check the return values of
+	gst_pad_push and gst_pad_push_event and pass them around as
+	necessary.
+
+	* gst-plugins/robustclock:
+	* src/wrapclock:
+	* src/Makefile.am (SUBDIRS): 
+	* gst-plugins/Makefile.am (SUBDIRS): 
+	Erased. Not necessary anymore with GStreamer 0.10.
+
+	* src/dvdread/Makefile.am (AM_CFLAGS): 
+	* gst-plugins/mpeg2sub/Makefile.am (libgstmpeg2subt_la_CFLAGS): 
+	* gst-plugins/iec958/Makefile.am (libiec958_la_CFLAGS): 
+	* gst-plugins/dvdblock/Makefile.am (libdvdblock_la_CFLAGS): 
+	* gst-plugins/capspipe/Makefile.am (libcapspipe_la_CFLAGS): 
+	* gst-plugins/alsaspdif/Makefile.am (libalsaspdif_la_CFLAGS): 
+	Use AM_CFLAGS properly all around.
+
+	* configure.ac (CFLAGS, AM_CFLAGS): Define properly.
+
+2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SoftwareAudio.__init__) 
+	(SoftwareVideo.__init__): Guarantee that the queues can hold a
+	complete second of material.
+
+2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.h: 
+	* gst-plugins/dvdblock/dvdblocksrc.c: 
+	(dvdblocksrc_class_init, dvdblocksrc_init) 
+	(dvdblocksrc_set_property, dvdblocksrc_get_property) 
+	(dvdblocksrc_create): 
+	Re-add the cancel-vobu property for canceling the playback of the
+	current VOBU. This time, it is thread safe.
+
+2005-12-18  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.c: 
+	(dvdblocksrc_class_init, dvdblocksrc_init) 
+	(dvdblocksrc_is_seekable, dvdblocksrc_do_seek): Add basic seeking
+	functionality by firing a signal when a seek is requested. The
+	success/failure status of the seek operation cannot still be
+	returned from the signal, since a custom marshaler is needed for
+	that purpose.
+
+2005-12-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SoftwareVideo.__init__): Increase video
+	queue size.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SoftwareVideo.__init__): Remove the
+	subtitle queue, since subtitle playback stops after the first
+	subtitle when it is there.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SoftwareVideo.__init__): 
+	Move queueing back in the video pipeline, so that there's no
+	buffering between subtitle decoding and video playback. This is
+	necessary for instant highlight changes.
+	* src/player/events.py (createCustom, highlight): 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_event_video) 
+	(gst_mpeg2subt_event_subtitle):
+	Send highlight changes as out-of-band. Must still be perfected
+	because certain highlight changes are synchronous.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.vobuRead): Add a loop that waits
+	until a command sets a new VOBU, instead of just returning when no
+	VOBU is set. Previously this job was done by the dvdblocksrc
+	element. This change makes still frames work again.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_getcaps): Rename getcaps_video to getcaps and adapt
+	it to 0.10.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SoftwareVideo.__init__) 
+	(Pipeline.__init__): Add a subtitle decoder to the pipeline.
+
+2005-12-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_dvd_event): Adapt to 0.10.
+	(gst_mpeg2subt_event_subtitle, gst_mpeg2subt_event_video): Don't
+	handle newsegment events in a special way.
+
+2005-12-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c: Use GST_BOILERPLATE.
+	(gst_mpeg2subt_init, gst_mpeg2subt_chain_video) 
+	(gst_mpeg2subt_event_video): Split handle_video into a chain and
+	an event function for the video pad.
+	(gst_mpeg2subt_setcaps, gst_mpeg2subt_init):
+	Rename from gst_mpeg2subt_link_video and
+	adapt to 0.10.
+	(gst_mpeg2subt_init, gst_mpeg2subt_chain_subtitle) 
+	(gst_mpeg2subt_event_subtitle): Split handle_subtitle into a chain
+	and an event function for the subtitle pad.
+	(gst_mpeg2subt_loop): Erase.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/loadplugins.py: Reenable loadplugins.py.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/events.py (flush_start, flush_stop): Define instead
+	of the old flush.
+
+	* src/player/manager.py (Manager.cancelVobu): Disable for the
+	moment since current dvdblock is not able to cancel VOBU
+	playback.
+	(Manager.cancelVobu): Send flush start and stop events.
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.setOverlay, VideoWidget.prepareWindowCb): Store
+	pipeline and use it to remove the handler after it is used.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (Pipeline.syncHandler): Make generic
+	handler robust against exceptions.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/Makefile.am: 
+	* gst-plugins/a52dec:
+	* configure.ac:
+	Erase fork of A52 plugin. Clean up make stuff accordingly.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+ 
+	* src/seamless.py (main): 
+	--pixel-aspect now takes a fraction in GStreamer format as value.
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__init__, VideoWidget.setOverlay) 
+	(VideoWidget.getOverlay, VideoWidget.presetAspectRatio) 
+	(resizeVideo, desiredSizeChanged, VideoWidget.prepareWindowCb) 
+	(VideoWidget.sizeAllocateCb, VideoWidget.destroyCb) 
+	(VideoWidget.destroyCb, VideoWidget.backgroundRealizeCb) 
+	(VideoWidget.videoEventFilterCb): 
+	* src/seamless.py (main): 
+	* src/player/pipeline.py (SoftwareVideo.__init__): 
+	* src/mainui.py (MainUserInterface.__init__) 
+	(MainUserInterface.videoReady): 
+	Revamp VideoWidget for Gstreamer 0.10: - Get rid of aspect ratio
+	handling, since the video sink does it now. - Set window id in
+	video sink using synchronous bus message. - Rename
+	set/getVideoSink to set/getOverlay. - Call the "ready" signal from
+	realize.
+
+2005-12-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (Pipeline.syncHandler): Fix invocation of
+	registered handlers.
+
+2005-12-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/queue, gst-plugins/mpegstream: Delete old forks of
+	GStreamer elements. Fixes 0.10 are now in GStreamer CVS.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.sendEvent): Get rid of hack to keep events
+	referenced. Alredy fixed in gst-python.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (Pipeline.__slots__, Pipeline.__init__) 
+	(Pipeline.syncHandler, Pipeline.addSyncBusHandler) 
+	(Pipeline.removeSyncBusHandler): Add a simple system to register
+	synchronous bus message handlers with the pipeline.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py: Adapt pipeline.py to the extent
+	necessary to achieve basic playback. File still under
+	construction.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__init__, Manager.sendEvent): Add
+	a hack to keep events referenced until gst_pad_push_event in
+	gst-python gets fixed.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (interactiveOp, synchronized): Set the
+	wrapper names to be the same of the wrapped functions.
+	(Manager.__init__, Manager.sendEvent, Manager.vobuRead) 
+	(Manager.vobuHeader): Port to GStreamer 0.10. Get rid of immediate
+	and queued events, since 0.10 don't require this.
+	(Manager.vobuHeader): Instead of sending nav events, keep
+	current segment information and send appropriate newsegment
+	events.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/loadplugins.py: Deactivate plugin manual loading (not
+	necessary in 0.10)
+	* src/videowidget.py (VideoWidget.videoEventFilter): Don't
+	register the VideoWidget as GType.
+	* src/seamless.py: Require GStreamer 0.10.
+	(main): Don't set the scheduler anymore. For the moment, don't
+	create the graphical interface.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/events.py (createCustom, audio, eos, filler, flush) 
+	(newsegment, highlight, nav, stillFrame, subpictureClut) 
+	(subpicture, subpictureHide, subpictureShow): Update to GStreamer
+	0.10.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/debug.py (enterLeave.wrapper): New debug function to log
+	arbitrary procedure invocations.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.c: Use the right base class in
+	BOILERPLATE macro.
+	(dvdblocksrc_create): Initialize buf to NULL.
+
+2005-12-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* configure.ac (plugindir): Bump GStreamer version requirement to
+	0.10.
+
+2005-11-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.h: Fix parent class.
+	* gst-plugins/dvdblock/dvdblocksrc.c (dvdblocksrc_class_init):
+	Set set un get_property before initialiting properties.
+	* gst-plugins/dvdblock/Makefile.am (libdvdblock_la_CFLAGS) 
+	(libdvdblock_la_LIBADD): Add GStreamer base library flags.
+	* configure.ac: Add check for GStreamer base libs.
+
+2005-11-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/dvdblock/dvdblocksrc.c: Port to 0.9 by deriving from
+	GstPushSrc (not yet tested).
+	* gst-plugins/Makefile.am (#SUBDIRS): Deactivate compilation of
+	most plugins for gradual porting.
+	* configure.ac: Bump GStreamer dependency to 0.9, and fix
+	GStreamer check.
+
 2005-06-23  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/sig.py: Add copyright notice.

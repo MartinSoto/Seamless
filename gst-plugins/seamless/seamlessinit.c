@@ -1,7 +1,8 @@
-/* GStreamer
- * Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+/* Seamless
+ * Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
  *
- * capspipeinit.c: Plugin initialization for the capsselect/aggreg system.
+ * seamlessinit.c: Initialization for the Seamless specific
+ * GStreamer plugin.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,20 +24,19 @@
 #include "config.h"
 #endif
 
-#include "capsselect.h"
-#include "capsaggreg.h"
+#include "dvdaspect.h"
+#include "dvdblocksrc.h"
 
 
 static gboolean
-plugin_init (GstPlugin * plugin)
+plugin_init (GstPlugin *plugin)
 {
-  if (!gst_element_register (plugin, "capsselect", GST_RANK_NONE,
-          GST_TYPE_CAPSSELECT)) {
+  if (!gst_element_register (plugin, "dvdaspect", GST_RANK_NONE,
+          GST_TYPE_DVDASPECT)) {
     return FALSE;
   }
-
-  if (!gst_element_register (plugin, "capsaggreg", GST_RANK_NONE,
-          GST_TYPE_CAPSAGGREG)) {
+  if (!gst_element_register (plugin, "dvdblocksrc", GST_RANK_NONE,
+          GST_TYPE_DVDBLOCKSRC)) {
     return FALSE;
   }
 
@@ -44,8 +44,13 @@ plugin_init (GstPlugin * plugin)
 }
 
 
-GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
-    GST_VERSION_MINOR,
-    "capspipe",
-    "Route buffers based on capabilities",
-    plugin_init, VERSION, "LGPL", PACKAGE, "http://seamless.sourceforge.net")
+GST_PLUGIN_DEFINE (
+  GST_VERSION_MAJOR,
+  GST_VERSION_MINOR,
+  "seamless",
+  "Special elements for the Seamless DVD player",
+  plugin_init,
+  VERSION,
+  "GPL",
+  PACKAGE,
+  "http://seamless.sourceforge.net");

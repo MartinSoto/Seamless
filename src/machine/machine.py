@@ -998,6 +998,31 @@ class VirtualMachine(object):
         return self.systemRegisters[regNr]
 
 
+    #
+    # Setup for Externally Controlled Registers
+    #
+
+    def setRegion(self, region):
+        """Set the machine's region."""
+        assert 0 <= region <= 8
+        if region == 0:
+            self.regionCode = 0
+        else:
+            self.regionCode = 1 << (region - 1)
+
+    def getRegion(self):
+        """Return the machine's region."""
+        if self.regionCode == 0:
+            return 0
+        else:
+            region = 1
+            code = self.regionCode
+            while not code & 0x01:
+                region += 1
+                code >>= 1
+            return region
+
+
 class DiscPlayer(object):
     __slots__ = ('machine',
                  'callOp',
@@ -1579,6 +1604,8 @@ class CellPlayer(object):
 
         if self.cell.stillTime > 0:
             # We have a still frame.
+
+            yield cmds.StillFrame()
 
             if self.cell.stillTime == 0xff:
                 # Unlimited wait time. Loop "infinitely" until a

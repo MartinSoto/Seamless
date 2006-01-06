@@ -1,52 +1,88 @@
 -*- Text -*-
 
-- Support angles.
+Numbers in () are priorities. Lower values represent higher
+priorities.
 
-- Some menu subpictures get displayed too early (Matrix PAL). Why?
 
-- Implement support for other sound types.
+User Interface
+--------------
 
-- Implement the cell time as still time thing. Monsters Inc seems to
-  use that in the warnings before the film.
+- (1) Add a menubar and a toolbar for normal operation.
 
-- Honor prohibited operations when it makes sense, or ignore them
-  smartly.
+- (1) Autodetect DVD drives when possible, and start playback
+  automatically when a disc is inserted.
 
-- Trap the stop (^Z) signal and stop the clock while the program is
+- (1) Use default audio and video sinks defined in the Gnome multimedia
+  systems selector.
+
+- (2) Add a status display (current title/chaper, playing time, etc.)
+
+
+Player Operation
+----------------
+
+- (1) Implement menu operation using the mouse pointer.
+
+- (3) Revise the implementation of the chapter backward operation, to
+  make it behave like a typical player, i.e., backward goes to the
+  beginning of the current chapter, except when closely following
+  another backward.
+
+- (3) Revise the chapter forward operation such that it jumps to the
+  end of the current chapter instead of to the beginning of the next
+  one. That way the final code gets executed anyway.
+
+- (2) Trap the stop (^Z) signal and stop the clock while the program is
   suspended.
 
-- Check for DVD I/O errors when starting and retry if necessary.
+- (2) Implement free changing of subtitles
 
-- Implement free changing of sutitles
+- (4) Implement backwards and fast playing.
 
-- Add __richcmp__ to dvdread wrappers as necessary.
+- (4) Implement auto NTSC/PAL mode.
 
-- Implement backwards playing.
+- (4) Implement exact seeking using the jump fields in nav packets.
 
-- Implement proper VOBU jumping, using the jump fields in nav packets.
 
-- Handle button nav packets properly with respect to time.
+Robustness
+----------
 
-- Create a Pyrex wrapper for lirc.
+- (1) Implement timeout when pipeline doesn't go to PLAY.
 
-- Implement auto NTSC/PAL mode.
+- (1) Add exception and error handling to the pipeline module.
 
-- LIRC component fails miserably when no LIRC kernel modules are
+
+DVD (Mis)Features
+-----------------
+
+- (3) Implement highlights when selecting buttons
+
+- (2) Handle button nav packets properly with respect to time.
+
+  - Some menu subpictures get displayed too early.
+
+- (1) Implement the cell time as still time thing.
+
+- (2) Honor prohibited operations when it makes sense, or ignore them
+  smartly.
+
+- (4) Implement support for non-seamless angles (AFAIK, I have no DVD
+  using them.)
+
+- (4) Implement support for DTS.
+
+
+Internals
+---------
+
+- (5) Add __richcmp__ to dvdread wrappers as necessary.
+
+
+Remote
+------
+
+- (5) Create a Pyrex wrapper for lirc.
+
+- (5) LIRC component fails miserably when no LIRC kernel modules are
   available.
-
-- Correct improper highlight handling in DVDs with letterboxed +
-  widescreen support.
-
-
-Particular DVDs
----------------
-
-- The Others: Main menu doesn't show the highlight.
-
-- Lola rennt: No highlight in some menus, e.g., Extras.
-
-- Lord of the Rings, The Two Towers: No character voices (only
-  background sounds and music) when playing with the a52dec
-  element. Apparently it cannot handle Dolby Digital EX sound
-  properly. This DVD works fine with the external decoder.
 

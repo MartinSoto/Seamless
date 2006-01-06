@@ -32,7 +32,7 @@ plugindir="\$(pkglibdir)/gst-plugins"
 AC_SUBST(plugindir)
 
 dnl Required versions of dependencies
-AC_SUBST(GSTREAMER_REQ, 0.8.0)
+AC_SUBST(GST_REQ, 0.9.7)
 AC_SUBST(GLIB_REQ, 2.0.0)
 AC_SUBST(PYGTK_REQ, 2.4.0)
 
@@ -42,15 +42,10 @@ PKG_CHECK_MODULES(GLIB, glib-2.0 gobject-2.0 gthread-2.0 gmodule-2.0, ,
 AC_SUBST(GLIB_LIBS)
 AC_SUBST(GLIB_CFLAGS)
 
-dnl check for gstreamer
-GST_MAJORMINOR=0.8
-PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GSTREAMER_REQ,
-  HAVE_GSTREAMER=yes, HAVE_GSTREAMER=no)
-if test "x$HAVE_GSTREAMER" = "xno"; then
-  GST_MAJORMINOR="0.7"
-  PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GSTREAMER_REQ, ,
-  AC_MSG_ERROR(Gstreamer >= $GSTREAMER_REQ was not found))
-fi
+dnl Check for GStreamer
+GST_MAJORMINOR=0.10
+AC_SUBST(GST_MAJORMINOR)
+PKG_CHECK_MODULES(GST, gstreamer-$GST_MAJORMINOR >= $GST_REQ)
 AC_SUBST(GST_CFLAGS)
 AC_SUBST(GST_LIBS)
 
@@ -58,20 +53,16 @@ AC_SUBST(GST_VERSION_MAJOR)
 AC_SUBST(GST_VERSION_MINOR)
 AC_SUBST(GST_MAJORMINOR)
 
-dnl check for GStreamer helper libs
-PKG_CHECK_MODULES(GSTLIBS, gstreamer-interfaces-$GST_MAJORMINOR >= $GSTREAMER_REQ, ,
-  AC_MSG_ERROR(Gstreamer Interfaces or Encoder Profiles >= $GSTREAMER_REQ was not found))
-OLD_CPPFLAGS=$CPPFLAGS
-CPPFLAGS="$CPPFLAGS $GSTLIBS_CFLAGS"
-AC_CHECK_HEADERS([gst/audio/audioclock.h], ,
-  AC_MSG_ERROR(Required interfaces not found - please install these))
-CPPFLAGS=$OLD_CPPFLAGS
-AC_SUBST(GSTLIBS_LIBS)
-AC_SUBST(GSTLIBS_CFLAGS)
+dnl Check for gstreamer-base; uninstalled is selected preferentially
+PKG_CHECK_MODULES(GST_BASE, gstreamer-base-$GST_MAJORMINOR >= $GST_REQ,
+  HAVE_GST_BASE="yes", HAVE_GST_BASE="no")
 
-AC_SUBST(GST_VERSION_MAJOR)
-AC_SUBST(GST_VERSION_MINOR)
-AC_SUBST(GST_MAJORMINOR)
+if test "x$HAVE_GST_BASE" = "xno"; then
+  AC_MSG_ERROR(no GStreamer Base Libs found)
+fi
+
+AC_SUBST(GST_BASE_LIBS)
+AC_SUBST(GST_BASE_CFLAGS)
 
 dnl Check for Python
 AM_PATH_PYTHON
@@ -116,39 +107,29 @@ AC_SUBST(ALSA_CFLAGS)
 AC_SUBST(ALSA_LIBS)
 AM_CONDITIONAL(HAVE_ALSA, test "x$HAVE_ALSA" = "xyes")
 
-dnl Check for liba52
-AC_CHECK_A52DEC(HAVE_A52DEC="yes", HAVE_A52DEC="no")
-AC_SUBST(HAVE_A52DEC)
-AC_SUBST(A52DEC_CFLAGS)
-AC_SUBST(A52DEC_LIBS)
-AM_CONDITIONAL(HAVE_A52DEC, test "x$HAVE_A52DEC" = "xyes")
-
 dnl Check for Pyrex
 AC_PATH_PROG(PYREXC, pyrexc, NOT_FOUND)
 AC_SUBST(PYREXC)
 
-dnl Be clean and use pure Gtk+-2.0
-EXTRA_CFLAGS="-Wall -Werror -DGTK_DISABLE_DEPRECATED=1 -DG_DISABLE_DEPRECATED=1 -DGDK_DISABLE_DEPRECATED=1 -DGDK_PIXBUF_DISABLE_DEPRECATED=1 -DGNOME_DISABLE_DEPRECATED=1 -DGST_DISABLE_DEPRECATED=1"
-AC_SUBST(EXTRA_CFLAGS)
+CFLAGS="-g -O2"
+AC_SUBST(CFLAGS)
+
+dnl Make warnings into errors. Use latest glib and GStreamer API.
+AM_CFLAGS="-Wall -Werror -DG_DISABLE_DEPRECATED=1 -DGST_DISABLE_DEPRECATED=1"
+AC_SUBST([AM_CFLAGS])
 
 AC_OUTPUT([
   Makefile
   config/Makefile
   gst-plugins/Makefile
-  gst-plugins/a52dec/Makefile
   gst-plugins/alsaspdif/Makefile
   gst-plugins/capspipe/Makefile
-  gst-plugins/dvdblock/Makefile
-  gst-plugins/iec958/Makefile
+  gst-plugins/seamless/Makefile
   gst-plugins/mpeg2sub/Makefile
-  gst-plugins/mpegstream/Makefile
-  gst-plugins/queue/Makefile
-  gst-plugins/robustclock/Makefile
   src/Makefile
   src/dvdread/Makefile
   src/machine/Makefile
   src/player/Makefile
-  src/wrapclock/Makefile
 ])
 
 echo

@@ -43,6 +43,8 @@ while '--help' in sys.argv:
     sys.argv.remove('--help')
     helpOpts = ['--help']
 
+import pygst
+pygst.require('0.10')
 import gst
 
 sys.argv.extend(helpOpts)
@@ -93,6 +95,27 @@ def main():
     optParser.add_option("--lirc", dest="lirc",
                          action="store_true",
                          help="enable lirc remote control support")
+    optParser.add_option("--region", dest="region",
+                         metavar="REGION",
+                         help="Set player's region to REGION. Possible "
+                         "regions are: "
+                         "0: Region free (not accepted by some DVDs); "
+                         "1: U.S., Canada, U.S. Territories; "
+                         "2: Japan, Europe, South Africa, and Middle "
+                         "East (including Egypt); "
+                         "3: Southeast Asia and East Asia (including "
+                         "Hong Kong); "
+                         "4: Australia, New Zealand, Pacific Islands, "
+                         "Central America, Mexico, South America, "
+                         "and the Caribbean; "
+                         "5: Eastern Europe (Former Soviet Union), "
+                         "Indian subcontinent, Africa, North Korea, "
+                         "and Mongolia; "
+                         "6: China; "
+                         "7: Reserved; "
+                         "8: Special international venues (airplanes, "
+                         "cruise ships, etc.)",
+                         default=0)
     optParser.add_option("--audio-sink", dest="audioSink",
                          metavar="SINK",
                          help="audio sink is SINK",
@@ -113,35 +136,13 @@ def main():
                          default="xvimagesink")
     optParser.add_option("--pixel-aspect", dest="pixelAspect",
                          metavar="ASPECT",
-                         help="set pixel aspect ratio to ASPECT (default 1.0)",
-                         default="1.0")    
-    optParser.add_option("--clock", dest="clockType",
-                         metavar="TYPE",
-                         help="'robust' to use the special robust clock"
-                         " (default), 'audiosink' to use the audio sink"
-                         " clock or 'system' to use the system clock ",
-                         default="robust",
-                         choices = ('robust', 'audiosink', 'system'))
+                         help="set pixel aspect ratio to ASPECT (default 1/1)",
+                         default="1/1")    
     (options, args) = optParser.parse_args()
     options = DictOptions(options)
 
     if args != []:
         optParser.error("invalid argument(s): %s" % string.join(args, ' '))
-
-    # Evaluate the pixel aspect ratio.
-    try:
-        options.pixelAspect = eval(options.pixelAspect, {}, {})
-    except:
-        optParser.error("invalid expression '%s'" % options.pixelAspect)
-    if options.pixelAspect < 1.0 or options.pixelAspect > 10.0:
-        optParser.error("value %0.3f out of range for pixel aspect ratio" %
-                        options.pixelAspect)
-
-    # Use the fair scheduler.
-    if gst.scheduler_factory_find('fairpth'):
-        gst.scheduler_factory_set_default_name('fairpth')
-    else:
-        gst.scheduler_factory_set_default_name('fairgthread')
 
     # Create the main objects.
     playerObj = player.DVDPlayer(options)

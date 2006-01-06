@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -26,6 +26,13 @@ import gst.interfaces
 
 
 class VideoWidget(gtk.EventBox):
+    __slots__ = ('background',
+                 'videoWin',
+                 'overlay',
+                 'pipeline',
+                 'cursorTimeout'
+                 'invisibleCursor')
+
     __gsignals__ = {
         'ready' : (gobject.SIGNAL_RUN_LAST,
                    gobject.TYPE_NONE,
@@ -53,68 +60,34 @@ class VideoWidget(gtk.EventBox):
         self.background.connect('realize', self.backgroundRealizeCb)
 
         self.videoWin = None
-        self.videoWinExposed = False
 
-        self.imageSink = None
-
-        self.pixelAspect = 1.0
-        self.desiredAspect = 4.0 / 3
-        self.presetAspect = None
+        self.overlay = None
 
         self.cursorTimeout = None
         self.invisibleCursor = None
 
 
-    def setImageSink(self, imageSink):
-        assert isinstance(imageSink, gst.interfaces.XOverlay)
-        self.imageSink = imageSink
-        self.imageSink.connect('desired-size-changed',
-                               self.desiredSizeChanged)
+    def setOverlay(self, overlay):
+        assert isinstance(overlay, gst.interfaces.XOverlay)
+        self.overlay = overlay
 
-    def getImageSink(self):
-        return self.imageSink
+        # Find the pipeline object containing the image sink. It must
+        # support installing synchronous message handlers, but we
+        # don't check for it.
+        self.pipeline = overlay
+        while not isinstance(self.pipeline, gst.Pipeline):
+            self.pipeline = self.pipeline.get_parent()
 
-    def setPixelAspect(self, pixelAspect):
-        self.pixelAspect = pixelAspect
+        # Install a handler for the prepare-xwindow-id message.
+        self.pipeline.addSyncBusHandler(self.prepareWindowCb)
 
-    def presetAspectRatio(self, presetAspect):
-        """Preset an aspect ratio to use from the next aspect ratio
-        change on.
-
-        The preset value will supersede any values set by the stream,
-        but will be activated only when the stream changes aspect
-        ratios. Passing a `None` value will deactivate the preset."""
-        self.presetAspect = presetAspect
+    def getOverlay(self):
+        return self.overlay
 
 
     #
     # Internal Operations
     #
-
-    def resizeVideo(self):
-        if self.window == None:
-            return
-
-        allocation = self.get_allocation()
-        widgetAspect = float(allocation.width) / allocation.height
-
-        desiredAspect = self.desiredAspect / self.pixelAspect
-
-        if widgetAspect >= desiredAspect:
-            width = allocation.height * desiredAspect
-            height = allocation.height
-            x = (allocation.width - width) / 2
-            y = 0
-        else:
-            width = allocation.width
-            height = allocation.width / desiredAspect
-            x = 0
-            y = (allocation.height - height) / 2
-
-        if self.videoWin:
-            self.xlock.acquire()
-            self.videoWin.move_resize(int(x), int(y), int(width), int(height))
-            self.xlock.release()
 
     def getInvisibleCursor(self):
         if self.invisibleCursor:
@@ -129,25 +102,34 @@ class VideoWidget(gtk.EventBox):
         self.invisibleCursor = gtk.gdk.Cursor(display, pixbuf, 0, 0);
         return self.invisibleCursor
 
-
-    #
-    # Signal Handlers
-    #
-
-    def desiredSizeChanged(self, imageSink, width, height):
-        if self.presetAspect:
-            self.desiredAspect = self.presetAspect
-        else:
-            self.desiredAspect = float(width) / height
-        self.resizeVideo()
+    def hidePointer(self):
+        self.window.set_cursor(self.getInvisibleCursor())
+        self.cursorTimeout = None
+        return False
 
 
     #
     # Callbacks
     #
 
+    def prepareWindowCb(self, bus, message):
+        if not message.structure.has_name('prepare-xwindow-id'):
+            return None
+
+        self.overlay.set_xwindow_id(self.videoWin.xid)
+
+        # Remove the callback from the pipeline.
+        self.pipeline.removeSyncBusHandler(self.prepareWindowCb)
+
+        return gst.BUS_DROP
+
     def sizeAllocateCb(self, widget, allocation):
-        self.resizeVideo()
+        if not self.videoWin:
+            return
+        
+        self.xlock.acquire()
+        self.videoWin.move_resize(0, 0, allocation.width, allocation.height)
+        self.xlock.release()
 
     def motionCb(self, widget, event):
         if self.cursorTimeout == None:
@@ -156,51 +138,40 @@ class VideoWidget(gtk.EventBox):
             gobject.source_remove(self.cursorTimeout)
         self.cursorTimeout = gobject.timeout_add(5000, self.hidePointer)
 
-    def hidePointer(self):
-        self.window.set_cursor(self.getInvisibleCursor())
-        self.cursorTimeout = None
-        return False
-
     def destroyCb(self, da):
-        self.imageSink.set_xwindow_id(0L)
+        self.overlay.set_xwindow_id(0L)
 
     def backgroundRealizeCb(self, widget):
         # Create the video window.
         self.videoWin = gtk.gdk.Window(
             self.background.window,
-            1, 1,
+            self.allocation.width, self.allocation.height,
             gtk.gdk.WINDOW_CHILD,
             gtk.gdk.EXPOSURE_MASK,
             gtk.gdk.INPUT_OUTPUT,
             "",
             0, 0)
-        self.videoWin.add_filter(self.videoEventFilter)
+
+        # Set a filter to trap expose events in the new window.
+        self.videoWin.add_filter(self.videoEventFilterCb)
 
         self.videoWin.show()
 
-    def videoEventFilter(self, event):
+        # Hide the pointer now.
+        self.hidePointer()
+
+        # We are ready to display video. The 'ready' signal could
+        # actually set up the image sink.
+        self.emit('ready')
+
+    def videoEventFilterCb(self, event):
         # FIXME: Check for expose event here. Cannot be done now
         # because pygtk seems to have a bug and only reports "NOTHING"
         # events.
         self.xlock.acquire()
 
-        if not self.videoWinExposed:
-            # We are ready to display video. The 'ready' signal could
-            # actually set up the image sink.
-            self.emit('ready')
-
-            if self.videoWin:
-                self.imageSink.set_xwindow_id(self.videoWin.xid)
-                self.videoWinExposed = True
-
-            # Hide the pointer now.
-            self.hidePointer()
-
-        self.imageSink.expose()
+        self.overlay.expose()
 
         self.xlock.release()
 
         return gtk.gdk.FILTER_CONTINUE
-
-
-gobject.type_register(VideoWidget)

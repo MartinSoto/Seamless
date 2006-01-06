@@ -63,12 +63,9 @@ class MainUserInterface(object):
         self.video.connect('ready', self.videoReady)
         self.video.connect('button-press-event', self.videoButtonPress)
 
-        self.video.setPixelAspect(options.pixelAspect)
-
-        # Preset the aspect ratio when the player changes it.
-        self.player.aspectRatioChanged.connect(self.video.\
-                                               presetAspectRatio,
-                                               passInstance=False)
+        # FIXME: If the video sink doesn't support XOverlay, we have a
+        # problem.
+        self.video.setOverlay(self.player.getVideoSink())
 
         # Give the window a decent minimum size.
         self.window.set_size_request(480, 360)
@@ -79,9 +76,12 @@ class MainUserInterface(object):
         self.window.set_default_size(int(rootWidth * 0.75),
                                      int(rootHeight * 0.75))
 
-        # Set the proper full screen mode.
+        # Set the full screen mode.
         self.fullScreen = self.options.fullScreen
         self.performFullScreen()
+
+        # Set the region.
+        self.player.setRegion(int(self.options.region))
 
         # Show the actual windows.
         self.video.show()
@@ -131,7 +131,9 @@ class MainUserInterface(object):
     def mainKeyPress(self, widget, event):
         keyName = gtk.gdk.keyval_name(event.keyval)
 
-        if keyName == 'Up':
+        if keyName == 'P' or keyName == 'p':
+            self.player.pause()
+        elif keyName == 'Up':
             self.player.up()
         elif keyName == 'Down':
             self.player.down()
@@ -167,8 +169,7 @@ class MainUserInterface(object):
         self.shutDown()
 
     def videoReady(self, widget):
-        # Setup and start the player.
-        self.video.setImageSink(self.player.getVideoSink())
+        # Start the player.
         self.player.start()
 
     def videoButtonPress(self, widget, event):
