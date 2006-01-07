@@ -3,6 +3,15 @@
 Numbers in () are priorities. Lower values represent higher
 priorities.
 
+Bugs
+----
+
+- xvimagesink still causes crashes sometimes when setting the window
+  id for the first time.
+
+- There's apparently a race condition, that causes the player to hang
+  when many flushes happen close to each other.
+
 
 User Interface
 --------------
