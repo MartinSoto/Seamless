@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -16,18 +16,23 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-# This package is used only to configure Seamless to work localy
-# without requiring an installation. Installed version of Seamless
+# This package is used only to configure Seamless to work locally
+# without requiring an installation. Installed versions of Seamless
 # use a generated config.py file.
 
 import os
 import sys
 
-# The suffix for plugin files.
+# Suffix for plugin files.
 pluginSuffix = '.so'
 
-# The base source directory.
+# Base source directory.
 base = os.path.split(os.path.split(__path__[0])[0])[0]
 
-# The directory containing the GStreamer plugins.
+# Directory containing the GStreamer plugins.
 gstPlugins = os.path.join(base, 'gst-plugins')
+
+# Directory contaning all glade files.
+gladeDir = os.path.join(base, 'glade')
+
+__all__ = (pluginSuffix, gstPlugins, glade)

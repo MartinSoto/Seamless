@@ -1,3 +1,23 @@
+2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* configure.ac: 
+	* src/Makefile.am (SUBDIRS): 
+	* src/gazpacho:
+	Copy the loader package from Gazpacho, so that we can load
+	Gazpacho created .glade files.
+
+	* configure.ac: 
+	* glade/seamless.glade
+	* src/config/__init__.py: 
+	* config/config.py.tmpl: 
+	* config/Makefile.am (config.py): 
+	* Makefile.am (SUBDIRS): 
+	Create a new glade file directory and define a configuration
+	variable to find its location. Also add a new seamless.glade file
+	and setup the compilation system to install it properly.
+
+	* autogen.sh: Pass parameters to configure script.
+
 2006-01-05  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/pipeline.py (Bin.makeParsedSubelem) 

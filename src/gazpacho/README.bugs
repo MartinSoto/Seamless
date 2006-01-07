@@ -1,0 +1,10 @@
+-*- text -*-
+
+The files in this directory were copied from the Gazpacho user
+interface builder (http://gazpacho.sicem.es/). Although it is my
+intention to contribute any useful changes back to the Gazpacho
+project, these files may still differ from the originals they were
+copied from. For this reason, bugs found in these files should be
+reported to the Seamless author and not to the Gazpacho authors.
+
+-- Martin Soto, 2006-01-06

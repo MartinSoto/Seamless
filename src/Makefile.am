@@ -1,4 +1,4 @@
-SUBDIRS = dvdread machine player
+SUBDIRS = dvdread gazpacho machine player
 
 pypkgdir = $(pkglibdir)/python
 
