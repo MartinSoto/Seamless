@@ -80,9 +80,6 @@ class MainUserInterface(object):
         self.fullScreen = self.options.fullScreen
         self.performFullScreen()
 
-        # Set the region.
-        self.player.setRegion(int(self.options.region))
-
         # Show the actual windows.
         self.video.show()
         self.window.show()

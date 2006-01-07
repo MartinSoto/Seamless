@@ -50,6 +50,9 @@ class DVDPlayer(SignalHolder):
         self.pipeline = pipeline.Pipeline(options)
         self.manager = manager.Manager(self.machine, self.pipeline)
 
+        # Set the region.
+        self.setRegion(int(options.region))
+
     def getDVDInfo(self):
         return self.info
 

@@ -1,5 +1,12 @@
 2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/player.py (DVDPlayer.__init__): 
+	* src/mainui.py (MainUserInterface.__init__): 
+	Move region setting to the player itself, which receives the
+	options object anyway.
+
+2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/config/__init__.py (__all__): Fix the export line.
 
 2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
