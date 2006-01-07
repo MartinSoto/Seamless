@@ -1,5 +1,9 @@
 2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/config/__init__.py (__all__): Fix the export line.
+
+2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* configure.ac: 
 	* src/Makefile.am (SUBDIRS): 
 	* src/gazpacho:

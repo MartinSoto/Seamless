@@ -35,4 +35,4 @@ gstPlugins = os.path.join(base, 'gst-plugins')
 # Directory contaning all glade files.
 gladeDir = os.path.join(base, 'glade')
 
-__all__ = (pluginSuffix, gstPlugins, glade)
+__all__ = (pluginSuffix, gstPlugins, gladeDir)
