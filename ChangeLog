@@ -1,5 +1,17 @@
 2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/mainwindow.py (MainWindow.__slots_, MainWindow.__init__) 
+	(MainWindow.performFullScreen, mainKeyPress): Add a toolbar and
+	connect some of the actions to it. Remove direct keyboard
+	handling.
+
+	* src/mainui.py (MainUserInterface, MainUserInterface.__init__) 
+	(MainUserInterface.alwaysAvailable): Convert MainUserInterface
+	into an baseui.UIManager and define the main operations as
+	actions.
+
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/baseui/uimanager.py (ActionGroup.__init__): Create the
 	action callbacks as method bound to UIManager. This way, they have
 	direct access to the UIManager instance and not to the ActionGroup

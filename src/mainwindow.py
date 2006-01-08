@@ -28,7 +28,8 @@ class MainWindow(gtk.Window):
 
                 'player',
 
-                'video')
+                'video',
+                'topBox')
 
     def __init__(self, mainUi):
         super(MainWindow, self).__init__()
@@ -38,15 +39,42 @@ class MainWindow(gtk.Window):
         self.player = mainUi.getPlayer()
         options = mainUi.getOptions()
 
+        self.mainUi.add_ui_from_string('''
+        <ui>
+          <toolbar name="toolbar">
+            <toolitem action="up"/>
+            <toolitem action="down"/>
+            <toolitem action="left"/>
+            <toolitem action="right"/>
+            <toolitem action="confirm"/>
+            <toolitem action="menu"/>
+            <separator/>
+            <toolitem action="pause"/>
+            <toolitem action="prevProgram"/>
+            <toolitem action="backward10"/>
+            <toolitem action="forward10"/>
+            <toolitem action="nextProgram"/>
+          </toolbar>
+        </ui>
+        ''')
+
         self.set_title(_('Seamless DVD Player'))
         self.set_border_width(0)
         self.set_property('can-focus', True)
         
-        self.connect('key-press-event', self.mainKeyPress)
         self.connect('delete_event', self.mainDeleteEvent)
 
+        vbox = gtk.VBox()
+        self.add(vbox)
+
+        self.topBox = gtk.VBox()
+        vbox.pack_start(self.topBox, expand=False)
+
+        toolbar = self.mainUi.get_widget('/toolbar')
+        self.topBox.pack_start(toolbar, expand=False)
+
         self.video = videowidget.VideoWidget()
-        self.add(self.video)
+        vbox.pack_start(self.video)
         
         self.video.add_events(gtk.gdk.BUTTON_PRESS_MASK)
         self.video.connect('ready', self.videoReady)
@@ -56,22 +84,22 @@ class MainWindow(gtk.Window):
         # problem.
         self.video.setOverlay(self.player.getVideoSink())
 
-        # Give the window a decent minimum size.
+        # Give the window a reasonable minimum size.
         self.set_size_request(480, 360)
 
         # Set the initial dimensions of the window to 75% of the screen.
         (rootWidth, rootHeight) = \
                     self.get_root_window().get_geometry()[2:4]
         self.set_default_size(int(rootWidth * 0.75),
-                                     int(rootHeight * 0.75))
+                              int(rootHeight * 0.75))
+
+        # Show the window with all of its subwidgets.
+        self.show_all()
 
         # Set the full screen mode.
         self.fullScreen = options.fullScreen
         self.performFullScreen()
 
-        # Show the actual windows.
-        self.video.show()
-        self.show()
 
     #
     # Fullscreen Support
@@ -83,10 +111,12 @@ class MainWindow(gtk.Window):
     def performFullScreen(self):
         if self.fullScreen:
             self.fullscreen()
+            self.topBox.hide()
             self.set_keep_above(1)
             self.video.grab_focus()
         else:
             self.unfullscreen()
+            self.topBox.show()
             self.set_keep_above(0)
 
     def toggleFullScreen(self):
@@ -97,40 +127,6 @@ class MainWindow(gtk.Window):
     #
     # Callbacks
     #
-
-    def mainKeyPress(self, widget, event):
-        keyName = gtk.gdk.keyval_name(event.keyval)
-
-        if keyName == 'P' or keyName == 'p':
-            self.player.pause()
-        elif keyName == 'Up':
-            self.player.up()
-        elif keyName == 'Down':
-            self.player.down()
-        elif event.state == 0 and keyName == 'Left':
-            self.player.left()
-        elif event.state == 0 and keyName == 'Right':
-            self.player.right()
-        elif keyName == 'Return':
-            self.player.confirm()
-        elif keyName == 'Page_Up':
-            self.player.prevProgram()
-        elif keyName == 'Page_Down':
-            self.player.nextProgram()
-        elif event.state == gtk.gdk.SHIFT_MASK and keyName == 'Left':
-            self.player.backward10()
-        elif event.state == gtk.gdk.SHIFT_MASK and keyName == 'Right':
-            self.player.forward10()
-        elif keyName == 'Escape':
-            self.player.menu()
-        elif keyName == 'F2':
-            self.player.nextAudioStream()
-        elif keyName == 'F3':
-            self.player.nextAngle()
-        elif event.state == gtk.gdk.SHIFT_MASK and keyName == 'F12':
-            debug.debugConsoleAsync(self.player)
-
-        return False
 
     def mainDeleteEvent(self, widget, event):
         return False

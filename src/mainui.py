@@ -26,6 +26,7 @@ import gtk
 
 import debug
 import player
+from baseui import UIManager, ActionGroup, action
 import mainwindow
 
 # "Plugins"
@@ -33,7 +34,10 @@ import lirc
 import xscreensaver
 
 
-class MainUserInterface(object):
+class MainUserInterface(UIManager):
+    """The class responsible for creating all widgets and implementing
+    the main actions associated to the Seamless user interface."""
+
     __slots__ = ('player',
                  'options',
                  
@@ -43,6 +47,8 @@ class MainUserInterface(object):
                  'xscreensaver')
 
     def __init__(self, player, options):
+        super(MainUserInterface, self).__init__()
+
         self.player = player
         self.options = options
 
@@ -75,3 +81,72 @@ class MainUserInterface(object):
         self.xscreensaver.close()
 
         gtk.main_quit()
+
+
+    class alwaysAvailable(ActionGroup):
+        """Always available operations."""
+
+        @action(stockId=gtk.STOCK_GO_UP)
+        def up(ui, action):
+            ui.player.up()
+
+        @action(stockId=gtk.STOCK_GO_DOWN)
+        def down(ui, action):
+            ui.player.down()
+
+        @action(stockId=gtk.STOCK_GO_BACK)
+        def left(ui, action):
+            ui.player.left()
+
+        @action(stockId=gtk.STOCK_GO_FORWARD)
+        def right(ui, action):
+            ui.player.right()
+
+        @action(stockId=gtk.STOCK_OK)
+        def confirm(ui, action):
+            ui.player.confirm()
+
+        @action(stockId=gtk.STOCK_HOME)
+        def menu(ui, action):
+            ui.player.menu()
+
+
+        @action(stockId=gtk.STOCK_MEDIA_PAUSE)
+        def pause(ui, action):
+            ui.player.pause()
+
+        @action(stockId=gtk.STOCK_MEDIA_PREVIOUS)
+        def prevProgram(ui, action):
+            ui.player.prevProgram()
+
+        @action(stockId=gtk.STOCK_MEDIA_NEXT)
+        def nextProgram(ui, action):
+            ui.player.nextProgram()
+
+        @action(stockId=gtk.STOCK_MEDIA_REWIND)
+        def backward10(ui, action):
+            ui.player.backward10()
+
+        @action(stockId=gtk.STOCK_MEDIA_FORWARD)
+        def forward10(ui, action):
+            ui.player.forward10()
+
+
+        @action(label=_("Next Audio"))
+        def nextAudioStream(ui, action):
+            ui.player.nextAudioStream()
+
+        @action(label=_("Next Angle"))
+        def nextAngle(ui, action):
+            ui.player.nextAngle()
+
+
+        @action(stockId=gtk.STOCK_QUIT)
+        def quit(ui, action):
+            ui.shutDown()
+
+
+        @action(label=_("Debug Console"))
+        def debugConsoleAsync(ui, action):
+            debug.debugConsoleAsync(ui.player)
+
