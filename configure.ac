@@ -128,6 +128,7 @@ AC_OUTPUT([
   gst-plugins/seamless/Makefile
   gst-plugins/mpeg2sub/Makefile
   src/Makefile
+  src/baseui/Makefile
   src/dvdread/Makefile
   src/gazpacho/Makefile
   src/gazpacho/loader/Makefile

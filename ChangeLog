@@ -1,3 +1,16 @@
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/baseui/uimanager.py: 
+	* src/baseui/actiongroup.py: 
+	* src/baseui/__init__.py: 
+	New package baseui for generic user interface code. For the moment
+	it offers a wrapper system for gtk.UIManager and gtk.ActionGroup.
+
+	* src/baseui/Makefile.am: 
+	* src/Makefile.am (SUBDIRS): 
+	* configure.ac: 
+	Install the python files in baseui.
+
 2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/player.py (DVDPlayer.__init__): 
