@@ -16,6 +16,8 @@ Bugs
 User Interface
 --------------
 
+- Add gettext support to the autotools files.
+
 - (1) Add a menubar and a toolbar for normal operation.
 
 - (1) Autodetect DVD drives when possible, and start playback
