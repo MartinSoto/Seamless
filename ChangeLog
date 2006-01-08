@@ -1,5 +1,14 @@
 2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/mainwindow.py: 
+	* src/mainui.py (MainUserInterface.__slots__) 
+	(MainUserInterface.__init__): 
+	In preparation for creating an UI manager, create a new class to
+	represent the main player window and move all relevant code from
+	mainui to it.
+
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/seamless.py: 
 	(main): Install the _() gettext translation function and mark the
 	commandline options' help text for translations.
