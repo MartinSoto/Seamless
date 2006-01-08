@@ -1,5 +1,18 @@
 2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/baseui/uimanager.py (ActionGroup.__init__): Create the
+	action callbacks as method bound to UIManager. This way, they have
+	direct access to the UIManager instance and not to the ActionGroup
+	containing the action.
+	(UIManager.__init__): Pass self as parameter when creating the
+	action groups, so that the callbacks can access the ui manager.
+
+	* src/baseui/actiongroup.py 
+	* src/baseui/uimanager.py:
+	Consolidate in a single file.
+
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/mainwindow.py: 
 	* src/mainui.py (MainUserInterface.__slots__) 
 	(MainUserInterface.__init__): 

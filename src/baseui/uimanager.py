@@ -16,10 +16,169 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
+import sys
+import new
+import re
+
 import gobject
 import gtk
 
-from actiongroup import ActionGroup
+
+class ActionGroup(gtk.ActionGroup):
+    """A convenient wrapper for the gtk.ActionGroup class.
+
+    Subclasses of this class can use the action, toggleAction and
+    radioActions decorators below, to specify the gtk.Actions contained
+    in the action group.
+
+    When creating an instance of the subclass (which is of course also
+    a gtk.ActionGroup instance) the arguments passed to the decorators
+    at class definition time are used to construct gtk.Action
+    instances that are automatically added to the new instance, and
+    the decorated functions themselves are used as action
+    callbacks. The callbacks don't receive the group instance itself
+    as first parameter (i.e, no self parameter) but an instance of the
+    gtk.UIManager passed as parameter to the constructor.
+
+    Instances of the actions specified using the actions* decorators
+    are also accesible as attributes of ActionGroup instances."""
+
+    def __init__(self, uiManager, name=None):
+        if name == None:
+            name = self.__class__.__name__
+
+        super(ActionGroup, self).__init__(name)
+
+        if hasattr(self, '_ActionGroup_actions'):
+            # Add the standard actions.
+            for func, stockId, label, accel, tooltip in \
+                self._ActionGroup_actions:
+                action = gtk.Action(func.__name__, label, tooltip, stockId)
+                action.connect('activate',
+                               new.instancemethod(func, uiManager,
+                                                  UIManager))
+                setattr(self, func.__name__, action)
+                self.add_action_with_accel(action, accel)
+
+        if hasattr(self, '_ActionGroup_toggle_actions'):
+            # Add the toggle actions.
+            for func, stockId, label, accel, tooltip, active in \
+                self._ActionGroup_toggle_actions:
+                action = gtk.ToggleAction(func.__name__, label, tooltip,
+                                          stockId)
+                action.set_active(active)
+                action.connect('toggled',
+                               new.instancemethod(func, uiManager, UIManager))
+                setattr(self, func.__name__, action)
+                self.add_action_with_accel(action, accel)
+
+        if hasattr(self, '_ActionGroup_radio_actions'):
+            # Add the radio actions.
+            for func, default, actionParams in \
+                    self._ActionGroup_radio_actions:
+                prevAction = None
+                for number, (name, stockId, label, accel, tooltip) in \
+                    actionParams.items():
+                    action = gtk.RadioAction(name, label, tooltip, stockId,
+                                             number)
+
+                    if prevAction:
+                        action.set_group(prevAction)
+                    prevAction = action
+
+                    if number == default:
+                        action.set_active(True)
+
+                    setattr(self, name, action)
+                    self.add_action_with_accel(action, accel)
+
+                # Connect the callback to one arbitrary action.
+                action.connect('changed',
+                               new.instancemethod(func, uiManager, UIManager))
+
+
+
+def action(stockId=None, label=None, accel=None, tooltip=None):
+    locals = sys._getframe(1).f_locals
+
+    lst = locals.get('_ActionGroup_actions')
+    if not lst:
+        # Initialize the list.
+        lst = []
+        locals['_ActionGroup_actions'] = lst
+
+    def decorator(func):
+        lst.append((func, stockId, label, accel, tooltip))
+        return func
+        
+    return decorator
+
+def toggleAction(stockId=None, label=None, accel=None, tooltip=None,
+                 active=False):
+    locals = sys._getframe(1).f_locals
+
+    lst = locals.get('_ActionGroup_toggle_actions')
+    if not lst:
+        # Initialize the list.
+        lst = []
+        locals['_ActionGroup_toggle_actions'] = lst
+
+    def decorator(func):
+        lst.append((func, stockId, label, accel, tooltip, active))
+        return func
+        
+    return decorator
+
+
+_namePattern = re.compile('([a-z][a-zA-Z]+)([0-9]+)')
+_validNames = ['name', 'stockId', 'label', 'accel', 'tooltip']
+
+def radioActions(default, **keywords):
+    locals = sys._getframe(1).f_locals
+
+    # A mapping from radio action numbers to their parameters.
+    actionParams = {}
+
+    # Fill in the parameters using the function keyword arguments.
+    for paramName, value in keywords.items():
+        # Validate and parse the name.
+        m = _namePattern.match(paramName)
+        if not m or not m.group(1) in _validNames:
+            raise TypeError, \
+                  "radioActions() got an unexpected keyword argument '%s'" \
+                  % paramName
+
+        # Retrieve or create the parameter list for this action.
+        number = int(m.group(2))
+        try:
+            params = actionParams[number]
+        except KeyError:
+            params = [None, None, None, None, None]
+            actionParams[number] = params
+
+        # Assign the actual value.
+        params[_validNames.index(m.group(1))] = value
+
+    # Check for actions without a name.
+    for number, params in actionParams.items():
+        if not params[0]:
+            raise TypeError, "parameter 'name%d' must be specified" % number
+
+    # The default action must exist.
+    if not default in actionParams:
+        raise ValueError, "default action %d not defined", default
+
+    lst = locals.get('_ActionGroup_radio_actions')
+    if not lst:
+        # Initialize the list.
+        lst = []
+        locals['_ActionGroup_radio_actions'] = lst
+
+    def decorator(func):
+        lst.append((func, default, actionParams))
+        return func
+        
+    return decorator
 
 
 class _CollectActionGroups(gobject.GObjectMeta):
@@ -38,7 +197,17 @@ class _CollectActionGroups(gobject.GObjectMeta):
 
 
 class UIManager(gtk.UIManager):
-    """A convenient wrapper for the gtk.UIManager class."""
+    """A convenient wrapper for the gtk.UIManager class.
+
+    Subclasses of this class, can specify action groups by defining a
+    contained class that derives (directly or indirectly) from
+    ActionGroup in this module.
+
+    When creating an instance of the subclass, instances of the
+    specified actions groups will automatically be created and added
+    to the manager. Such action groups are also accesible as
+    attributes of the UIManager instance.
+    """
 
     __metaclass__ = _CollectActionGroups
 
@@ -50,35 +219,148 @@ class UIManager(gtk.UIManager):
         # Create one instance of each class and add it to self.
         pos = 0
         for groupClass in self._UIManager_actionGroupClasses:
-            group = groupClass(*args, **keywords)
+            group = groupClass(self, *args, **keywords)
             setattr(self, group.get_name(), group)
             self.insert_action_group(group, pos)
             pos += 1
 
         
 if __name__ == "__main__":
-    from actiongroup import action
+
+    # Test the module:
+
+    obj = None
+    cb = None
+    aa = None
+    ac = None
+
+    class SomeActionGroup(ActionGroup):
+        @action(stockId=gtk.STOCK_QUIT)
+        def quit(ui, action):
+            global obj, cb, aa
+            obj = ui
+            cb = 'quit'
+            aa = action
+
+        @action(label='Special', tooltip='Very special indeed')
+        def special(ui, action):
+            global obj, cb, aa
+            obj = ui
+            cb = 'special'
+            aa = action
+
+        @toggleAction(label='Flip', active=True)
+        def flipflop(ui, action):
+            global obj, cb, aa
+            obj = ui
+            cb = 'flipflop'
+            aa = action
+
+        @radioActions(default=2,
+                      name1='yin', label1='Yin',
+                      name2='yan', label2='Yan', stockId2=gtk.STOCK_OPEN,
+                      tooltip2='The yan')
+        def taoChanged(ui, action, current):
+            global obj, cb, aa
+            obj = ui
+            cb = 'taoChanged'
+            aa = action
+            ac = current
+
+    dummyUi = "dummy UI manager"
+    ag = SomeActionGroup(dummyUi)
+    assert ag.get_name() == 'SomeActionGroup'
+    assert len(ag.list_actions()) == 5
+
+    a = ag.quit
+    assert a == ag.get_action('quit')
+    assert isinstance(a, gtk.Action)
+    assert a.get_property('stock-id') == gtk.STOCK_QUIT
+    a.activate()
+    assert obj == dummyUi
+    assert cb == 'quit'
+    assert aa == a
+
+    a = ag.special
+    assert a == ag.get_action('special')
+    assert isinstance(a, gtk.Action)
+    assert a.get_property('label') == 'Special'
+    assert a.get_property('tooltip') == 'Very special indeed'
+    a.activate()
+    assert obj == dummyUi
+    assert cb == 'special'
+    assert aa == a
+
+    a = ag.flipflop
+    assert a == ag.get_action('flipflop')
+    assert isinstance(a, gtk.ToggleAction)
+    assert a.get_active()
+    assert a.get_property('label') == 'Flip'
+    a.toggled()
+    assert obj == dummyUi
+    assert cb == 'flipflop'
+    assert aa == a
+
+    a = ag.yin
+    assert a == ag.get_action('yin')
+    assert isinstance(a, gtk.RadioAction)
+    assert not a.get_active()
+    assert a.get_property('label') == 'Yin'
+
+    a2 = ag.yan
+    assert a2 == ag.get_action('yan')
+    assert isinstance(a2, gtk.RadioAction)
+    assert a2.get_active()
+    assert a2.get_property('label') == 'Yan'
+    assert a2.get_property('stock-id') == gtk.STOCK_OPEN
+    assert a2.get_property('tooltip') == 'The yan'
+
+    a.activate()
+    assert cb == 'taoChanged'
+    assert aa == a or aa == a2
+    assert a.get_current_value() == 1
+    assert a.get_active()
+    assert not a2.get_active()
+
+    cb = None
+    a2.activate()
+    assert cb == 'taoChanged'
+    assert aa == a or aa == a2
+    assert a.get_current_value() == 2
+    assert not a.get_active()
+    assert a2.get_active()
 
     class SomeUIManager(UIManager):
         class actionGroup1(ActionGroup):
             @action(stockId=gtk.STOCK_QUIT)
-            def quit(self, action):
-                global cb, aa
-                cb = 'quit'
+            def quit(ui, action):
+                global obj, cb, aa
+                obj = ui
+                cb = 'ui_quit'
                 aa = action
 
         class actionGroup2(ActionGroup):
             @action(stockId=gtk.STOCK_QUIT)
-            def quit(self, action):
-                global cb, aa
-                cb = 'quit'
+            def quit(ui, action):
+                global obj, cb, aa
+                obj = ui
+                cb = 'ui_quit2'
                 aa = action
 
         class Dummy(object):
             pass
+
+    obj = None
+    cb = None
+    aa = None
 
     uim = SomeUIManager()
 
     assert len(uim.get_action_groups()) == 2
     assert isinstance(uim.actionGroup1, gtk.ActionGroup)
     assert len(uim.actionGroup1.list_actions()) == 1
+
+    uim.actionGroup1.quit.activate()
+    assert obj == uim
+    assert cb == 'ui_quit'
+    assert aa == uim.actionGroup1.quit
