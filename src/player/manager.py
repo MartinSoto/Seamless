@@ -284,17 +284,16 @@ class Manager(object):
                                          self.segmentStop))
 
         # Check for audio shutdown.
-        if self.audio != -1:
-            if not self.audioShutdown and \
-               (nav.getFirstAudioOffset(self.audio + 1) == 0x0000 or
+        if not self.audioShutdown and \
+               (self.audio == -1 or \
+                nav.getFirstAudioOffset(self.audio + 1) == 0x0000 or
                 nav.getFirstAudioOffset(self.audio + 1) == 0x3fff):
-                self.shutdownAudio()
-            elif self.audioShutdown and \
-                 nav.getFirstAudioOffset(self.audio + 1) != 0x0000 and \
-                 nav.getFirstAudioOffset(self.audio + 1) != 0x3fff:
-                self.restartAudio()
-        else:
-            print "Beware!"
+            self.shutdownAudio()
+        elif self.audioShutdown and \
+             self.audio != -1 and \
+             nav.getFirstAudioOffset(self.audio + 1) != 0x0000 and \
+             nav.getFirstAudioOffset(self.audio + 1) != 0x3fff:
+            self.restartAudio()
 
         # FIXME: This should be done later in the game, namely, when
         # the packet actually reaches the subtitle element.
