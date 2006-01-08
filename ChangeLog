@@ -1,3 +1,9 @@
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.vobuHeader): Also shutdown the
+	sound pipeline when no physical audio channel is reported by the
+	machine.
+
 2006-01-05  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/pipeline.py (Bin.makeParsedSubelem) 
