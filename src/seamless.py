@@ -27,11 +27,15 @@ from optparse import OptionParser
 # Work around a bug in Python 2.3 that breaks gst-python.
 os.environ['PYGTK_USE_GIL_STATE_API'] = '1'
 
+# Activate the _() function.
+import gettext
+gettext.install('seamless')
+
 import gobject
 try:
     gobject.threads_init()
 except:
-    print "WARNING: gobject doesn't have threads_init, no threadsafety"
+    print _("WARNING: gobject doesn't have threads_init, no threadsafety")
 
 import pygtk
 pygtk.require('2.0')
@@ -83,21 +87,21 @@ def main():
 
     # Parse the commandline.
     optParser = OptionParser()
-    optParser.set_usage('Usage: %prog [options]')
-    optParser.set_description("Seamless: A DVD player based on GStreamer")
+    optParser.set_usage(_('Usage: %prog [options]'))
+    optParser.set_description(_("Seamless: A DVD player based on GStreamer"))
     optParser.add_option("--fullscreen", dest="fullScreen",
                          action="store_true",
-                         help="start in full screen mode")
+                         help=_("start in full screen mode"))
     optParser.add_option("--device", dest="location",
                          metavar="PATH",
-                         help="set path to DVD device to PATH",
+                         help=_("set path to DVD device to PATH"),
                          default="/dev/dvd")
     optParser.add_option("--lirc", dest="lirc",
                          action="store_true",
-                         help="enable lirc remote control support")
+                         help=_("enable lirc remote control support"))
     optParser.add_option("--region", dest="region",
                          metavar="REGION",
-                         help="Set player's region to REGION. Possible "
+                         help=_("Set player's region to REGION. Possible "
                          "regions are: "
                          "0: Region free (not accepted by some DVDs); "
                          "1: U.S., Canada, U.S. Territories; "
@@ -114,35 +118,36 @@ def main():
                          "6: China; "
                          "7: Reserved; "
                          "8: Special international venues (airplanes, "
-                         "cruise ships, etc.)",
+                         "cruise ships, etc.)"),
                          default=0)
     optParser.add_option("--audio-sink", dest="audioSink",
                          metavar="SINK",
-                         help="audio sink is SINK",
+                         help=_("audio sink is SINK"),
                          default="alsasink")
     optParser.add_option("--spdif-card", dest="spdifCard",
                          metavar="CARD",
-                         help="Instead of decoding audio in software, "
+                         help=_("Instead of decoding audio in software, "
                          "output raw AC3 and DTS to the SP/DIF "
                          "output in card CARD. CARD must be an audio "
                          "card name as defined by the ALSA driver (look "
                          "at the contents of your /proc/asound/cards "
                          "file). This option won't work if you don't "
                          "have the ALSA audio drivers installed and "
-                         "configured in your machine")
+                         "configured in your machine"))
     optParser.add_option("--video-sink", dest="videoSink",
                          metavar="SINK",
-                         help="video sink is SINK",
+                         help=_("video sink is SINK"),
                          default="xvimagesink")
     optParser.add_option("--pixel-aspect", dest="pixelAspect",
                          metavar="ASPECT",
-                         help="set pixel aspect ratio to ASPECT (default 1/1)",
+                         help=_("set pixel aspect ratio to ASPECT "
+                                "(default 1/1)"),
                          default="1/1")    
     (options, args) = optParser.parse_args()
     options = DictOptions(options)
 
     if args != []:
-        optParser.error("invalid argument(s): %s" % string.join(args, ' '))
+        optParser.error(_("invalid argument(s): %s") % string.join(args, ' '))
 
     # Create the main objects.
     playerObj = player.DVDPlayer(options)

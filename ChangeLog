@@ -1,5 +1,11 @@
 2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/seamless.py: 
+	(main): Install the _() gettext translation function and mark the
+	commandline options' help text for translations.
+
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/baseui/uimanager.py: 
 	* src/baseui/actiongroup.py: 
 	* src/baseui/__init__.py: 
