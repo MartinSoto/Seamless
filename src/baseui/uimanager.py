@@ -41,7 +41,8 @@ class ActionGroup(gtk.ActionGroup):
     gtk.UIManager passed as parameter to the constructor.
 
     Instances of the actions specified using the actions* decorators
-    are also accesible as attributes of ActionGroup instances."""
+    are also accesible as attributes of the UIManager passed as
+    parameter to the constructor."""
 
     def __init__(self, uiManager, name=None):
         if name == None:
@@ -57,7 +58,7 @@ class ActionGroup(gtk.ActionGroup):
                 action.connect('activate',
                                new.instancemethod(func, uiManager,
                                                   UIManager))
-                setattr(self, func.__name__, action)
+                setattr(uiManager, func.__name__, action)
                 self.add_action_with_accel(action, accel)
 
         if hasattr(self, '_ActionGroup_toggle_actions'):
@@ -69,7 +70,7 @@ class ActionGroup(gtk.ActionGroup):
                 action.set_active(active)
                 action.connect('toggled',
                                new.instancemethod(func, uiManager, UIManager))
-                setattr(self, func.__name__, action)
+                setattr(uiManager, func.__name__, action)
                 self.add_action_with_accel(action, accel)
 
         if hasattr(self, '_ActionGroup_radio_actions'):
@@ -89,7 +90,7 @@ class ActionGroup(gtk.ActionGroup):
                     if number == default:
                         action.set_active(True)
 
-                    setattr(self, name, action)
+                    setattr(uiManager, name, action)
                     self.add_action_with_accel(action, accel)
 
                 # Connect the callback to one arbitrary action.
@@ -267,12 +268,14 @@ if __name__ == "__main__":
             aa = action
             ac = current
 
-    dummyUi = "dummy UI manager"
+    class DummyUi: pass
+    dummyUi = DummyUi()
+
     ag = SomeActionGroup(dummyUi)
     assert ag.get_name() == 'SomeActionGroup'
     assert len(ag.list_actions()) == 5
 
-    a = ag.quit
+    a = dummyUi.quit
     assert a == ag.get_action('quit')
     assert isinstance(a, gtk.Action)
     assert a.get_property('stock-id') == gtk.STOCK_QUIT
@@ -281,7 +284,7 @@ if __name__ == "__main__":
     assert cb == 'quit'
     assert aa == a
 
-    a = ag.special
+    a = dummyUi.special
     assert a == ag.get_action('special')
     assert isinstance(a, gtk.Action)
     assert a.get_property('label') == 'Special'
@@ -291,7 +294,7 @@ if __name__ == "__main__":
     assert cb == 'special'
     assert aa == a
 
-    a = ag.flipflop
+    a = dummyUi.flipflop
     assert a == ag.get_action('flipflop')
     assert isinstance(a, gtk.ToggleAction)
     assert a.get_active()
@@ -301,13 +304,13 @@ if __name__ == "__main__":
     assert cb == 'flipflop'
     assert aa == a
 
-    a = ag.yin
+    a = dummyUi.yin
     assert a == ag.get_action('yin')
     assert isinstance(a, gtk.RadioAction)
     assert not a.get_active()
     assert a.get_property('label') == 'Yin'
 
-    a2 = ag.yan
+    a2 = dummyUi.yan
     assert a2 == ag.get_action('yan')
     assert isinstance(a2, gtk.RadioAction)
     assert a2.get_active()
@@ -341,7 +344,7 @@ if __name__ == "__main__":
 
         class actionGroup2(ActionGroup):
             @action(stockId=gtk.STOCK_QUIT)
-            def quit(ui, action):
+            def quit2(ui, action):
                 global obj, cb, aa
                 obj = ui
                 cb = 'ui_quit2'
@@ -360,7 +363,7 @@ if __name__ == "__main__":
     assert isinstance(uim.actionGroup1, gtk.ActionGroup)
     assert len(uim.actionGroup1.list_actions()) == 1
 
-    uim.actionGroup1.quit.activate()
+    uim.quit.activate()
     assert obj == uim
     assert cb == 'ui_quit'
-    assert aa == uim.actionGroup1.quit
+    assert aa == uim.quit

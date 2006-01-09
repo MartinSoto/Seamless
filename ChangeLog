@@ -1,3 +1,9 @@
+2006-01-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/baseui/uimanager.py (ActionGroup.__init__): Add action
+	instances as attributes to the UIManager instead of the action
+	groups.
+
 2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/manager.py (Manager.vobuHeader): Also shutdown the
