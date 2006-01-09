@@ -106,47 +106,56 @@ class MainUserInterface(UIManager):
         def confirm(ui, action):
             ui.player.confirm()
 
-        @action(stockId=gtk.STOCK_HOME)
+        @action(stockId=gtk.STOCK_HOME, label=_('Menu'), accel='m',
+                tooltip=_('Go to the DVD menu'))
         def menu(ui, action):
             ui.player.menu()
 
 
-        @action(stockId=gtk.STOCK_MEDIA_PAUSE)
+        @action(stockId=gtk.STOCK_MEDIA_PAUSE, accel='p',
+                tooltip=_('Pause playback'))
         def pause(ui, action):
             ui.player.pause()
 
-        @action(stockId=gtk.STOCK_MEDIA_PREVIOUS)
+        @action(stockId=gtk.STOCK_MEDIA_PREVIOUS, accel='Page_Up',
+                tooltip=_('Jump to previous chapter'))
         def prevProgram(ui, action):
             ui.player.prevProgram()
 
-        @action(stockId=gtk.STOCK_MEDIA_NEXT)
+        @action(stockId=gtk.STOCK_MEDIA_NEXT, accel='Page_Down',
+                tooltip=_('Jump to next chapter'))
         def nextProgram(ui, action):
             ui.player.nextProgram()
 
-        @action(stockId=gtk.STOCK_MEDIA_REWIND)
+        @action(stockId=gtk.STOCK_MEDIA_REWIND, accel='<Shift>Left',
+                tooltip=_('Jump 10 seconds backwards'))
         def backward10(ui, action):
             ui.player.backward10()
 
-        @action(stockId=gtk.STOCK_MEDIA_FORWARD)
+        @action(stockId=gtk.STOCK_MEDIA_FORWARD, accel='<Shift>Right',
+                tooltip=_('Jump 10 seconds forwards'))
         def forward10(ui, action):
             ui.player.forward10()
 
 
-        @action(label=_("Next Audio"))
+        @action(label=_("Next Audio"), accel='F2',
+                tooltip=_('Select next audio track'))
         def nextAudioStream(ui, action):
             ui.player.nextAudioStream()
 
-        @action(label=_("Next Angle"))
+        @action(label=_("Next Angle"), accel='F3',
+                tooltip=_('Select next angle'))
         def nextAngle(ui, action):
             ui.player.nextAngle()
 
 
-        @action(stockId=gtk.STOCK_QUIT)
+        @action(stockId=gtk.STOCK_QUIT, accel='<Ctrl>Q',
+                tooltip=_(''))
         def quit(ui, action):
             ui.shutDown()
 
 
-        @action(label=_("Debug Console"))
+        @action(label=_("Debug Console"), accel='<Ctrl>F12')
         def debugConsoleAsync(ui, action):
             debug.debugConsoleAsync(ui.player)
 

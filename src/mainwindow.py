@@ -39,24 +39,50 @@ class MainWindow(gtk.Window):
         self.player = mainUi.getPlayer()
         options = mainUi.getOptions()
 
+        # Give the window a reasonable minimum size.
+        self.set_size_request(480, 360)
+
+        # Set the initial dimensions of the window to 75% of the screen.
+        (rootWidth, rootHeight) = \
+                    self.get_root_window().get_geometry()[2:4]
+        self.set_default_size(int(rootWidth * 0.75),
+                              int(rootHeight * 0.75))
+
+        # Define the toolbar.
         self.mainUi.add_ui_from_string('''
         <ui>
           <toolbar name="toolbar">
-            <toolitem action="up"/>
-            <toolitem action="down"/>
-            <toolitem action="left"/>
-            <toolitem action="right"/>
-            <toolitem action="confirm"/>
             <toolitem action="menu"/>
             <separator/>
             <toolitem action="pause"/>
+            <separator/>
             <toolitem action="prevProgram"/>
             <toolitem action="backward10"/>
             <toolitem action="forward10"/>
             <toolitem action="nextProgram"/>
           </toolbar>
+
+          <accelerator action="menu"/>
+
+          <accelerator action="pause"/>
+
+          <accelerator action="prevProgram"/>
+          <accelerator action="nextProgram"/>
+          <accelerator action="backward10"/>
+          <accelerator action="forward10"/>
+
+          <accelerator action="nextAudioStream"/>
+          <accelerator action="nextAngle"/>
+
+          <accelerator action="quit"/>
+
+          <accelerator action="debugConsoleAsync"/>
         </ui>
         ''')
+
+        # Add the central AccelGroup to the window.
+        accelgroup = mainUi.get_accel_group()
+        self.add_accel_group(accelgroup)
 
         self.set_title(_('Seamless DVD Player'))
         self.set_border_width(0)
@@ -80,18 +106,13 @@ class MainWindow(gtk.Window):
         self.video.connect('ready', self.videoReady)
         self.video.connect('button-press-event', self.videoButtonPress)
 
+        self.video.set_property('can-focus', True)
+        self.video.connect('key-press-event', self.videoKeyPress)
+        self.video.grab_focus()
+
         # FIXME: If the video sink doesn't support XOverlay, we have a
         # problem.
         self.video.setOverlay(self.player.getVideoSink())
-
-        # Give the window a reasonable minimum size.
-        self.set_size_request(480, 360)
-
-        # Set the initial dimensions of the window to 75% of the screen.
-        (rootWidth, rootHeight) = \
-                    self.get_root_window().get_geometry()[2:4]
-        self.set_default_size(int(rootWidth * 0.75),
-                              int(rootHeight * 0.75))
 
         # Show the window with all of its subwidgets.
         self.show_all()
@@ -137,3 +158,23 @@ class MainWindow(gtk.Window):
 
     def videoButtonPress(self, widget, event):
         self.toggleFullScreen()
+
+    def videoKeyPress(self, widget, event):
+        keyName = gtk.gdk.keyval_name(event.keyval)
+
+        # These five actions must be handled here explicitly since
+        # their corresponding keys cannot be used in accelerators.
+        if keyName == 'Up':
+            self.mainUi.up.activate()
+        elif keyName == 'Down':
+            self.mainUi.down.activate()
+        elif event.state == 0 and keyName == 'Left':
+            self.mainUi.left.activate()
+        elif event.state == 0 and keyName == 'Right':
+            self.mainUi.right.activate()
+        elif keyName == 'Return':
+            self.mainUi.confirm.activate()
+        else:
+            return False
+
+        return True

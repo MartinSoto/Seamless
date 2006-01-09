@@ -1,3 +1,14 @@
+2006-01-10  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainui.py	(MainUserInterface.alwaysAvailable): Add
+	keyboard accelerators and tooltips to many of the actions.
+
+	* src/mainwindow.py (MainWindow.__init__): Install accelerator
+	group and add most existing actions as accelerators to the XML
+	description. Clean up window construction.
+	(MainWindow.videoKeyPress): Arrow keys and return must be handled
+	with an event handler instead of using key accelerators.
+
 2006-01-09  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/baseui/uimanager.py (ActionGroup.__init__): Add action
