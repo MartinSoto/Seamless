@@ -1,5 +1,13 @@
 2006-01-10  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__init__, VideoWidget.do_expose_event) 
+	(VideoWidget.prepareWindowCb, sizeAllocateCb) 
+	(backgroundRealizeCb, VideoWidget.realizeCb, videoEventFilterCb):
+	Revamp the video widget to use a single DrawingArea.
+
+2006-01-10  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/mainui.py	(MainUserInterface.alwaysAvailable): Add
 	keyboard accelerators and tooltips to many of the actions.
 

@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -25,10 +25,8 @@ import gst
 import gst.interfaces
 
 
-class VideoWidget(gtk.EventBox):
-    __slots__ = ('background',
-                 'videoWin',
-                 'overlay',
+class VideoWidget(gtk.DrawingArea):
+    __slots__ = ('overlay',
                  'pipeline',
                  'cursorTimeout'
                  'invisibleCursor')
@@ -40,26 +38,23 @@ class VideoWidget(gtk.EventBox):
         }
 
     def __init__(self):
-        self.__gobject_init__()
+        super(VideoWidget, self).__init__()
+
+        # When double buffering is active, Gtk ends up painting on top
+        # of the overlay color, this completely breaking the video
+        # display.
+        self.set_double_buffered(False)
+        self.set_app_paintable(True)
 
         # A lock to protect accesses to the display window.
         self.xlock = threading.RLock()
 
-        self.set_visible_window(False)
-        self.set_above_child(True)
         self.set_events(gtk.gdk.POINTER_MOTION_MASK)
-        self.connect('size-allocate', self.sizeAllocateCb)
         self.connect('motion-notify-event', self.motionCb)
         self.connect('destroy', self.destroyCb)
+        self.connect('realize', self.realizeCb)
 
-        self.background = gtk.DrawingArea()
-        self.background.modify_bg(gtk.STATE_NORMAL,
-                                  gtk.gdk.color_parse('black'))
-        self.add(self.background)
-        self.background.show()
-        self.background.connect('realize', self.backgroundRealizeCb)
-
-        self.videoWin = None
+        self.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse('black'))
 
         self.overlay = None
 
@@ -83,6 +78,20 @@ class VideoWidget(gtk.EventBox):
 
     def getOverlay(self):
         return self.overlay
+
+
+    #
+    # Expose
+    #
+
+    def do_expose_event(self, event):
+        self.xlock.acquire()
+
+        self.overlay.expose()
+
+        self.xlock.release()
+
+        return True    
 
 
     #
@@ -116,20 +125,12 @@ class VideoWidget(gtk.EventBox):
         if not message.structure.has_name('prepare-xwindow-id'):
             return None
 
-        self.overlay.set_xwindow_id(self.videoWin.xid)
+        self.overlay.set_xwindow_id(self.window.xid)
 
         # Remove the callback from the pipeline.
         self.pipeline.removeSyncBusHandler(self.prepareWindowCb)
 
         return gst.BUS_DROP
-
-    def sizeAllocateCb(self, widget, allocation):
-        if not self.videoWin:
-            return
-        
-        self.xlock.acquire()
-        self.videoWin.move_resize(0, 0, allocation.width, allocation.height)
-        self.xlock.release()
 
     def motionCb(self, widget, event):
         if self.cursorTimeout == None:
@@ -141,37 +142,10 @@ class VideoWidget(gtk.EventBox):
     def destroyCb(self, da):
         self.overlay.set_xwindow_id(0L)
 
-    def backgroundRealizeCb(self, widget):
-        # Create the video window.
-        self.videoWin = gtk.gdk.Window(
-            self.background.window,
-            self.allocation.width, self.allocation.height,
-            gtk.gdk.WINDOW_CHILD,
-            gtk.gdk.EXPOSURE_MASK,
-            gtk.gdk.INPUT_OUTPUT,
-            "",
-            0, 0)
-
-        # Set a filter to trap expose events in the new window.
-        self.videoWin.add_filter(self.videoEventFilterCb)
-
-        self.videoWin.show()
-
+    def realizeCb(self, widget):
         # Hide the pointer now.
         self.hidePointer()
 
         # We are ready to display video. The 'ready' signal could
         # actually set up the image sink.
         self.emit('ready')
-
-    def videoEventFilterCb(self, event):
-        # FIXME: Check for expose event here. Cannot be done now
-        # because pygtk seems to have a bug and only reports "NOTHING"
-        # events.
-        self.xlock.acquire()
-
-        self.overlay.expose()
-
-        self.xlock.release()
-
-        return gtk.gdk.FILTER_CONTINUE
