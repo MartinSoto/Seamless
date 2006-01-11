@@ -1,3 +1,14 @@
+2006-01-11  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/tasklet/__init__.py: 
+	* src/tasklet/tasklet.py: Added a copy of Gustavo Carneiro's
+	tasklet framework.
+
+	* src/Makefile.am: 
+	* src/tasklet/Makefile.am: 
+	* configure.ac: 
+	Arrange for tasklet files to be distributed.
+
 2006-01-10  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/videowidget.py (VideoWidget.__slots__) 
