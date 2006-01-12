@@ -1,5 +1,14 @@
 2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/videowidget.py (VideoWidget.__init__, realizeCb)
+	(VideoWidget.mapCb): Emit the "ready" signal when map-event
+	arrives, instead of at realize time. This (hopefully) fixes a race
+	condition that was causing Seamless to abort with an XError
+	because the player could try to display video when the window
+	wasn't still there.
+
+2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/mainwindow.py (MainWindow.__init__) 
 	(MainWindow.mainConfigureEvent): React to the configure event in
 	the main window, to refresh the video overlay when

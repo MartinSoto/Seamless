@@ -56,7 +56,7 @@ class VideoWidget(gtk.DrawingArea):
 
         self.set_events(gtk.gdk.POINTER_MOTION_MASK)
         self.connect('delete-event', self.deleteCb)
-        self.connect('realize', self.realizeCb)
+        self.connect('map-event', self.mapCb)
 
         self.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse('black'))
 
@@ -199,7 +199,7 @@ class VideoWidget(gtk.DrawingArea):
         self.overlay.set_xwindow_id(0L)
         set.overlaySet = False
 
-    def realizeCb(self, widget):
+    def mapCb(self, widget, event):
         # Start the cursor task.
         self.cursorTask = tasklet.run(self.updateCursor())
 
