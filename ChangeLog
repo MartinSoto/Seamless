@@ -1,5 +1,15 @@
 2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/mainui.py (MainUserInterface.alwaysAvailable.pause): Convert
+	the pause action into a toggle action. This make it a toggle on
+	the toolbar as well.
+
+	* src/player/player.py (DVDPlayer.pause): Pass an activate
+	parameter to the pause operation to activate or deactivate the
+	pause.
+
+2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/mainwindow.py (MainWindow.__init__) 
 	(MainWindow.performFullScreen): Activate cursor hiding only when
 	the window is maximized.

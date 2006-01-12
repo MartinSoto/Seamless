@@ -26,7 +26,7 @@ import gtk
 
 import debug
 import player
-from baseui import UIManager, ActionGroup, action
+from baseui import UIManager, ActionGroup, action, toggleAction
 import mainwindow
 
 # "Plugins"
@@ -112,10 +112,10 @@ class MainUserInterface(UIManager):
             ui.player.menu()
 
 
-        @action(stockId=gtk.STOCK_MEDIA_PAUSE, accel='p',
+        @toggleAction(stockId=gtk.STOCK_MEDIA_PAUSE, accel='p',
                 tooltip=_('Pause playback'))
         def pause(ui, action):
-            ui.player.pause()
+            ui.player.pause(action.get_active())
 
         @action(stockId=gtk.STOCK_MEDIA_PREVIOUS, accel='Page_Up',
                 tooltip=_('Jump to previous chapter'))

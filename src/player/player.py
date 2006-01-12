@@ -80,13 +80,12 @@ class DVDPlayer(SignalHolder):
     def start(self):
         self.pipeline.set_state(gst.STATE_PLAYING)
 
-    def pause(self):
-        """Toggle between paused and playing."""
-        (status, state, pending) = self.pipeline.get_state()
-
-        if state == gst.STATE_PLAYING:
+    def pause(self, activate):
+        """Toggle between paused and playing. When `activate` is TRUE
+        pause playback, else continue playback."""
+        if activate:
             self.pipeline.set_state(gst.STATE_PAUSED)
-        elif state == gst.STATE_PAUSED:
+        else:
             self.pipeline.set_state(gst.STATE_PLAYING)
 
     @interactiveOp
