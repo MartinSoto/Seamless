@@ -87,7 +87,8 @@ class MainWindow(gtk.Window):
         self.set_title(_('Seamless DVD Player'))
         self.set_border_width(0)
         self.set_property('can-focus', True)
-        
+
+        self.connect('configure-event', self.mainConfigureEvent)
         self.connect('delete_event', self.mainDeleteEvent)
 
         vbox = gtk.VBox()
@@ -152,6 +153,9 @@ class MainWindow(gtk.Window):
     #
     # Callbacks
     #
+
+    def mainConfigureEvent(self, widget, event):
+        self.video.forceVideoUpdate()
 
     def mainDeleteEvent(self, widget, event):
         return False

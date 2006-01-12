@@ -32,7 +32,9 @@ class VideoWidget(gtk.DrawingArea):
                  'pipeline',
 
                  'cursorTimeout',
-                 'cursorTask')
+                 'cursorTask',
+
+                 'overlaySet')
 
     __gsignals__ = {
         'ready' : (gobject.SIGNAL_RUN_LAST,
@@ -63,6 +65,9 @@ class VideoWidget(gtk.DrawingArea):
         self.cursorTimeout = None
         self.cursorTask = None
 
+        # The video overlay window is not yet set.
+        self.overlaySet = False
+
 
     def setOverlay(self, overlay):
         assert isinstance(overlay, gst.interfaces.XOverlay)
@@ -88,12 +93,19 @@ class VideoWidget(gtk.DrawingArea):
 
     def do_expose_event(self, event):
         self.xlock.acquire()
-
         self.overlay.expose()
-
         self.xlock.release()
 
-        return True    
+        return True
+
+    def forceVideoUpdate(self):
+        """Force an update of the video display. This is used to keep
+        the video properly repainted when the main window is moved
+        without exposing any new area."""
+        if self.overlaySet:
+            self.xlock.acquire()
+            self.overlay.expose()
+            self.xlock.release()
 
 
     #
@@ -176,6 +188,7 @@ class VideoWidget(gtk.DrawingArea):
             return None
 
         self.overlay.set_xwindow_id(self.window.xid)
+        self.overlaySet = True
 
         # Remove the callback from the pipeline.
         self.pipeline.removeSyncBusHandler(self.prepareWindowCb)
@@ -184,6 +197,7 @@ class VideoWidget(gtk.DrawingArea):
 
     def deleteCb(self, da):
         self.overlay.set_xwindow_id(0L)
+        set.overlaySet = False
 
     def realizeCb(self, widget):
         # Start the cursor task.

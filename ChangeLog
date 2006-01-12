@@ -1,5 +1,18 @@
 2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/mainwindow.py (MainWindow.__init__) 
+	(MainWindow.mainConfigureEvent): React to the configure event in
+	the main window, to refresh the video overlay when
+	the window is moved. Previously, still frames and paused video got
+	badly displayed when moving the window.
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__init__, VideoWidget.forceVideoUpdate) 
+	(VideoWidget.prepareWindowCb, VideoWidget.deleteCb): Add a
+	public operation to refresh the video overlay.
+
+2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/mainui.py (MainUserInterface.alwaysAvailable.pause): Convert
 	the pause action into a toggle action. This make it a toggle on
 	the toolbar as well.
