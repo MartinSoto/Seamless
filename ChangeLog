@@ -1,3 +1,17 @@
+2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainwindow.py (MainWindow.__init__) 
+	(MainWindow.performFullScreen): Activate cursor hiding only when
+	the window is maximized.
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__init__, getInvisibleCursor) 
+	(VideoWidget.updateCursor, hidePointer) 
+	(VideoWidget.setCursorTimeout, motionCb, VideoWidget.realizeCb):
+	Reimplement cursor hiding as a tasklet, allow for a settable
+	timeout, and make the cursor blink before it gets hidden, so that
+	the user notices it.
+
 2006-01-11  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/tasklet/__init__.py: 

@@ -24,12 +24,15 @@ import gtk
 import gst
 import gst.interfaces
 
+import tasklet
+
 
 class VideoWidget(gtk.DrawingArea):
     __slots__ = ('overlay',
                  'pipeline',
-                 'cursorTimeout'
-                 'invisibleCursor')
+
+                 'cursorTimeout',
+                 'cursorTask')
 
     __gsignals__ = {
         'ready' : (gobject.SIGNAL_RUN_LAST,
@@ -41,7 +44,7 @@ class VideoWidget(gtk.DrawingArea):
         super(VideoWidget, self).__init__()
 
         # When double buffering is active, Gtk ends up painting on top
-        # of the overlay color, this completely breaking the video
+        # of the overlay color, thus completely breaking the video
         # display.
         self.set_double_buffered(False)
         self.set_app_paintable(True)
@@ -50,8 +53,7 @@ class VideoWidget(gtk.DrawingArea):
         self.xlock = threading.RLock()
 
         self.set_events(gtk.gdk.POINTER_MOTION_MASK)
-        self.connect('motion-notify-event', self.motionCb)
-        self.connect('destroy', self.destroyCb)
+        self.connect('delete-event', self.deleteCb)
         self.connect('realize', self.realizeCb)
 
         self.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse('black'))
@@ -59,7 +61,7 @@ class VideoWidget(gtk.DrawingArea):
         self.overlay = None
 
         self.cursorTimeout = None
-        self.invisibleCursor = None
+        self.cursorTask = None
 
 
     def setOverlay(self, overlay):
@@ -95,27 +97,75 @@ class VideoWidget(gtk.DrawingArea):
 
 
     #
-    # Internal Operations
+    # Cursor
     #
 
-    def getInvisibleCursor(self):
-        if self.invisibleCursor:
-           return self.invisibleCursor
-
+    def updateCursor(self):
+        # Create an invisible cursor object.
         display = self.get_display()
-        if display == None:
-            return None
+        assert display
 
         pixbuf = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8, 1, 1)
         pixbuf.fill(0x00000000)
-        self.invisibleCursor = gtk.gdk.Cursor(display, pixbuf, 0, 0);
-        return self.invisibleCursor
+        invisibleCursor = gtk.gdk.Cursor(display, pixbuf, 0, 0);
+        
+        hidden = False
 
-    def hidePointer(self):
-        self.window.set_cursor(self.getInvisibleCursor())
-        self.cursorTimeout = None
-        return False
+        update = tasklet.WaitForMessages(accept='timeoutUpdated')
+        motion = tasklet.WaitForSignal(self, 'motion-notify-event')
+        delete = tasklet.WaitForSignal(self, 'delete-event')
 
+        while True:
+            if self.cursorTimeout == None:
+                # Cursor always visible, check only for updates.
+                yield (update, delete)
+            elif hidden:
+                # Cursor already hidden, no firther timeout check.
+                yield (update, motion, delete)
+            else:
+                yield (update, motion, delete,
+                       tasklet.WaitForTimeout(1000 * self.cursorTimeout))
+            event = tasklet.get_event()
+
+            if isinstance(event, tasklet.WaitForSignal) and \
+                   event.signal == 'delete-event':
+                # Finish the task.
+                return
+            elif isinstance(event, tasklet.WaitForTimeout):
+                # Blink the cursor.
+                on = False
+                for i in range(11):
+                    if on:
+                        self.window.set_cursor(None)
+                        hidden = False
+                    else:
+                        self.window.set_cursor(invisibleCursor)
+                        hidden = True
+
+                    yield (update, motion, delete,
+                           tasklet.WaitForTimeout(200))
+                    event = tasklet.get_event()
+                    
+                    if isinstance(event, tasklet.WaitForSignal) and \
+                           event.signal == 'delete-event':
+                        return
+                    elif isinstance(event, tasklet.WaitForTimeout):
+                        on = not on
+                    else:
+                        self.window.set_cursor(None)
+                        hidden = False
+                        break
+            else:
+                self.window.set_cursor(None)
+                hidden = False
+
+    def setCursorTimeout(self, timeout):
+        assert timeout == None or timeout >= 0
+
+        self.cursorTimeout = timeout
+        # Tell the cursor task that the timeout was updated.
+        if self.cursorTask:
+            self.cursorTask.send_message(tasklet.Message('timeoutUpdated'))
 
     #
     # Callbacks
@@ -132,19 +182,12 @@ class VideoWidget(gtk.DrawingArea):
 
         return gst.BUS_DROP
 
-    def motionCb(self, widget, event):
-        if self.cursorTimeout == None:
-            self.window.set_cursor(None)
-        else:
-            gobject.source_remove(self.cursorTimeout)
-        self.cursorTimeout = gobject.timeout_add(5000, self.hidePointer)
-
-    def destroyCb(self, da):
+    def deleteCb(self, da):
         self.overlay.set_xwindow_id(0L)
 
     def realizeCb(self, widget):
-        # Hide the pointer now.
-        self.hidePointer()
+        # Start the cursor task.
+        self.cursorTask = tasklet.run(self.updateCursor())
 
         # We are ready to display video. The 'ready' signal could
         # actually set up the image sink.

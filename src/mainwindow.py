@@ -110,6 +110,8 @@ class MainWindow(gtk.Window):
         self.video.connect('key-press-event', self.videoKeyPress)
         self.video.grab_focus()
 
+        self.video.setCursorTimeout(None)
+
         # FIXME: If the video sink doesn't support XOverlay, we have a
         # problem.
         self.video.setOverlay(self.player.getVideoSink())
@@ -135,10 +137,12 @@ class MainWindow(gtk.Window):
             self.topBox.hide()
             self.set_keep_above(1)
             self.video.grab_focus()
+            self.video.setCursorTimeout(5)
         else:
             self.unfullscreen()
             self.topBox.show()
             self.set_keep_above(0)
+            self.video.setCursorTimeout(None)
 
     def toggleFullScreen(self):
         self.fullScreen = not self.fullScreen
