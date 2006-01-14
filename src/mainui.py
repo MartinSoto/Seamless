@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
+
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
@@ -54,8 +55,9 @@ class MainUserInterface(UIManager):
 
         # Create the main window.
         self.window = mainwindow.MainWindow(self)
-
         self.window.connect('destroy', lambda widget: self.shutDown())
+        self.window.fullScreen(options.fullScreen)
+        self.window.show()
 
         # Initialize all 'plugins'.
         # FIXME: A decent framework for extensions is necessary here.
@@ -136,6 +138,11 @@ class MainUserInterface(UIManager):
                 tooltip=_('Jump 10 seconds forward'))
         def forward10(ui, action):
             ui.player.forward10()
+
+
+        @toggleAction(stockId=gtk.STOCK_FULLSCREEN)
+        def fullScreen(ui, action):
+            ui.window.fullScreen(action.get_active())
 
 
         @action(label=_("Next Audio"), accel='F2',

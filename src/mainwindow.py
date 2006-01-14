@@ -28,8 +28,11 @@ class MainWindow(gtk.Window):
 
                 'player',
 
+                'topBox',
                 'video',
-                'topBox')
+                'leaveFullScreenBox',
+
+                'fullScreenActive')
 
     def __init__(self, mainUi):
         super(MainWindow, self).__init__()
@@ -37,7 +40,6 @@ class MainWindow(gtk.Window):
         self.mainUi = mainUi
 
         self.player = mainUi.getPlayer()
-        options = mainUi.getOptions()
 
         # Give the window a reasonable minimum size.
         self.set_size_request(480, 360)
@@ -53,13 +55,21 @@ class MainWindow(gtk.Window):
         <ui>
           <toolbar name="toolbar">
             <toolitem action="menu"/>
+
             <separator/>
+
             <toolitem action="pause"/>
+
             <separator/>
+
             <toolitem action="prevProgram"/>
             <toolitem action="backward10"/>
             <toolitem action="forward10"/>
             <toolitem action="nextProgram"/>
+
+            <separator/>
+
+            <toolitem action="fullScreen"/>
           </toolbar>
 
           <accelerator action="menu"/>
@@ -92,23 +102,24 @@ class MainWindow(gtk.Window):
         self.connect('delete_event', self.mainDeleteEvent)
 
         vbox = gtk.VBox()
+        vbox.show()
         self.add(vbox)
 
+        # An additional box makes it possible to hide/show all top
+        # elements in a single operation.
         self.topBox = gtk.VBox()
         vbox.pack_start(self.topBox, expand=False)
 
         toolbar = self.mainUi.get_widget('/toolbar')
+        toolbar.show()
         self.topBox.pack_start(toolbar, expand=False)
 
         self.video = videowidget.VideoWidget()
+        self.video.show()
         vbox.pack_start(self.video)
-        
-        self.video.add_events(gtk.gdk.BUTTON_PRESS_MASK)
-        self.video.connect('ready', self.videoReady)
-        self.video.connect('button-press-event', self.videoButtonPress)
-
         self.video.set_property('can-focus', True)
         self.video.connect('key-press-event', self.videoKeyPress)
+        self.video.connect('ready', self.videoReady)
         self.video.grab_focus()
 
         self.video.setCursorTimeout(None)
@@ -117,37 +128,68 @@ class MainWindow(gtk.Window):
         # problem.
         self.video.setOverlay(self.player.getVideoSink())
 
-        # Show the window with all of its subwidgets.
-        self.show_all()
+        # A table container allows us to lay widgets on top of the
+        # video display.
+        table = gtk.Table(3, 3)
+        table.show()
+        self.video.add(table)
 
-        # Set the full screen mode.
-        self.fullScreen = options.fullScreen
-        self.performFullScreen()
+        # An expansive empty label in the middle position forces
+        # widgets in the corners to shrink to their natural sizes.
+        expandLabel = gtk.Label()
+        expandLabel.show()
+        table.attach(expandLabel, left_attach=1, right_attach=2,
+                     top_attach=1, bottom_attach=2)
+
+        # The fullscreen cancel button. In order for widgets to be
+        # visible on top of the video overlay, they must have a
+        # window. For this reason we put the button in an event box.
+        self.leaveFullScreenBox = gtk.EventBox()
+        table.attach(self.leaveFullScreenBox, left_attach=2, right_attach=3,
+                     top_attach=0, bottom_attach=1,
+                     xoptions=0, yoptions=0, xpadding=10, ypadding=10)
+        
+        leaveFullScreen = gtk.Button(stock=gtk.STOCK_LEAVE_FULLSCREEN)
+        leaveFullScreen.show()
+        leaveFullScreen.connect('clicked', self._leaveFullScreenClicked)
+        self.leaveFullScreenBox.add(leaveFullScreen)
+
+        # No fullscreen by default.
+        self.fullScreenActive = False
+        self.video.connect('cursor-hidden', self._videoCursorHidden)
+        self.video.connect('cursor-shown', self._videoCursorShown)
 
 
     #
-    # Fullscreen Support
+    # Full Screen Support
     #
 
-    def isFullScreen(self):
-        return self.fullScreen
-
-    def performFullScreen(self):
-        if self.fullScreen:
-            self.fullscreen()
+    def fullScreen(self, activate):
+        self.fullScreenActive = activate
+        if activate:
             self.topBox.hide()
-            self.set_keep_above(1)
             self.video.grab_focus()
             self.video.setCursorTimeout(5)
+            self.fullscreen()
+            self.set_keep_above(1)
+            self.leaveFullScreenBox.show()
         else:
+            self.leaveFullScreenBox.hide()
             self.unfullscreen()
-            self.topBox.show()
             self.set_keep_above(0)
+            self.topBox.show()
             self.video.setCursorTimeout(None)
 
-    def toggleFullScreen(self):
-        self.fullScreen = not self.fullScreen
-        self.performFullScreen()
+    def _videoCursorHidden(self, widget):
+        if self.fullScreenActive:
+            self.leaveFullScreenBox.hide()
+
+    def _videoCursorShown(self, widget):
+        if self.fullScreenActive:
+            self.leaveFullScreenBox.show()
+
+    def _leaveFullScreenClicked(self, widget):
+        self.mainUi.fullScreen.set_active(False)
 
 
     #
@@ -164,9 +206,6 @@ class MainWindow(gtk.Window):
         # Start the player.
         self.player.start()
 
-    def videoButtonPress(self, widget, event):
-        self.toggleFullScreen()
-
     def videoKeyPress(self, widget, event):
         keyName = gtk.gdk.keyval_name(event.keyval)
 
@@ -182,6 +221,8 @@ class MainWindow(gtk.Window):
             self.mainUi.right.activate()
         elif keyName == 'Return':
             self.mainUi.confirm.activate()
+        elif keyName == 'Escape':
+            self.mainUi.fullScreen.set_active(False)
         else:
             return False
 

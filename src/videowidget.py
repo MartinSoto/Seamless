@@ -27,7 +27,7 @@ import gst.interfaces
 import tasklet
 
 
-class VideoWidget(gtk.DrawingArea):
+class VideoWidget(gtk.EventBox):
     __slots__ = ('overlay',
                  'pipeline',
 
