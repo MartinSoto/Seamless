@@ -1,5 +1,11 @@
 2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/mainui.py (MainUserInterface.alwaysAvailable)
+	(MainUserInterface.alwaysAvailable): Fix misspellings in tooltip
+	strings.
+
+2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/videowidget.py (VideoWidget.__slots__) 
 	(VideoWidget.__gsignals__, VideoWidget.__init__) 
 	(VideoWidget._showCursor, VideoWidget._hideCursor) 

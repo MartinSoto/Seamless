@@ -128,12 +128,12 @@ class MainUserInterface(UIManager):
             ui.player.nextProgram()
 
         @action(stockId=gtk.STOCK_MEDIA_REWIND, accel='<Shift>Left',
-                tooltip=_('Jump 10 seconds backwards'))
+                tooltip=_('Jump 10 seconds backward'))
         def backward10(ui, action):
             ui.player.backward10()
 
         @action(stockId=gtk.STOCK_MEDIA_FORWARD, accel='<Shift>Right',
-                tooltip=_('Jump 10 seconds forwards'))
+                tooltip=_('Jump 10 seconds forward'))
         def forward10(ui, action):
             ui.player.forward10()
 
