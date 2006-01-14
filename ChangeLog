@@ -1,3 +1,8 @@
+2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/tasklet/__init__.py (initTask): Add a generator to convert
+	the __init__ method of class into a generator.
+
 2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/videowidget.py (VideoWidget.__init__, realizeCb)

@@ -25,3 +25,19 @@ def task(generator):
         return tasklet.run(generator(*args, **keywords))
 
     return wrapper
+
+def initTask(generator):
+    """A decorator to convert an __init__ method into a tasklet.
+
+    Creating an object with such an __init__ method will automatically
+    start the task. If the object has a writable `_mainTask'
+    attribute, it will be set to task object."""
+
+    def wrapper(self, *args, **keywords):
+        taskObj = tasklet.run(generator(self, *args, **keywords))
+        try:
+            self._mainTask = taskObj
+        except:
+            pass
+
+    return wrapper
