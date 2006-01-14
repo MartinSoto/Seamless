@@ -1,5 +1,16 @@
 2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__gsignals__, VideoWidget.__init__) 
+	(VideoWidget._showCursor, VideoWidget._hideCursor) 
+	(VideoWidget._updateCursor, mapCb): Further VideoWidget
+	rework. The __init__ method is now a tasklet that waits until a
+	map event arrives to initialize the window. This ensures that
+	initialization happens only once. There are also new signals
+	cursor-hidden and cursor-shown.
+
+2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/tasklet/__init__.py (initTask): Add a generator to convert
 	the __init__ method of class into a generator.
 
