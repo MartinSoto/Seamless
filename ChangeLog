@@ -1,3 +1,9 @@
+2006-01-15  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/seamless/dvdblocksrc.c (dvdblocksrc_class_init) 
+	(dvdblocksrc_do_seek): Actually pass the segment as parameter to the
+	do-seek signal.
+
 2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/mainui.py (MainUserInterface.__init__)

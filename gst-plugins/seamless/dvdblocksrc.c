@@ -174,7 +174,7 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
         G_SIGNAL_RUN_LAST,
         G_STRUCT_OFFSET (DVDBlockSrcClass, do_seek),
         NULL, NULL,
-        g_cclosure_marshal_VOID__BOXED,
+        gst_marshal_VOID__BOXED,
         G_TYPE_NONE,
         1, GST_TYPE_SEGMENT);
 
@@ -555,7 +555,7 @@ dvdblocksrc_do_seek (GstBaseSrc *src, GstSegment *segment)
   GST_DEBUG_OBJECT (src, "doing seek");
 
   g_signal_emit (G_OBJECT (src),
-        dvdblocksrc_signals[DO_SEEK_SIGNAL], 0);
+        dvdblocksrc_signals[DO_SEEK_SIGNAL], 0, segment);
 
   return TRUE;
 }
