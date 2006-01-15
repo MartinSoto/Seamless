@@ -457,6 +457,10 @@ class Manager(object):
 
             self.mainItr.push(self.__class__.flush)
 
+            # Don't allow this function to enter at all, unless the
+            # flush operation is complete.
+            self.flushing = True
+
         gst.debug("end run interactive")
 
 
@@ -615,7 +619,6 @@ class Manager(object):
 
         self.audioShutdown = False
 
-        self.flushing = True
         self.showingStill = False
 
         # Start the actual flush operation.

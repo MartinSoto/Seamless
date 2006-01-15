@@ -1,5 +1,14 @@
 2006-01-15  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (Manager.runInteractive, Manager.flush):
+	Change the point where the 'flushing' attribute is set to True, to
+	ensure that it isn't possible to enter runInteractive while a
+	flush operation is in progress. This fixes a race condition that
+	was causing the player to block when many flushes happened close
+	to each other (i.e., when skipping chapters).
+
+2006-01-15  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/seamless/dvdblocksrc.c (dvdblocksrc_class_init) 
 	(dvdblocksrc_do_seek): Actually pass the segment as parameter to the
 	do-seek signal.
