@@ -1,5 +1,12 @@
 2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/seamless.py (main): Trap and report errors caused by not
+	found plugins. Use message.errorDialog for all errors.
+
+	* src/message.py: New module for message dialogs.
+
+2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/seamless.py (main): Use a dialog box to report problems when
 	the DVD cannot be open.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Seamless DVD Player
-# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -54,6 +54,7 @@ sys.argv.extend(helpOpts)
 
 import player
 import mainui
+import message
 
 
 class DictOptions(object):
@@ -152,24 +153,28 @@ def main():
     try:
         playerObj = player.DVDPlayer(options)
     except IOError, e:
-        main_msg = _("Cannot open DVD in path '%s'") % options.location
-        dialog =  gtk.MessageDialog(type=gtk.MESSAGE_ERROR,
-                                    buttons=gtk.BUTTONS_CLOSE,
-                                    message_format=main_msg)
-        sec_msg = _("Your DVD drive could not be found. You may try to "
-                    "use the --device command line option to specify the "
-                    "correct device path to your drive. If you are sure"
-                    " that you specified a valid path, verify that you "
-                    "have read access to the device.")
-        dialog.format_secondary_markup(sec_msg)
-        dialog.connect('response', gtk.main_quit)
-        dialog.show()
-        gtk.main()
+        mainMsg = _("Cannot open DVD in path '%s'") % options.location
+        secMsg = _("Your DVD drive could not be found. You may try to "
+                   "use the --device command line option to specify the "
+                   "correct device path to your drive. If you are sure"
+                   " that you specified a valid path, verify that you "
+                   "have read access to the device.")
+        message.errorDialog(mainMsg, secMsg)
         return 1
+    except gst.PluginNotFoundError, e:
+        mainMsg = _("Cannot find GStreamer plugin '%s'") % str(e)
+        secMsg = _("GStreamer is the multimedia system used by this "
+                   "program to play video and audio, and it seems to "
+                   "be installed incompletely or configured incorrectly"
+                   " in your machine. Check your software installation"
+                   " and try starting this program again.")
+        message.errorDialog(mainMsg, secMsg)
+        return 1        
 
     appInstance = mainui.MainUserInterface(playerObj, options)
-    gtk.main()
 
+    # Get into the main loop.
+    gtk.main()
     return 0
 
 if __name__ == "__main__":
