@@ -169,7 +169,14 @@ def main():
                    " in your machine. Check your software installation"
                    " and try starting this program again.")
         message.errorDialog(mainMsg, secMsg)
-        return 1        
+        return 1
+    except player.PipelineParseError, e:
+        secMsg = _("A Gstreamer pipeline specified through the command"
+                   " line options could not be parsed, or tried to use"
+                   " unavailable GStreamer elements. Check your command"
+                   " line and try again.")
+        message.errorDialog(str(e), secMsg)
+        return 1
 
     appInstance = mainui.MainUserInterface(playerObj, options)
 

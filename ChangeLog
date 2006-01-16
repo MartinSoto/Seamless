@@ -1,5 +1,15 @@
 2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/seamless.py (main): Trap and report errors caused by
+	incorrect pipelines specified in the command line.
+
+	* src/player/pipeline.py (PipelineParseError) 
+	(Bin.makeParsedSubelem): 
+	* src/player/__init__.py: 
+	Raise a custom exception when a pipeline cannot be parsed.
+
+2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/seamless.py (main): Trap and report errors caused by not
 	found plugins. Use message.errorDialog for all errors.
 

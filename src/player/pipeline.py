@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -24,6 +24,10 @@ import gst
 import loadplugins
 
 
+class PipelineParseError(Exception):
+    pass
+
+
 class Bin(gst.Bin):
     """An enhanced GStreamer bin."""
 
@@ -41,7 +45,13 @@ class Bin(gst.Bin):
         if name == None:
             name = type
 
-        subelem = gst.parse_launch(descr)
+        try:
+            subelem = gst.parse_launch(descr)
+        except gobject.GError, e:
+            raise PipelineParseError(
+                _("Error parsing GStreamer pipeline '%s': %s") %
+                (descr, str(e)))
+
         subelem.set_property('name', name)
 
         self.addSubelem(subelem, **keywords)
