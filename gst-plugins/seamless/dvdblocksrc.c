@@ -48,6 +48,7 @@ static GstElementDetails dvdblocksrc_details = GST_ELEMENT_DETAILS (
 enum {
   VOBU_READ_SIGNAL,
   VOBU_HEADER_SIGNAL,
+  EVENT_SIGNAL,
   DO_SEEK_SIGNAL,
   LAST_SIGNAL,
 };
@@ -102,6 +103,9 @@ dvdblocksrc_get_property (GObject *object,
     guint prop_id, 
     GValue *value,
     GParamSpec *pspec);
+
+static gboolean
+dvdblocksrc_event (GstBaseSrc * src, GstEvent * event);
 
 static GstFlowReturn
 dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf);
@@ -168,6 +172,15 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
         gst_marshal_VOID__BOXED,
         G_TYPE_NONE,
         1, GST_TYPE_BUFFER);
+  dvdblocksrc_signals[EVENT_SIGNAL] =
+    g_signal_new ("event",
+        G_TYPE_FROM_CLASS (klass),
+        G_SIGNAL_RUN_LAST,
+        G_STRUCT_OFFSET (DVDBlockSrcClass, event_signal),
+        NULL, NULL,
+        gst_marshal_VOID__BOXED,
+        G_TYPE_NONE,
+        1, GST_TYPE_EVENT);
   dvdblocksrc_signals[DO_SEEK_SIGNAL] =
     g_signal_new ("do-seek",
         G_TYPE_FROM_CLASS (klass),
@@ -206,6 +219,7 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
           FALSE, G_PARAM_READWRITE));
 
   gstbasesrc_class->stop = dvdblocksrc_stop;
+  gstbasesrc_class->event = dvdblocksrc_event;
   gstbasesrc_class->is_seekable = dvdblocksrc_is_seekable;
   gstbasesrc_class->do_seek = dvdblocksrc_do_seek;
 
@@ -338,6 +352,19 @@ dvdblocksrc_get_property (GObject *object, guint prop_id,
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
+  }
+}
+
+
+static gboolean
+dvdblocksrc_event (GstBaseSrc * src, GstEvent * event)
+{
+  if (GST_BASE_SRC_CLASS (parent_class)->event) {
+    g_signal_emit (G_OBJECT (src),
+        dvdblocksrc_signals[EVENT_SIGNAL], 0, event);
+    return GST_BASE_SRC_CLASS (parent_class)->event (src, event);
+  } else {
+    return FALSE;
   }
 }
 

@@ -1,5 +1,25 @@
 2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/videowidget.py (VideoWidget.__init__, VideoWidget.deleteCb):
+	Manually send button press navigation events up the pipeline,
+	since Gtk seems to be preventing the GStreamer components from
+	doing so automatically.
+
+	* src/player/player.py (DVDPlayer.__init__) 
+	(DVDPlayer.sourceEvent, DVDPlayer.selectByPos) 
+	(DVDPlayer.confirmByPos): Select the button under the mouse cursor
+	according to navigation events, and confirm on button press.
+
+	* src/machine/machine.py (VirtualMachine.getButtonByPos): New
+	method to find the button corresponding to a screen position.
+
+	* gst-plugins/seamless/dvdblocksrc.h: 
+	* gst-plugins/seamless/dvdblocksrc.c
+	(dvdblocksrc_class_init, dvdblocksrc_event): New 'event' signal
+	that gets fired every time an upstream event arrives to the sink.
+
+2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/seamless.py (main): Trap and report errors caused by
 	incorrect pipelines specified in the command line.
 

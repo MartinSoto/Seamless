@@ -37,7 +37,8 @@ class DVDPlayer(SignalHolder):
     __slots__ = ('info',
                  'machine',
                  'pipeline',
-                 'manager')
+                 'manager',
+                 'src')
 
     def __init__(self, options):
         # Create an info object for the DVD.
@@ -49,6 +50,11 @@ class DVDPlayer(SignalHolder):
         self.machine = machine.VirtualMachine(self.info)
         self.pipeline = pipeline.Pipeline(options)
         self.manager = manager.Manager(self.machine, self.pipeline)
+
+        # Listen to navigation (upstream) events arriving to the
+        # source element.
+        self.src = self.pipeline.getBlockSource()
+        self.src.connect('event', self.sourceEvent)
 
         # Set the region.
         self.setRegion(int(options.region))
@@ -272,3 +278,41 @@ class DVDPlayer(SignalHolder):
             return
 
         yield Call(self.machine.callMenu(dvdread.MENU_TYPE_ROOT, 0))
+
+
+    #
+    # Navigation Events
+    #
+
+    def sourceEvent(self, src, event):
+        if event.type == gst.EVENT_NAVIGATION:
+            structure = event.get_structure()
+            if structure.has_name('application/x-gst-navigation'):
+                if structure['event'] == 'mouse-move':
+                    self.selectByPos(int(structure['pointer_x']),
+                                     int(structure['pointer_y']))
+                elif structure['event'] == 'mouse-button-press':
+                    self.confirmByPos(int(structure['pointer_x']),
+                                      int(structure['pointer_y']))
+
+    @interactiveOp
+    def selectByPos(self, x, y):
+        buttonNr = self.machine.getButtonByPos(x, y)
+        if buttonNr == None:
+            return
+
+        yield Call(self.selectButtonInteractive(buttonNr))
+
+    @interactiveOp
+    def confirmByPos(self, x, y):
+        buttonNr = self.machine.getButtonByPos(x, y)
+        if buttonNr == None:
+            return
+
+        yield Call(self.machine.selectButton(buttonNr))
+
+        btnObj = self.machine.getButtonObj()
+        if btnObj == None:
+            return
+
+        yield Call(self.machine.buttonCommand(btnObj.command))
