@@ -18,7 +18,6 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-
 import os
 import string
 import sys
@@ -150,10 +149,28 @@ def main():
         optParser.error(_("invalid argument(s): %s") % string.join(args, ' '))
 
     # Create the main objects.
-    playerObj = player.DVDPlayer(options)
-    appInstance = mainui.MainUserInterface(playerObj, options)
+    try:
+        playerObj = player.DVDPlayer(options)
+    except IOError, e:
+        main_msg = _("Cannot open DVD in path '%s'") % options.location
+        dialog =  gtk.MessageDialog(type=gtk.MESSAGE_ERROR,
+                                    buttons=gtk.BUTTONS_CLOSE,
+                                    message_format=main_msg)
+        sec_msg = _("Your DVD drive could not be found. You may try to "
+                    "use the --device command line option to specify the "
+                    "correct device path to your drive. If you are sure"
+                    " that you specified a valid path, verify that you "
+                    "have read access to the device.")
+        dialog.format_secondary_markup(sec_msg)
+        dialog.connect('response', gtk.main_quit)
+        dialog.show()
+        gtk.main()
+        return 1
 
+    appInstance = mainui.MainUserInterface(playerObj, options)
     gtk.main()
 
+    return 0
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

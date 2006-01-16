@@ -1,3 +1,8 @@
+2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/seamless.py (main): Use a dialog box to report problems when
+	the DVD cannot be open.
+
 2006-01-15  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/manager.py (Manager.runInteractive, Manager.flush):
