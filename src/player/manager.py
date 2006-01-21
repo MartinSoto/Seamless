@@ -143,7 +143,6 @@ class Manager(object):
                  'palette',
 
                  'audio',
-                 'audioShutdown',
 
                  'interactiveCount',
                  'vobuReadReturn',
@@ -190,7 +189,6 @@ class Manager(object):
 
         # The audio state:
         self.audio = -1
-        self.audioShutdown = False
 
         # A counter that increments itself whenever an interactive
         # operation is executed. It is used to deal with call/resume
@@ -527,18 +525,6 @@ class Manager(object):
 
         self.sendEvent(events.audio(self.audio))
 
-    def shutdownAudio(self):
-        """Shutdown the audio pipeline."""
-        gst.debug('Shutting down audio')
-        self.audioShutdown = True
-        self.sendEvent(events.audioShutdown())
-
-    def restartAudio(self):
-        """Restart the audio pipeline."""
-        gst.debug('Restarting audio')
-        self.audioShutdown = False
-        self.sendEvent(events.audioRestart())
-
     def setSubpicture(self, phys, hide):
         """Set the physical subpicture stream to `phys`.
 
@@ -610,8 +596,6 @@ class Manager(object):
 
         self.segmentStart = None
         self.segmentStop = None
-
-        self.audioShutdown = False
 
         self.showingStill = False
 

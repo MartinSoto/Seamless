@@ -1,5 +1,12 @@
 2006-01-21  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(shutdownAudio, restartAudio, Manager.flush): 
+	* src/player/events.py (audioShutdown, audioRestart): Get rid of
+	all code related to audio shutdown/restart operations.
+
+2006-01-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.vobuHeader): Partially adapt
 	audio shutdown code to send fill gap events instead. Still work in
 	progress.

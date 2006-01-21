@@ -92,18 +92,6 @@ def audioFillGap(start, stop):
     st.set_value('stop', stop, 'uint64')
     return createCustom(st)
 
-def audioShutdown():
-    """Create and return an audio shutdown event."""
-    st = gst.Structure('application/x-gst-dvd')
-    st.set_value('event', 'dvd-audio-shutdown')
-    return createCustom(st)
-
-def audioRestart():
-    """Create and return an audio restart event."""
-    st = gst.Structure('application/x-gst-dvd')
-    st.set_value('event', 'dvd-audio-restart')
-    return createCustom(st)
-
 
 #
 # Subpicture DVD Events
