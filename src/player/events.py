@@ -83,6 +83,15 @@ def audio(physical):
     st.set_value('physical', physical, 'int')
     return createCustom(st)
 
+def audioFillGap(start, stop):
+    """Create and return a new audio fill gap event for the specified
+    start and stop times."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-audio-fill-gap')
+    st.set_value('start', start, 'uint64')
+    st.set_value('stop', stop, 'uint64')
+    return createCustom(st)
+
 def audioShutdown():
     """Create and return an audio shutdown event."""
     st = gst.Structure('application/x-gst-dvd')

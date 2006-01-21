@@ -283,14 +283,16 @@ class BackPlayer(Bin):
     def __init__(self, options, name='backplayer'):
         super(BackPlayer, self).__init__(name)
 
-        src = self.makeSubelem('dvdblocksrc', location=options['location'])
-        demux = self.makeSubelem('dvddemux')
+        self.makeSubelem('dvdblocksrc', location=options['location'])
+        self.makeSubelem('dvddemux')
+        self.makeSubelem('audiofiller')
 
         self.link('dvdblocksrc', 'dvddemux')
+        self.linkPads('dvddemux', 'current_audio', 'audiofiller', 'sink')
 
         self.ghostify('dvddemux', 'current_video', 'video')
         self.ghostify('dvddemux', 'current_subpicture', 'subtitle')
-        self.ghostify('dvddemux', 'current_audio', 'audio')
+        self.ghostify('audiofiller', 'src', 'audio')
 
     def getBlockSource(self):
         return self.get_by_name('dvdblocksrc')

@@ -283,18 +283,12 @@ class Manager(object):
         self.sendEvent(events.newsegment(update, self.segmentStart,
                                          self.segmentStop))
 
-        # Check for audio shutdown.
-        if not self.audioShutdown and \
-               (self.audio == -1 or \
-                nav.getFirstAudioOffset(self.audio + 1) == 0x0000 or
-                nav.getFirstAudioOffset(self.audio + 1) == 0x3fff):
-            self.shutdownAudio()
-        elif self.audioShutdown and \
-             self.audio != -1 and \
-             nav.getFirstAudioOffset(self.audio + 1) != 0x0000 and \
-             nav.getFirstAudioOffset(self.audio + 1) != 0x3fff:
-            self.restartAudio()
-
+        if self.audio == -1 or \
+           nav.getFirstAudioOffset(self.audio + 1) == 0x0000 or \
+           nav.getFirstAudioOffset(self.audio + 1) == 0x3fff:
+            # This VOBU has no audio. Fill with silence.
+            self.sendEvent(events.audioFillGap(start, stop))
+            
         # FIXME: This should be done later in the game, namely, when
         # the packet actually reaches the subtitle element.
         self.machine.callIterator(self.machine.setButtonNav(nav))

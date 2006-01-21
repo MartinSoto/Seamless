@@ -1,3 +1,24 @@
+2006-01-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.vobuHeader): Partially adapt
+	audio shutdown code to send fill gap events instead. Still work in
+	progress.
+
+	* src/player/events.py (audioFillGap): New function to create
+	audio fill gap events.
+
+	* src/player/pipeline.py (BackPlayer.__init__): Insert an
+	audiofiller element between the demux and the audio pipeline.
+
+	* gst-plugins/seamless/Makefile.am (libseamless_la_SOURCES) 
+	(noinst_HEADERS): 
+	* gst-plugins/seamless/seamlessinit.c (plugin_init): 
+	* gst-plugins/seamless/audiofiller.c: New element intended to fill
+	audio gaps. When receiving a dvd-audio-fill-gap event, it sends as
+	much PCM silence down the pipeline as the event specifies. This is
+	though as an interim solution until GStreamer has working sparse
+	stream support.
+
 2006-01-17  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* README: Point to SourceForge instead of GNA.
