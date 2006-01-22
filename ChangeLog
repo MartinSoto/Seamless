@@ -3,6 +3,20 @@
 	WARNING: This patch breaks unlimited still frames, thus making
 	many DVDs unplayable.
 
+	* src/player/manager.py (synchronized.wrapper): Actually return
+	the return value of the wrapped method.
+	(Manager.__init__, Manager.runInteractive, Manager.flush) 
+	(Manager.flushMsgHandler): Yet another flush revamp. Now the flush
+	operation is executed synchronously from runInteractive.
+	(Manager.cancelVobu): Reactivate use of the cancel-vobu property.
+
+	* gst-plugins/seamless/dvdblocksrc.c (dvdblocksrc_create): Better
+	debugging info.
+	(dvdblocksrc_do_seek): Cancel playback of the current VOBU. Not
+	doing that is an effective way of making mpeg2dec crash.
+
+2006-01-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/pipeline.py (SoftwareAudio.__init__): Limit the queue
 	by size as well.
 

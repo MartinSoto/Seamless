@@ -475,7 +475,8 @@ dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
 
   *outbuf = buf;
 
-  GST_LOG_OBJECT (src, "leaving create normally");
+  GST_LOG_OBJECT (src, "leaving create normally, buf: %p, size: %d, data: %p",
+      buf, GST_BUFFER_SIZE (buf), GST_BUFFER_DATA (buf));
 
  done:
   g_mutex_unlock (src->cancel_lock);
@@ -577,9 +578,17 @@ dvdblocksrc_is_seekable (GstBaseSrc *src)
 
 
 static gboolean
-dvdblocksrc_do_seek (GstBaseSrc *src, GstSegment *segment)
+dvdblocksrc_do_seek (GstBaseSrc *bsrc, GstSegment *segment)
 {
+  DVDBlockSrc *src = DVDBLOCKSRC (bsrc);
+
   GST_DEBUG_OBJECT (src, "doing seek");
+
+  /* Cancel playback of the current VOBU. */
+  g_mutex_lock (src->cancel_lock);
+  src->vobu_start = -1;
+  src->block_count = 0;
+  g_mutex_unlock (src->cancel_lock);
 
   g_signal_emit (G_OBJECT (src),
         dvdblocksrc_signals[DO_SEEK_SIGNAL], 0, segment);

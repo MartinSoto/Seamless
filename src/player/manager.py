@@ -50,7 +50,7 @@ def synchronized(method):
     def wrapper(self, *args, **keywords):
         self.lock.acquire()
         try:
-            method(self, *args, **keywords)
+            return method(self, *args, **keywords)
         finally:
             self.lock.release()
 
@@ -100,7 +100,7 @@ class Manager(object):
     sequence of command objects (as an iterator) that, when invoked
     with the manager as parameter, perform the required operations.
     The machine is restricted to use the operations defined in the
-    `machine` module.
+    `machine.cmds` module.
 
     The `PlayVobu` operation is particularly important, since it is
     used by the machine to tell the pipeline which VOBU from the disk
@@ -165,9 +165,6 @@ class Manager(object):
         # The synchronized method lock.
         self.lock = threading.RLock()
 
-        # A bus message handler for the flush operation.
-        self.pipeline.get_bus().add_watch(self.flushMsgHandler)
-
         # Connect our signals to the source object.
         self.src.connect('vobu-read', self.vobuRead)
         self.src.connect('vobu-header', self.vobuHeader)
@@ -215,7 +212,7 @@ class Manager(object):
     def vobuRead(self, src):
         """Invoked by the source element after reading a complete
         VOBU."""
-        gst.log("Vobu read")
+        gst.log("VOBU read")
 
         # Commands expecting this method to return set vobuReadReturn
         # to True.
@@ -239,7 +236,7 @@ class Manager(object):
     @synchronized
     def vobuHeader(self, src, buf):
         """The signal handler for the source's vobu-header signal."""
-        gst.log("Vobu header")
+        gst.log("VOBU header")
 
         # Release the lock set by the playVobu operation.
         self.lock.release()
@@ -285,59 +282,6 @@ class Manager(object):
         # FIXME: This should be done later in the game, namely, when
         # the packet actually reaches the subtitle element.
         self.machine.callIterator(self.machine.setButtonNav(nav))
-
-
-    #
-    # Bus Message Handling
-    #
-
-    def flushMsgHandler(self, bus, msg):
-        """Implements pipeline flushing by sending a flushing seek
-        event from the application thread."""
-
-        # Flush is started by a seamless.Flush bus message. We pause
-        # the pipeline, send a seek event, and set the pipeline into
-        # motion again.
-        if msg.type & gst.MESSAGE_APPLICATION and \
-               msg.structure.has_name('seamless.Flush'):
-            # Flush message received, start flushing.
-            self.pipeline.set_state(gst.STATE_PAUSED)
-
-        elif self.flushing and \
-                 msg.type & gst.MESSAGE_STATE_CHANGED and \
-                 msg.src == self.pipeline:
-            (old, new, pending) =  msg.parse_state_changed()
-
-            if new == gst.STATE_PAUSED and \
-                   pending == gst.STATE_VOID_PENDING:
-                # The pipeline is paused.
-
-                self.pipeline.prepareFlush()
-
-                # Send the seek event from a single sink element to
-                # guarantee that it arrives only once to the source.
-                self.pipeline.getVideoSink().seek(1.0, gst.FORMAT_TIME,
-                                                  gst.SEEK_FLAG_FLUSH,
-                                                  gst.SEEK_TYPE_CUR, 0,
-                                                  gst.SEEK_TYPE_NONE, -1)
-
-                # Set the stream time to guarantee audio/video
-                # synchronization.
-                self.pipeline.set_new_stream_time(0L)
-
-                # Go back to playing.
-                self.pipeline.set_state(gst.STATE_PLAYING)
-
-            elif new == gst.STATE_PLAYING and \
-                     pending == gst.STATE_VOID_PENDING:
-                # We are playing again, complete the flush operation.
-
-                self.pipeline.closeFlush()
-            
-                self.flushing = False
-                gst.debug("flush completed")
-
-        return True
 
 
     #
@@ -395,14 +339,13 @@ class Manager(object):
         # pipeline. Otherwise, we flush the pipeline before executing
         # the collected commands.
         #
-        # There is a caveat, however: when an interactive operation
-        # performs a DVD call operation, the wrapper remains in the
-        # itersched stack, and will eventually return its
-        # `EndInteractive` when the DVD machine does a resume. For
-        # this reason, we put a consecutive count in the
-        # `EndInteractive` objects and check it in `collectCmds` to
-        # make sure that we are reacting to the right `EndInteractive`
-        # command.
+        # There is a caveat: when an interactive operation performs a
+        # DVD call operation, the wrapper remains in the itersched
+        # stack, and will eventually return its `EndInteractive` when
+        # the DVD machine does a resume. For this reason, we put a
+        # consecutive count in the `EndInteractive` objects and check
+        # it in `collectCmds` to make sure that we are reacting to the
+        # right `EndInteractive` command.
 
         if self.flushing:
             return
@@ -433,22 +376,79 @@ class Manager(object):
             for cmd in cmds:
                 cmd(self)
         else:
-            # We reached a VOBU playback operation while doing the
-            # interactive operation. Flush and go on.
-            self.cancelVobu()
-
             # Push back the collected commands so that they get
             # executed.
             for cmd in reversed(cmds):
                 self.mainItr.push(cmd)
 
-            self.mainItr.push(self.__class__.flush)
-
-            # Don't allow this function to enter at all, unless the
-            # flush operation is complete.
-            self.flushing = True
+            self.flush()
 
         gst.debug("end run interactive")
+
+    def flush(self):
+        """Flush the pipeline."""
+        gst.debug("flushing")
+            
+        # Don't allow interactive operations until the flush
+        # completes.
+        self.flushing = True
+
+        # Reset the highlight state.
+        self.area = None
+        self.button = None
+        self.palette = None
+
+        self.segmentStart = None
+        self.segmentStop = None
+
+        # Pause the pipeline and wait until the pipeline is paused.
+        self.pipeline.set_state(gst.STATE_PAUSED)
+        self.pipeline.get_state(gst.CLOCK_TIME_NONE)
+
+        self.pipeline.prepareFlush()
+
+        # Send the seek event from a single sink element to
+        # guarantee that it arrives only once to the source.
+        self.pipeline.getVideoSink().seek(1.0, gst.FORMAT_TIME,
+                                          gst.SEEK_FLAG_FLUSH,
+                                          gst.SEEK_TYPE_CUR, 0,
+                                          gst.SEEK_TYPE_NONE, -1)
+
+        # Set the stream time to guarantee audio/video
+        # synchronization.
+        self.pipeline.set_new_stream_time(0L)
+
+        # Set a bus message handler to react when the pipeline is
+        # actually playing and complete the flush operation. This
+        # cannot be done here because this method is mutually
+        # exclusive with vobuRead.
+        self.pipeline.get_bus().add_watch(self.flushMsgHandler)
+
+        # Go back to playing.
+        self.pipeline.set_state(gst.STATE_PLAYING)
+
+    @synchronized
+    def flushMsgHandler(self, bus, msg):
+        """Implements pipeline flushing by sending a flushing seek
+        event from the application thread."""
+
+        if msg.type & gst.MESSAGE_STATE_CHANGED and \
+               msg.src == self.pipeline:
+            (old, new, pending) =  msg.parse_state_changed()
+
+            if new == gst.STATE_PLAYING and \
+                   pending == gst.STATE_VOID_PENDING:
+                # We are playing again, complete the flush operation.
+
+                self.pipeline.closeFlush()
+            
+                self.flushing = False
+                gst.debug("flush completed")
+
+                # Remove this handler.
+                return False
+
+        return True
 
 
     #
@@ -482,7 +482,7 @@ class Manager(object):
         firing the `vobu-read` singnal."""
         gst.debug("cancel VOBU")
 
-        #self.src.set_property('cancel-vobu', True)
+        self.src.set_property('cancel-vobu', True)
 
     def setAspectRatio(self, aspectRatio):
         """Set the display aspect ratio to `aspectRatio`."""
@@ -582,22 +582,3 @@ class Manager(object):
             self.sendEvent(events.audioFillGap(self.segmentStop,
                                                self.segmentStop + blockSize))
             self.segmentStop += blockSize
-
-    def flush(self):
-        """Flush the pipeline."""
-        gst.debug("flush")
-            
-        # Reset the highlight state.
-        self.area = None
-        self.button = None
-        self.palette = None
-
-        self.segmentStart = None
-        self.segmentStop = None
-
-        # Start the actual flush operation.
-        msg = gst.message_new_application(self.src,
-                                          gst.Structure('seamless.Flush'))
-        self.pipeline.get_bus().post(msg)
-
-        self.vobuReadReturn = True
