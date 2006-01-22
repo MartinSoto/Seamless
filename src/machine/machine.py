@@ -19,7 +19,6 @@
 """Main implementation of the DVD virtual machine."""
 
 import sys
-import time
 
 import itersched
 from itersched import NoOp, Call, Chain, Restart, restartPoint
@@ -1627,16 +1626,15 @@ class CellPlayer(object):
         if self.cell.stillTime > 0:
             # We have a still frame.
 
-            yield cmds.StillFrame()
-
             if self.cell.stillTime == 0xff:
-                # Unlimited wait time. Loop "infinitely" until a
-                # restart operation takes this method out of the
-                # stack.
-                while True:
-                    yield cmds.Pause()
+                # Unlimited wait time.
+                yield cmds.StillFrame(None)
+
+                # Control should not return to this point. A restart
+                # operation (triggered, for example, by user
+                # interaction) should take it somewhere else.
+                assert False, "Attempt to continue after an unlimited still"
             else:
                 # Wait the specified number of seconds.
-                endTime = time.time() + self.cell.stillTime
-                while time.time() < endTime:
-                    yield cmds.Pause()
+                yield cmds.StillFrame(self.cell.stillTime)
+

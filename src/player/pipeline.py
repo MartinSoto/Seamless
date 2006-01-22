@@ -116,7 +116,9 @@ class SoftwareAudio(Bin):
         
         self.makeSubelem('capsaggreg')
 
-        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=0,
+        # Time limiting doesn't seem to be working properly. Limit by
+        # size as well.
+        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=192000,
                          max_size_time=gst.SECOND)
         self.makeParsedSubelem(options['audioSink'], 'audiosink')
 
@@ -176,9 +178,8 @@ class SpdifAudio(Bin):
         
         self.makeSubelem('capsaggreg')
 
-        # Apparently, this queue can get confused and accept too much
-        # material if limited only by time. Fortunately, we can also
-        # limit it to 1s material by size.
+        # Time limiting doesn't seem to be working properly. Limit by
+        # size as well.
         self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=192000,
                          max_size_time=gst.SECOND)
         self.makeSubelem(options['audioSink'], 'audiosink',

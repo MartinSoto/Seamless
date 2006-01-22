@@ -16,7 +16,6 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-import time
 import threading
 import traceback
 import sys
@@ -150,9 +149,7 @@ class Manager(object):
                  'segmentStart',
                  'segmentStop',
 
-                 'flushing',
-
-                 'showingStill')
+                 'flushing')
 
 
     def __init__(self, machine, pipeline):
@@ -204,12 +201,10 @@ class Manager(object):
         # True if we are in the middle of a flush operation.
         self.flushing = False
 
-        # True if we are currently showing a still frame.
-        self.showingStill = False
-
     def sendEvent(self, event):
         """Send `event` down the pipeline."""
-        self.srcPad.push_event(event)
+        if not self.srcPad.push_event(event):
+            gst.warning("Error sending event '%s'" % str(event))
 
 
     #
@@ -358,13 +353,13 @@ class Manager(object):
 
     def collectCmds(self):
         """Collect commands for the machine iterator until a PlayVobu,
-        Pause or EndInteractive command arrives, and return them in a
-        list."""
+        StillFrame or EndInteractive command arrives, and return them
+        in a list."""
         cmds = []
         for cmd in self.mainItr:
             cmds.append(cmd)
             if isinstance(cmd, machine.PlayVobu) or \
-               isinstance(cmd, machine.Pause) or \
+               isinstance(cmd, machine.StillFrame) or \
                (isinstance(cmd, self.EndInteractive) and
                 cmd.count == self.interactiveCount):
                 return cmds
@@ -465,19 +460,6 @@ class Manager(object):
         'domain', 'titleNr', and 'sectorNr'."""
         gst.log("play vobu")
 
-        if self.showingStill:
-            # This is the first VOBU after a timed still. Since it is
-            # difficult to regain synchronization in this case, we
-            # just flush before playing the VOBU.
-            gst.debug("flushing after still")
-
-            # Queue a flush command and a PlayVobu so that a call to
-            # this procedure will be repeated with the same
-            # parameters. The flush clears the still frame.
-            self.mainItr.push(machine.PlayVobu(domain, titleNr, sectorNr))
-            self.mainItr.push(self.__class__.flush)
-            return
-
         if self.lastDomain != domain:
             self.lastDomain = domain
             self.resetHighlight()
@@ -577,13 +559,29 @@ class Manager(object):
 
         self.sendEvent(events.highlightReset())
 
-    def stillFrame(self):
-        """Tell the pipeline that a still frame was sent."""
-        gst.debug("still frame")
+    # The number of silence blocks to send every second when
+    # displaying a still. This number should be high enough that
+    # interactivity is not hurt, and low enough that it doesn't cause
+    # excesive processor load.
+    SILENCE_BLOCKS_PER_SECOND = 20
 
-        self.showingStill = True
+    def stillFrame(self, seconds):
+        """Tell the pipeline that a still frame was sent, and direct
+        it to play silence for the specified number of seconds."""
+        gst.debug("still frame: %d" % seconds)
 
         self.sendEvent(events.stillFrame())
+
+        # Extend the current segment up to the end of the still time.
+        self.sendEvent(events.newsegment(True, self.segmentStart,
+                                         self.segmentStop +
+                                         seconds * gst.SECOND))
+
+        blockSize = gst.SECOND / self.SILENCE_BLOCKS_PER_SECOND
+        for i in xrange(seconds * self.SILENCE_BLOCKS_PER_SECOND):
+            self.sendEvent(events.audioFillGap(self.segmentStop,
+                                               self.segmentStop + blockSize))
+            self.segmentStop += blockSize
 
     def flush(self):
         """Flush the pipeline."""
@@ -597,22 +595,9 @@ class Manager(object):
         self.segmentStart = None
         self.segmentStop = None
 
-        self.showingStill = False
-
         # Start the actual flush operation.
         msg = gst.message_new_application(self.src,
                                           gst.Structure('seamless.Flush'))
         self.pipeline.get_bus().post(msg)
 
         self.vobuReadReturn = True
-
-    def pause(self):
-        """Pause the pipeline for a short time (currently 0.1s).
-
-        Warning: This method temporarily releases the object's lock"""
-        gst.log("pause")
-
-        # We don't want to keep the lock while sleeping.
-        self.lock.release()
-        time.sleep(0.1)
-        self.lock.acquire()

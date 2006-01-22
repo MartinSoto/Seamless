@@ -121,14 +121,10 @@ class ResetHighlight(PipelineCmd):
 
 
 class StillFrame(PipelineCmd):
-    """When constructed without parameters, tell the pipeline that a
-    still frame was sent."""
+    """When constructed without parameter list `(seconds)', tell the
+    pipeline that a still frame was sent and should be displayed for
+    the specified number of seconds. If `seconds` is None the still
+    frame should remain displayed until an external event, like user
+    interaction, cancels it."""
     __slots__ = ()
     methodName = 'stillFrame'
-
-
-class Pause(PipelineCmd):
-    """When constructed without parameters, pause the pipeline for a
-    short time."""
-    __slots__ = ()
-    methodName = 'pause'

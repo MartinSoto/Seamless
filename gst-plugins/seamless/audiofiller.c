@@ -291,6 +291,11 @@ audiofiller_push_silence (AudioFiller * audiofiller, GstClockTime start,
       result = FALSE;
       goto done;
     }
+
+    GST_LOG_OBJECT (audiofiller,
+	"Sent filler buffer, timestamp %0.3fs, size: %d",
+	(1.0 * GST_BUFFER_TIMESTAMP (buf)) / GST_SECOND,
+	GST_BUFFER_SIZE (buf));
   }
   
  done:
@@ -301,5 +306,7 @@ audiofiller_push_silence (AudioFiller * audiofiller, GstClockTime start,
 static GstFlowReturn
 audiofiller_transform_ip (GstBaseTransform *trans, GstBuffer *buf)
 {
+  GST_LOG_OBJECT (trans, "Forwarded buffer, timestamp %0.3fs",
+      (1.0 * GST_BUFFER_TIMESTAMP (buf)) / GST_SECOND);
   return GST_FLOW_OK;
 }
