@@ -1,5 +1,11 @@
 2006-01-23  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (Manager.flush): Don't restart the
+	pipeline if it was originally paused. This allows for seeking in
+	paused mode.
+
+2006-01-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.__slots__, Manager.__init__)
 	(Manager.flush, Manager.stillFrame): Reimplement unlimited still
 	frames.

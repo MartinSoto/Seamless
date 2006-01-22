@@ -415,9 +415,12 @@ class Manager(object):
         while self.showingStill:
             self.stillCancelCond.wait()
 
-        # Pause the pipeline and wait until the pipeline is paused.
-        self.pipeline.set_state(gst.STATE_PAUSED)
-        self.pipeline.get_state(gst.CLOCK_TIME_NONE)
+        origState = self.pipeline.get_state(gst.CLOCK_TIME_NONE)[1]
+
+        if origState == gst.STATE_PLAYING:
+            # Pause the pipeline.
+            self.pipeline.set_state(gst.STATE_PAUSED)
+            self.pipeline.get_state(gst.CLOCK_TIME_NONE)
 
         self.pipeline.prepareFlush()
 
@@ -432,14 +435,20 @@ class Manager(object):
         # synchronization.
         self.pipeline.set_new_stream_time(0L)
 
-        # Set a bus message handler to react when the pipeline is
-        # actually playing and complete the flush operation. This
-        # cannot be done here because this method is mutually
-        # exclusive with vobuRead.
-        self.pipeline.get_bus().add_watch(self.flushMsgHandler)
+        if origState == gst.STATE_PLAYING:
+            # Set a bus message handler to react when the pipeline is
+            # actually playing and complete the flush operation. This
+            # cannot be done here because this method is mutually
+            # exclusive with vobuRead.
+            self.pipeline.get_bus().add_watch(self.flushMsgHandler)
 
-        # Go back to playing.
-        self.pipeline.set_state(gst.STATE_PLAYING)
+            # Go back to playing:
+            self.pipeline.set_state(gst.STATE_PLAYING)
+        else:
+            self.pipeline.closeFlush()
+            
+            self.flushing = False
+            gst.debug("flush completed")
 
     @synchronized
     def flushMsgHandler(self, bus, msg):
