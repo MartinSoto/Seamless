@@ -1,7 +1,10 @@
-2006-01-22  Martin Soto  <martinsoto@users.sourceforge.net>
+2006-01-23  Martin Soto  <martinsoto@users.sourceforge.net>
 
-	WARNING: This patch breaks unlimited still frames, thus making
-	many DVDs unplayable.
+	* src/player/manager.py (Manager.__slots__, Manager.__init__)
+	(Manager.flush, Manager.stillFrame): Reimplement unlimited still
+	frames.
+
+2006-01-22  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/manager.py (synchronized.wrapper): Actually return
 	the return value of the wrapped method.

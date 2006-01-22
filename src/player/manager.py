@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -17,6 +17,7 @@
 # USA
 
 import threading
+import time
 import traceback
 import sys
 
@@ -149,7 +150,10 @@ class Manager(object):
                  'segmentStart',
                  'segmentStop',
 
-                 'flushing')
+                 'flushing',
+
+                 'showingStill',
+                 'stillCancelCond')
 
 
     def __init__(self, machine, pipeline):
@@ -197,6 +201,12 @@ class Manager(object):
 
         # True if we are in the middle of a flush operation.
         self.flushing = False
+
+        # True if we are currently showing a still frame.
+        self.showingStill = False
+
+        # Condition object to notify the canceling of a still frame.
+        self.stillCancelCond = threading.Condition(self.lock)
 
     def sendEvent(self, event):
         """Send `event` down the pipeline."""
@@ -401,6 +411,10 @@ class Manager(object):
         self.segmentStart = None
         self.segmentStop = None
 
+        # If a still is being displayed, cancel it.
+        while self.showingStill:
+            self.stillCancelCond.wait()
+
         # Pause the pipeline and wait until the pipeline is paused.
         self.pipeline.set_state(gst.STATE_PAUSED)
         self.pipeline.get_state(gst.CLOCK_TIME_NONE)
@@ -567,18 +581,53 @@ class Manager(object):
 
     def stillFrame(self, seconds):
         """Tell the pipeline that a still frame was sent, and direct
-        it to play silence for the specified number of seconds."""
-        gst.debug("still frame: %d" % seconds)
+        it to play silence for the specified number of seconds.
+
+        Warning: This method temporarily releases the object's lock"""
+        gst.debug("still frame: %s" % str(seconds))
 
         self.sendEvent(events.stillFrame())
 
-        # Extend the current segment up to the end of the still time.
-        self.sendEvent(events.newsegment(True, self.segmentStart,
-                                         self.segmentStop +
-                                         seconds * gst.SECOND))
+        if seconds != None:
+            # Extend the current segment up to the end of the still time.
+            self.sendEvent(events.newsegment(True, self.segmentStart,
+                                             self.segmentStop +
+                                             seconds * gst.SECOND))
+            remainingBlocks = seconds * self.SILENCE_BLOCKS_PER_SECOND
+        else:
+            # Open the current segment.
+            #self.sendEvent(events.newsegment(True, self.segmentStart, -1))
+            remainingBlocks = None
 
-        blockSize = gst.SECOND / self.SILENCE_BLOCKS_PER_SECOND
-        for i in xrange(seconds * self.SILENCE_BLOCKS_PER_SECOND):
+        blockDuration = gst.SECOND / self.SILENCE_BLOCKS_PER_SECOND    
+
+        self.showingStill = True
+
+        while remainingBlocks == None or remainingBlocks > 0:
+            # Release the lock here, to allow for interactive
+            # operations to happen. If an interactive operation needs
+            # to flush the pipeline, it will cancel this loop by
+            # setting the 'flushing' attribute. Unlimited stills can
+            # only end this way.
+            self.lock.release()
             self.sendEvent(events.audioFillGap(self.segmentStop,
-                                               self.segmentStop + blockSize))
-            self.segmentStop += blockSize
+                                               self.segmentStop +
+                                               blockDuration))
+            self.lock.acquire()
+
+            if self.flushing:
+                self.stillCancelCond.notify()
+
+                # The machine should not be called again until a flush
+                # happens.
+                self.vobuReadReturn = True
+
+                # Cancel the still frame:
+                break
+
+            self.segmentStop += blockDuration
+
+            if remainingBlocks != None:
+                remainingBlocks -= 1
+
+        self.showingStill = False
