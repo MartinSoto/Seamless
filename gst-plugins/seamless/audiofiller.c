@@ -220,8 +220,7 @@ audiofiller_event (GstBaseTransform *trans, GstEvent *event)
       event_type = gst_structure_get_string (structure, "event");
 
       if (strcmp (event_type, "dvd-audio-fill-gap") == 0) {
-	GstClockTime start = GST_CLOCK_TIME_NONE;
-	GstClockTime stop = GST_CLOCK_TIME_NONE;
+	GstClockTime start, stop;
 
 	if (!gst_structure_get_clock_time (structure, "start",
 		&start) ||
@@ -229,6 +228,7 @@ audiofiller_event (GstBaseTransform *trans, GstEvent *event)
 		&stop)) {
 	  GST_WARNING_OBJECT (audiofiller,
 	      "incorrect dvd-audio-fill-gap event");
+	  result = FALSE;
 	  goto done;
 	}
 

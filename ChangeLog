@@ -1,5 +1,10 @@
 2006-01-23  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/seamless/audiofiller.c (audiofiller_event): Return
+	FALSE if an incorrect dvd-audio-fill-gap arrives.
+
+2006-01-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.flush): Don't restart the
 	pipeline if it was originally paused. This allows for seeking in
 	paused mode.
