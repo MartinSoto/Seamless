@@ -367,6 +367,14 @@ gst_mpeg2subt_setcaps (GstPad * pad, GstCaps * caps)
     mpeg2subt->out_buffers[i] = g_malloc (sizeof (guint16) * width);
   }
 
+  /* Retrieve the frame rate, if available. */
+  if (!gst_structure_get_fraction (structure, "framerate",
+	  &(mpeg2subt->frame_numerator), &(mpeg2subt->frame_denominator))) {
+    /* Choose an arbitrary frame rate and hope for the best... */
+    mpeg2subt->frame_numerator = 25;
+    mpeg2subt->frame_denominator = 1;
+  }
+
  done:
   gst_object_unref (GST_OBJECT (mpeg2subt));
   return res;
@@ -526,11 +534,13 @@ gst_mpeg2subt_loop (GstMpeg2Subt * mpeg2subt)
   }
 
   if (GST_CLOCK_TIME_IS_VALID (mpeg2subt->still_ts)) {
+    /* We are playing a still frame. */
+
     g_return_if_fail (mpeg2subt->last_frame != NULL);
 
     /* Advance the timestamp. */
-    /* FIXME: Use actual frame rate. */
-    mpeg2subt->still_ts += GST_SECOND / 25;
+    mpeg2subt->still_ts += (GST_SECOND * mpeg2subt->frame_denominator) /
+      mpeg2subt->frame_numerator;
 
     if (mpeg2subt->flushing ||
 	(GST_CLOCK_TIME_IS_VALID (mpeg2subt->still_stop) &&

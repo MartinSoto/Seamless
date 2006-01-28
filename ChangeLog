@@ -1,5 +1,11 @@
 2006-01-28  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt):
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_setcaps) 
+	(gst_mpeg2subt_loop): Use the actual frame rate for still frames.
+
+2006-01-28  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.stillFrame): Send still frame
 	events with proper start and stop times.
 

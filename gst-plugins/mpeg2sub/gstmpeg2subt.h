@@ -154,6 +154,9 @@ struct _GstMpeg2Subt {
     clip_right, clip_bottom;	/* Highlight area position and
 				   size. */
 
+  gint frame_numerator;		/* Frame rate numerator. */
+  gint frame_denominator;	/* Frame rate denominator. */
+
   gint in_width, in_height;
   gint current_button;
 };
