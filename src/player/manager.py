@@ -595,17 +595,19 @@ class Manager(object):
         Warning: This method temporarily releases the object's lock"""
         gst.debug("still frame: %s" % str(seconds))
 
-        self.sendEvent(events.stillFrame())
-
         if seconds != None:
             # Extend the current segment up to the end of the still time.
             self.sendEvent(events.newsegment(True, self.segmentStart,
                                              self.segmentStop +
                                              seconds * gst.SECOND))
+            self.sendEvent(events.stillFrame(self.segmentStart,
+                                             self.segmentStop +
+                                             seconds * gst.SECOND))
             remainingBlocks = seconds * self.SILENCE_BLOCKS_PER_SECOND
         else:
             # Open the current segment.
-            #self.sendEvent(events.newsegment(True, self.segmentStart, -1))
+            self.sendEvent(events.newsegment(True, self.segmentStart, -1))
+            self.sendEvent(events.stillFrame(self.segmentStart, -1))
             remainingBlocks = None
 
         blockDuration = gst.SECOND / self.SILENCE_BLOCKS_PER_SECOND    

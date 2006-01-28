@@ -41,11 +41,30 @@ extern "C" {
 #define GST_IS_MPEG2SUBT_CLASS(obj) \
   (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_MPEG2SUBT))
 
-/* Lock and unlock the object. */
+/* Lock and unlock the object, and wait for conditions. */
+#ifdef GST_MPEG2SUBT_DEBUG_LOCKING
+
 #define GST_MPEG2SUBT_LOCK(mpeg2subt) \
-  (g_static_mutex_lock (&((mpeg2subt)->lock)))
+  {g_mutex_lock ((mpeg2subt)->lock); \
+   fprintf (stderr, "+++ Locking in '%s', line %d\n", __func__, __LINE__);}
 #define GST_MPEG2SUBT_UNLOCK(mpeg2subt) \
-  (g_static_mutex_unlock (&((mpeg2subt)->lock)))
+  {fprintf (stderr, "+++ Unlocking in '%s', line %d\n", __func__, __LINE__); \
+   g_mutex_unlock ((mpeg2subt)->lock);}
+#define GST_MPEG2SUBT_COND_WAIT(mpeg2subt, cond) \
+  {fprintf (stderr, "+++ Unlocking (wait) in '%s', line %d\n", __func__, __LINE__); \
+   g_cond_wait (cond, (mpeg2subt)->lock); \
+   fprintf (stderr, "+++ Locking (wait) in '%s', line %d\n", __func__, __LINE__);}
+
+#else
+
+#define GST_MPEG2SUBT_LOCK(mpeg2subt) \
+  {g_mutex_lock ((mpeg2subt)->lock);}
+#define GST_MPEG2SUBT_UNLOCK(mpeg2subt) \
+  {g_mutex_unlock ((mpeg2subt)->lock);}
+#define GST_MPEG2SUBT_COND_WAIT(mpeg2subt, cond) \
+  {g_cond_wait (cond, (mpeg2subt)->lock);}
+
+#endif /* GST_MPEG2SUBT_DEBUG_LOCKING */
 
 typedef struct _GstMpeg2Subt GstMpeg2Subt;
 typedef struct _GstMpeg2SubtClass GstMpeg2SubtClass;
@@ -61,13 +80,28 @@ typedef struct YUVA_val {
 struct _GstMpeg2Subt {
   GstElement element;
 
-  GstPad *videopad,*subtitlepad,*srcpad;
+  GMutex *lock;			/* A lock to protect the element's
+				   internal data structures. */
+
+  GstPad *videopad, *subtitlepad, *srcpad;
+
+  GstMiniObject *data;		/* Buffer or event being passed from
+				   the video chain or event function
+				   to the loop function. */
+  GCond *data_received;		/* A new video frame was stored in
+				   current_frame by the push
+				   function. */
+  GCond *data_processed;	/* The video frame in current_frame
+				   was processed by the loop
+				   function. */
+  gboolean flushing;		/* TRUE if the element is flushing. */
 
   GstBuffer *partialbuf;	/* Collect together subtitle buffers
                                    until we have a full control
                                    sequence. */
   GQueue *subt_queue;		/* Queue of subtitle control sequences
                                    pending for display. */
+
   GstBuffer *last_frame;	/* Last video frame seen. */
 
   guchar *cur_cmds;		/* Block of SPU commands to
@@ -90,6 +124,11 @@ struct _GstMpeg2Subt {
 				   display is active. */
   gboolean forced_display;	/* TRUE if menu forced display was
 				   activated. */
+
+  GstClockTime still_ts;	/* Last timestamp used for displaying
+				   the still frame. */
+  GstClockTime still_stop;	/* Stop time for the current still
+				   frame. */
 
   /* 
    * Store 1 line width of U, V and A respectively.
@@ -117,9 +156,6 @@ struct _GstMpeg2Subt {
 
   gint in_width, in_height;
   gint current_button;
-
-  GStaticMutex lock;		/* A lock to protect the element's
-				   internal data structures. */
 };
 
 struct _GstMpeg2SubtClass {

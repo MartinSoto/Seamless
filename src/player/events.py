@@ -43,14 +43,6 @@ def filler():
     """Create and return a filler event."""
     return gst.event_new_filler()
 
-def flush_start():
-    """Create and return a flush start event."""
-    return gst.event_new_flush_start()
-
-def flush_stop():
-    """Create and return a flush stop event."""
-    return gst.event_new_flush_stop()
-
 def newsegment(update, startTime, endTime):
     """Create and return a newsegment event for the specified start
     and end times. Times are specified in nanoseconds."""
@@ -120,10 +112,13 @@ def highlightReset():
 
     return createCustom(st)
 
-def stillFrame():
-    """Create and return a still frame event."""
+def stillFrame(start, stop):
+    """Create and return a still frame event with the specified start
+    and stop times."""
     st = gst.Structure('application/x-gst-dvd')
     st.set_value('event', 'dvd-spu-still-frame')
+    st.set_value('start', start, 'uint64')
+    st.set_value('stop', stop, 'uint64')
     return createCustom(st)
 
 def subpictureClut(clut):
