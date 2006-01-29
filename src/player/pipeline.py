@@ -324,6 +324,7 @@ class Pipeline(gst.Pipeline):
 
 
     def __init__(self, options, name="dvdplayer"):
+        # Necessary for __gsignals__ to work.
         self.__gobject_init__()
 
         # A message handler to track pipeline state changes.
