@@ -273,6 +273,9 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt, GstMpeg2SubtClass * gclass)
   memset (mpeg2subt->subtitle_alpha, 0, sizeof (mpeg2subt->subtitle_alpha));
   memset (mpeg2subt->menu_alpha, 0, sizeof (mpeg2subt->menu_alpha));
   memset (mpeg2subt->out_buffers, 0, sizeof (mpeg2subt->out_buffers));
+
+  gst_segment_init (&(mpeg2subt->video_segment), GST_FORMAT_TIME);
+  gst_segment_init (&(mpeg2subt->subtitle_segment), GST_FORMAT_TIME);
 }
 
 static void
@@ -455,6 +458,8 @@ gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event)
 	    (GstTaskFunction) gst_mpeg2subt_loop, mpeg2subt);
       }
 
+      gst_segment_init (&(mpeg2subt->video_segment), GST_FORMAT_TIME);
+
       GST_MPEG2SUBT_UNLOCK (mpeg2subt);
       goto done;
     case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
@@ -611,6 +616,22 @@ gst_mpeg2subt_loop (GstMpeg2Subt * mpeg2subt)
     GstEvent *event = GST_EVENT(mpeg2subt->data);
 
     switch (GST_EVENT_TYPE (event)) {
+      case GST_EVENT_NEWSEGMENT:
+      {
+	gboolean update;
+	gdouble rate;
+	GstFormat format;
+	gint64 start;
+	gint64 stop;
+	gint64 position;
+
+	gst_event_parse_new_segment (event, &update, &rate, &format,
+	    &start, &stop, &position);
+
+	gst_segment_set_newsegment (&(mpeg2subt->video_segment), update,
+	    rate, format, start, stop, position);
+	break;
+      }
       case GST_EVENT_EOS:
 	/* Stop the task. */
 	gst_pad_pause_task (mpeg2subt->srcpad);
@@ -782,6 +803,22 @@ gst_mpeg2subt_process_events (GstMpeg2Subt * mpeg2subt)
     event = GST_EVENT (data);
 
     switch (GST_EVENT_TYPE (event)) {
+      case GST_EVENT_NEWSEGMENT:
+      {
+	gboolean update;
+	gdouble rate;
+	GstFormat format;
+	gint64 start;
+	gint64 stop;
+	gint64 position;
+
+	gst_event_parse_new_segment (event, &update, &rate, &format,
+	    &start, &stop, &position);
+
+	gst_segment_set_newsegment (&(mpeg2subt->subtitle_segment), update,
+	    rate, format, start, stop, position);
+	break;
+      }
       case GST_EVENT_CUSTOM_DOWNSTREAM:
 	GST_LOG_OBJECT (mpeg2subt,
 	    "DVD event on subtitle pad with timestamp %llu",
@@ -898,9 +935,14 @@ gst_mpeg2subt_update (GstMpeg2Subt * mpeg2subt, GstClockTime time)
     gst_mpeg2subt_next_block (mpeg2subt);
   }
 
+  /* When comparing subtitle and video times, use running time based
+     on the NEWSEGMENT events seen on both streams till now. */
   while (mpeg2subt->cur_cmds != NULL &&
 	 (mpeg2subt->cur_cmds_time == GST_CLOCK_TIME_NONE ||
-	  mpeg2subt->cur_cmds_time <= time + COMPARE_GAP)) {
+	  gst_segment_to_running_time (&(mpeg2subt->subtitle_segment),
+	      GST_FORMAT_TIME, mpeg2subt->cur_cmds_time) <= 
+	     gst_segment_to_running_time (&(mpeg2subt->video_segment),
+		 GST_FORMAT_TIME, time) + COMPARE_GAP)) {
     gst_mpeg2subt_execute_block (mpeg2subt);
     gst_mpeg2subt_next_block (mpeg2subt);
   }
@@ -1257,6 +1299,7 @@ gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_FLUSH_STOP:
       gst_mpeg2subt_flush_subtitle (mpeg2subt);
+      gst_segment_init (&(mpeg2subt->subtitle_segment), GST_FORMAT_TIME);
       gst_event_unref (event);
       break;
     case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:

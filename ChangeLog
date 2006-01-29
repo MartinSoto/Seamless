@@ -1,5 +1,17 @@
 2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init)
+	(gst_mpeg2subt_event_video, gst_mpeg2subt_loop)
+	(gst_mpeg2subt_process_events, gst_mpeg2subt_next_block)
+	(gst_mpeg2subt_event_subtitle): *
+	gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt): Keep track of
+	NEWSEGMENT events in both the video and audio streams, and use
+	them together with the timestamps to decide when to display the
+	subtitles/highlights. This fixes occasional glitches with
+	highlight display.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c
 	(gst_mpeg2subt_handle_dvd_event): Forward custom events that
 	aren't DVD events.

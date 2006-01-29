@@ -157,6 +157,13 @@ struct _GstMpeg2Subt {
   gint frame_numerator;		/* Frame rate numerator. */
   gint frame_denominator;	/* Frame rate denominator. */
 
+  GstSegment video_segment;	/* Segment object to keep track of
+				   segment changes in the video
+				   stream. */
+  GstSegment subtitle_segment;	/* Segment object to keep track of
+				   segment changes in the subtitle
+				   stream. */
+
   gint in_width, in_height;
   gint current_button;
 };
