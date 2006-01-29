@@ -306,18 +306,15 @@ class StateTracker(gobject.GObject):
     through __gsignals__."""
 
     __gsignals__ = {
-        'state-null' : (gobject.SIGNAL_RUN_LAST,
-                        gobject.TYPE_NONE,
-                        ()),
-        'state-ready' : (gobject.SIGNAL_RUN_LAST,
-                         gobject.TYPE_NONE,
-                         ()),
         'state-paused' : (gobject.SIGNAL_RUN_LAST,
                           gobject.TYPE_NONE,
                           ()),
         'state-playing' : (gobject.SIGNAL_RUN_LAST,
                            gobject.TYPE_NONE,
-                           ())
+                           ()),
+        'eos' : (gobject.SIGNAL_RUN_LAST,
+                 gobject.TYPE_NONE,
+                 ())        
         }
 
 
@@ -344,7 +341,8 @@ class Pipeline(gst.Pipeline):
         # The current pipeline state.
         self.currentState = gst.STATE_NULL
 
-        # If not `None` the state we are currently changing to.
+        # The state we are currently changing to, or `None` if no
+        # change is pending.
         self.statePending = None
 
         self.tracker = StateTracker()
@@ -412,25 +410,25 @@ class Pipeline(gst.Pipeline):
         if msg.type & gst.MESSAGE_STATE_CHANGED and \
                msg.src == self:
             (old, new, pending) =  msg.parse_state_changed()
-            print old, new, pending
 
             if pending == gst.STATE_VOID_PENDING:
                 self.currentState = new
                 self.statePending = None
 
-                if new == gst.STATE_NULL:
-                    self.tracker.emit('state-null')
-                elif new == gst.STATE_READY:
-                    self.tracker.emit('state-ready')
-                elif new == gst.STATE_PAUSED:
+                if new == gst.STATE_PAUSED:
                     self.tracker.emit('state-paused')
                 elif new == gst.STATE_PLAYING:
                     self.tracker.emit('state-playing')
+        elif msg.type & gst.MESSAGE_EOS:
+            self.tracker.emit('eos')
 
     def setState(self, state):
         """Set the state of the playback pipeline to `state`."""
         self.statePending = state
         self.set_state(state)
+        if state in (gst.STATE_NULL, gst.STATE_READY):
+            # Wait for the state change to complete.
+            self.get_state(gst.CLOCK_TIME_NONE)
 
     def getState(self):
         """Return the current pipeline state, or `None` if state is

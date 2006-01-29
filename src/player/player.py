@@ -16,9 +16,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-import time
+import sys
 
+import gobject
 import gst
+
+import tasklet
 
 import dvdread
 import machine
@@ -27,10 +30,9 @@ from manager import interactiveOp
 import pipeline
 
 from itersched import NoOp, Call
-from sig import SignalHolder, signal
 
 
-class DVDPlayer(SignalHolder):
+class DVDPlayer(gobject.GObject):
     """Main interface to interactively control the DVD playback system
     and query its state."""
 
@@ -40,7 +42,16 @@ class DVDPlayer(SignalHolder):
                  'manager',
                  'src')
 
+    __gsignals__ = {
+        'stopped' : (gobject.SIGNAL_RUN_LAST,
+                     gobject.TYPE_NONE,
+                     ())
+        }
+
+
     def __init__(self, options):
+        super(DVDPlayer, self).__init__()
+
         # Create an info object for the DVD.
         self.info = dvdread.DVDInfo(options.location)
 
@@ -98,21 +109,30 @@ class DVDPlayer(SignalHolder):
     def stopMachine(self):
         yield Call(self.machine.exit())
 
+    @tasklet.task
     def stop(self):
-        self.pipeline.setState(gst.STATE_PAUSED)
+        """Stop the player. This operation is asynchronous. The
+        'stopped' signal will be emitted when the player is actually
+        stopped."""
+        if self.pipeline.getState() != gst.STATE_PLAYING:
+            # Restart the pipeline to guarantee that the EOS event can
+            # actually reach the sinks.
+            self.pipeline.setState(gst.STATE_PLAYING)
+            yield tasklet.WaitForSignal(self.pipeline.tracker,
+                                        'state-playing')
+            tasklet.get_event()
+
         self.stopMachine()
 
-        # Wait for the pipeline to actually reach the paused state.
-        maxIter = 40
-        while maxIter > 0 and \
-                  self.pipeline.getState() != gst.STATE_PAUSED:
-            print self.pipeline.getState()
-            time.sleep(0.1)
-            maxIter -= 1
+        # Wait for the EOS message to reach the sinks.
+        yield tasklet.WaitForSignal(self.pipeline.tracker, 'eos')
+        tasklet.get_event()
 
-        # Shutdown the pipeline and confirm the state.
+        # Shutdown the pipeline and wait for the NULL state to be reached.
         self.pipeline.setState(gst.STATE_NULL)
-        self.pipeline.get_state()
+
+        # The player is stopped now.
+        self.emit('stopped')
 
 
     #

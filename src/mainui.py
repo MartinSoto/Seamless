@@ -26,6 +26,7 @@ import gst
 import gtk
 
 import debug
+import tasklet
 import player
 from baseui import UIManager, ActionGroup, action, toggleAction
 import mainwindow
@@ -71,10 +72,14 @@ class MainUserInterface(UIManager):
     def getOptions(self):
         return self.options
 
-    def shutDown(self):
+    @tasklet.task
+    def shutdown(self):
         self.window.hide()
 
+        # Stop the player, and wait for actual termination.
         self.player.stop()
+        yield tasklet.WaitForSignal(self.player, 'stopped')
+        tasklet.get_event()
 
         # Stop control plugins.
         # FIXME: A decent framework for extensions is necessary here.
@@ -159,7 +164,7 @@ class MainUserInterface(UIManager):
         @action(stockId=gtk.STOCK_QUIT, accel='<Ctrl>Q',
                 tooltip=_(''))
         def quit(ui, action):
-            ui.shutDown()
+            ui.shutdown()
 
 
         @action(label=_("Debug Console"), accel='<Ctrl>F12')

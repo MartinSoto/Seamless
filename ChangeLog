@@ -1,5 +1,24 @@
 2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/mainwindow.py (MainWindow.mainDeleteEvent): Cancel closing
+	of the window here, and just wait for shutdown() to do its work.
+
+	* src/mainui.py (MainUserInterface.shutdown): Rename from
+	'shutDown'. Make asynchronous, based on the player's 'stopped'
+	signal.
+
+	* src/player/player.py (DVDPlayer.__gsignals__): Add 'stopped'
+	signal.
+	(DVDPlayer.stop): Stop asynchronously and send the 'stopped'
+	signal when ready.
+
+	* src/player/pipeline.py (StateTracker.__gsignals__) 
+	(Pipeline.stateMsgHandler, Pipeline.setState): Add eos
+	signal. Don't emit signals for the NULL and READY states but wait
+	for them synchronously instead.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.runInteractive, flush): Implement
 	the flush operation as a single tasklet.
 

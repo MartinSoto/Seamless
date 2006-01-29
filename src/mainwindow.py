@@ -200,7 +200,11 @@ class MainWindow(gtk.Window):
         self.video.forceVideoUpdate()
 
     def mainDeleteEvent(self, widget, event):
-        return False
+        self.mainUi.shutdown()
+
+        # Cancel stop here. the shutdown() method will call
+        # gtk.main_quit() wehn ready.
+        return True
 
     def videoReady(self, widget):
         # Start the player.
