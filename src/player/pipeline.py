@@ -299,18 +299,58 @@ class BackPlayer(Bin):
         return self.get_by_name('dvdblocksrc')
 
 
+class StateTracker(gobject.GObject):
+    """An object to track state changes in the pipeline. This is a
+    hack to work around an apparent bug in gst-python, which prevents
+    descendants of GStreamer classes from having new signals defined
+    through __gsignals__."""
+
+    __gsignals__ = {
+        'state-null' : (gobject.SIGNAL_RUN_LAST,
+                        gobject.TYPE_NONE,
+                        ()),
+        'state-ready' : (gobject.SIGNAL_RUN_LAST,
+                         gobject.TYPE_NONE,
+                         ()),
+        'state-paused' : (gobject.SIGNAL_RUN_LAST,
+                          gobject.TYPE_NONE,
+                          ()),
+        'state-playing' : (gobject.SIGNAL_RUN_LAST,
+                           gobject.TYPE_NONE,
+                           ())
+        }
+
+
 class Pipeline(gst.Pipeline):
     """The GStreamer pipeline used to play DVDs."""
 
-    __slots__ = ('backPlayer',
+    __slots__ = ('currentState',
+                 'pendingState',
+                 'tracker',
+
+                 'backPlayer',
                  'audioBin',
                  'videoBin',
                  'syncHandlers')
 
+
     def __init__(self, options, name="dvdplayer"):
         super(Pipeline, self).__init__(name)
 
-        # Build the pipeline.
+        # A message handler to track pipeline state changes.
+        self.get_bus().add_signal_watch()
+        self.get_bus().connect('message', self.stateMsgHandler)
+
+        # The current pipeline state.
+        self.currentState = gst.STATE_NULL
+
+        # If not `None` the state we are currently changing to.
+        self.statePending = None
+
+        self.tracker = StateTracker()
+
+
+        # Build the pipeline:
 
         # The back player.
         self.backPlayer = BackPlayer(options)
@@ -363,6 +403,45 @@ class Pipeline(gst.Pipeline):
 
 
     #
+    # State Handling
+    #
+
+    def stateMsgHandler(self, bus, msg):
+        """Keep track of pipeline state changes."""
+
+        if msg.type & gst.MESSAGE_STATE_CHANGED and \
+               msg.src == self:
+            (old, new, pending) =  msg.parse_state_changed()
+            print old, new, pending
+
+            if pending == gst.STATE_VOID_PENDING:
+                self.currentState = new
+                self.statePending = None
+
+                if new == gst.STATE_NULL:
+                    self.tracker.emit('state-null')
+                elif new == gst.STATE_READY:
+                    self.tracker.emit('state-ready')
+                elif new == gst.STATE_PAUSED:
+                    self.tracker.emit('state-paused')
+                elif new == gst.STATE_PLAYING:
+                    self.tracker.emit('state-playing')
+
+    def setState(self, state):
+        """Set the state of the playback pipeline to `state`."""
+        self.statePending = state
+        self.set_state(state)
+
+    def getState(self):
+        """Return the current pipeline state, or `None` if state is
+        being changed right now."""
+        if self.statePending != None:
+            return None
+        else:
+            return self.currentState
+
+
+    #
     # Component Retrieval
     #
 
@@ -374,7 +453,7 @@ class Pipeline(gst.Pipeline):
 
 
     #
-    # Flush handling
+    # Flush
     #
 
     def prepareFlush(self):

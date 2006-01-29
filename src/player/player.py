@@ -84,32 +84,34 @@ class DVDPlayer(SignalHolder):
     #
 
     def start(self):
-        self.pipeline.set_state(gst.STATE_PLAYING)
+        self.pipeline.setState(gst.STATE_PLAYING)
 
     def pause(self, activate):
         """Toggle between paused and playing. When `activate` is TRUE
         pause playback, else continue playback."""
         if activate:
-            self.pipeline.set_state(gst.STATE_PAUSED)
+            self.pipeline.setState(gst.STATE_PAUSED)
         else:
-            self.pipeline.set_state(gst.STATE_PLAYING)
+            self.pipeline.setState(gst.STATE_PLAYING)
 
     @interactiveOp
     def stopMachine(self):
         yield Call(self.machine.exit())
 
     def stop(self):
+        self.pipeline.setState(gst.STATE_PAUSED)
         self.stopMachine()
 
         # Wait for the pipeline to actually reach the paused state.
         maxIter = 40
         while maxIter > 0 and \
-                  self.pipeline.get_state() == gst.STATE_PLAYING:
+                  self.pipeline.getState() != gst.STATE_PAUSED:
+            print self.pipeline.getState()
             time.sleep(0.1)
             maxIter -= 1
 
         # Shutdown the pipeline and confirm the state.
-        self.pipeline.set_state(gst.STATE_NULL)
+        self.pipeline.setState(gst.STATE_NULL)
         self.pipeline.get_state()
 
 

@@ -24,6 +24,7 @@ import sys
 import gst
 
 import itersched
+import tasklet
 
 import dvdread
 import events
@@ -357,7 +358,9 @@ class Manager(object):
         # it in `collectCmds` to make sure that we are reacting to the
         # right `EndInteractive` command.
 
-        if self.flushing:
+        if self.flushing or self.pipeline.getState() == None:
+            # We are in the middle of a transition. Ignore the
+            # request.
             return
 
         def interactiveWrapper(count):
@@ -391,36 +394,44 @@ class Manager(object):
             for cmd in reversed(cmds):
                 self.mainItr.push(cmd)
 
+            # Don't allow interactive operations until the flush
+            # completes.
+            self.flushing = True
+
+            # Reset the highlight state.
+            self.area = None
+            self.button = None
+            self.palette = None
+
+            self.segmentStart = None
+            self.segmentStop = None
+
+            # If a still is being displayed, cancel it.
+            while self.showingStill:
+                self.stillCancelCond.wait()
+
+            # Release the lock for flushing to avoid a possible
+            # deadlock with vobuRead, which is also protected by
+            # GStreamer's internal stream lock.
+            self.lock.release()
             self.flush()
+            self.lock.acquire()
 
         gst.debug("end run interactive")
 
+    @tasklet.task
     def flush(self):
         """Flush the pipeline."""
         gst.debug("flushing")
             
-        # Don't allow interactive operations until the flush
-        # completes.
-        self.flushing = True
-
-        # Reset the highlight state.
-        self.area = None
-        self.button = None
-        self.palette = None
-
-        self.segmentStart = None
-        self.segmentStop = None
-
-        # If a still is being displayed, cancel it.
-        while self.showingStill:
-            self.stillCancelCond.wait()
-
-        origState = self.pipeline.get_state(gst.CLOCK_TIME_NONE)[1]
+        origState = self.pipeline.getState()
 
         if origState == gst.STATE_PLAYING:
             # Pause the pipeline.
-            self.pipeline.set_state(gst.STATE_PAUSED)
-            self.pipeline.get_state(gst.CLOCK_TIME_NONE)
+            self.pipeline.setState(gst.STATE_PAUSED)
+            yield tasklet.WaitForSignal(self.pipeline.tracker,
+                                        'state-paused')
+            tasklet.get_event()
 
         self.pipeline.prepareFlush()
 
@@ -436,42 +447,16 @@ class Manager(object):
         self.pipeline.set_new_stream_time(0L)
 
         if origState == gst.STATE_PLAYING:
-            # Set a bus message handler to react when the pipeline is
-            # actually playing and complete the flush operation. This
-            # cannot be done here because this method is mutually
-            # exclusive with vobuRead.
-            self.pipeline.get_bus().add_watch(self.flushMsgHandler)
-
             # Go back to playing:
             self.pipeline.set_state(gst.STATE_PLAYING)
-        else:
-            self.pipeline.closeFlush()
+            yield tasklet.WaitForSignal(self.pipeline.tracker,
+                                        'state-playing')
+            tasklet.get_event()
+
+        self.pipeline.closeFlush()
             
-            self.flushing = False
-            gst.debug("flush completed")
-
-    @synchronized
-    def flushMsgHandler(self, bus, msg):
-        """Implements pipeline flushing by sending a flushing seek
-        event from the application thread."""
-
-        if msg.type & gst.MESSAGE_STATE_CHANGED and \
-               msg.src == self.pipeline:
-            (old, new, pending) =  msg.parse_state_changed()
-
-            if new == gst.STATE_PLAYING and \
-                   pending == gst.STATE_VOID_PENDING:
-                # We are playing again, complete the flush operation.
-
-                self.pipeline.closeFlush()
-            
-                self.flushing = False
-                gst.debug("flush completed")
-
-                # Remove this handler.
-                return False
-
-        return True
+        self.flushing = False
+        gst.debug("flush completed")
 
 
     #
