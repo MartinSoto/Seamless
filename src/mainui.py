@@ -56,7 +56,7 @@ class MainUserInterface(UIManager):
 
         # Create the main window.
         self.window = mainwindow.MainWindow(self)
-        self.window.connect('destroy', lambda widget: self.shutDown())
+        self.window.connect('delete-event', self.mainWindowDeleteEvent)
         self.window.fullScreen(options.fullScreen)
         self.window.show()
 
@@ -88,6 +88,13 @@ class MainUserInterface(UIManager):
         self.xscreensaver.close()
 
         gtk.main_quit()
+
+    def mainWindowDeleteEvent(self, widget, event):
+        self.shutdown()
+
+        # Prevent the window from being closed here. The shutdown()
+        # tasklet will call gtk.main_quit() when ready.
+        return True
 
 
     class alwaysAvailable(ActionGroup):

@@ -99,7 +99,6 @@ class MainWindow(gtk.Window):
         self.set_property('can-focus', True)
 
         self.connect('configure-event', self.mainConfigureEvent)
-        self.connect('delete_event', self.mainDeleteEvent)
 
         vbox = gtk.VBox()
         vbox.show()
@@ -198,13 +197,6 @@ class MainWindow(gtk.Window):
 
     def mainConfigureEvent(self, widget, event):
         self.video.forceVideoUpdate()
-
-    def mainDeleteEvent(self, widget, event):
-        self.mainUi.shutdown()
-
-        # Cancel stop here. the shutdown() method will call
-        # gtk.main_quit() wehn ready.
-        return True
 
     def videoReady(self, widget):
         # Start the player.

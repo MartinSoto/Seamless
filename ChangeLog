@@ -1,5 +1,15 @@
 2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/mainwindow.py (MainWindow.__init__, mainDeleteEvent): 
+	* src/mainui.py (MainUserInterface.__init__) 
+	(MainUserInterface.mainWindowDeleteEvent): 
+	Move handling of the delete event completely to
+	MainUserInterface. Trap only the delete event.
+
+	* src/lirc.py (LIRC.readData): shutDown -> shutdown.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/mainwindow.py (MainWindow.mainDeleteEvent): Cancel closing
 	of the window here, and just wait for shutdown() to do its work.
 
