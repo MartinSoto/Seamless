@@ -1,5 +1,17 @@
 2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/pipeline.py (StateTracker, Pipeline.__slots__) 
+	(Pipeline.__init__, Pipeline.stateMsgHandler): Move __gsignals__
+	to the Pipeline class and get rid of the StateTracker
+	workaround. Thanks to Johan Dahlin for the suggested fix (or, at
+	least, much less radical workaround.)
+
+	* src/player/player.py (DVDPlayer.stop): 
+	* src/player/manager.py (Manager.flush): 
+	Don't reference pipeline.tracker attribute.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/mainwindow.py (MainWindow.__init__, mainDeleteEvent): 
 	* src/mainui.py (MainUserInterface.__init__) 
 	(MainUserInterface.mainWindowDeleteEvent): 

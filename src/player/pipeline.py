@@ -299,11 +299,16 @@ class BackPlayer(Bin):
         return self.get_by_name('dvdblocksrc')
 
 
-class StateTracker(gobject.GObject):
-    """An object to track state changes in the pipeline. This is a
-    hack to work around an apparent bug in gst-python, which prevents
-    descendants of GStreamer classes from having new signals defined
-    through __gsignals__."""
+class Pipeline(gst.Pipeline):
+    """The GStreamer pipeline used to play DVDs."""
+
+    __slots__ = ('currentState',
+                 'pendingState',
+
+                 'backPlayer',
+                 'audioBin',
+                 'videoBin',
+                 'syncHandlers')
 
     __gsignals__ = {
         'state-paused' : (gobject.SIGNAL_RUN_LAST,
@@ -318,21 +323,8 @@ class StateTracker(gobject.GObject):
         }
 
 
-class Pipeline(gst.Pipeline):
-    """The GStreamer pipeline used to play DVDs."""
-
-    __slots__ = ('currentState',
-                 'pendingState',
-                 'tracker',
-
-                 'backPlayer',
-                 'audioBin',
-                 'videoBin',
-                 'syncHandlers')
-
-
     def __init__(self, options, name="dvdplayer"):
-        super(Pipeline, self).__init__(name)
+        self.__gobject_init__()
 
         # A message handler to track pipeline state changes.
         self.get_bus().add_signal_watch()
@@ -344,8 +336,6 @@ class Pipeline(gst.Pipeline):
         # The state we are currently changing to, or `None` if no
         # change is pending.
         self.statePending = None
-
-        self.tracker = StateTracker()
 
 
         # Build the pipeline:
@@ -416,11 +406,11 @@ class Pipeline(gst.Pipeline):
                 self.statePending = None
 
                 if new == gst.STATE_PAUSED:
-                    self.tracker.emit('state-paused')
+                    self.emit('state-paused')
                 elif new == gst.STATE_PLAYING:
-                    self.tracker.emit('state-playing')
+                    self.emit('state-playing')
         elif msg.type & gst.MESSAGE_EOS:
-            self.tracker.emit('eos')
+            self.emit('eos')
 
     def setState(self, state):
         """Set the state of the playback pipeline to `state`."""

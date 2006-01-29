@@ -118,14 +118,13 @@ class DVDPlayer(gobject.GObject):
             # Restart the pipeline to guarantee that the EOS event can
             # actually reach the sinks.
             self.pipeline.setState(gst.STATE_PLAYING)
-            yield tasklet.WaitForSignal(self.pipeline.tracker,
-                                        'state-playing')
+            yield tasklet.WaitForSignal(self.pipeline, 'state-playing')
             tasklet.get_event()
 
         self.stopMachine()
 
         # Wait for the EOS message to reach the sinks.
-        yield tasklet.WaitForSignal(self.pipeline.tracker, 'eos')
+        yield tasklet.WaitForSignal(self.pipeline, 'eos')
         tasklet.get_event()
 
         # Shutdown the pipeline and wait for the NULL state to be reached.

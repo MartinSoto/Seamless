@@ -429,8 +429,7 @@ class Manager(object):
         if origState == gst.STATE_PLAYING:
             # Pause the pipeline.
             self.pipeline.setState(gst.STATE_PAUSED)
-            yield tasklet.WaitForSignal(self.pipeline.tracker,
-                                        'state-paused')
+            yield tasklet.WaitForSignal(self.pipeline, 'state-paused')
             tasklet.get_event()
 
         self.pipeline.prepareFlush()
@@ -449,8 +448,7 @@ class Manager(object):
         if origState == gst.STATE_PLAYING:
             # Go back to playing:
             self.pipeline.set_state(gst.STATE_PLAYING)
-            yield tasklet.WaitForSignal(self.pipeline.tracker,
-                                        'state-playing')
+            yield tasklet.WaitForSignal(self.pipeline, 'state-playing')
             tasklet.get_event()
 
         self.pipeline.closeFlush()
