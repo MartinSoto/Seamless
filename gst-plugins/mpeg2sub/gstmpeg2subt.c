@@ -294,7 +294,8 @@ gst_mpeg2subt_finalize (GObject * gobject)
     gst_buffer_unref (mpeg2subt->partialbuf);
   }
   while (!g_queue_is_empty (mpeg2subt->subt_queue)) {
-    gst_buffer_unref (GST_BUFFER (g_queue_pop_head (mpeg2subt->subt_queue)));
+    gst_mini_object_unref (GST_MINI_OBJECT (g_queue_pop_head
+			       (mpeg2subt->subt_queue)));
   }
   g_queue_free (mpeg2subt->subt_queue);
   if (mpeg2subt->last_frame) {
@@ -767,6 +768,44 @@ gst_mpeg2subt_execute_block (GstMpeg2Subt * mpeg2subt)
   }
 }
 
+/* Process events from the front of the subtitle queue until a buffer
+   is reached or the queue is empty. Returns the first buffer seen or
+   NULL if the queue is empty. */
+static GstBuffer *
+gst_mpeg2subt_process_events (GstMpeg2Subt * mpeg2subt)
+{
+  GstMiniObject *data;
+  GstEvent *event;
+
+  data = GST_MINI_OBJECT (g_queue_peek_head ((mpeg2subt)->subt_queue));
+  while (data != NULL && GST_IS_EVENT (data)) {
+    event = GST_EVENT (data);
+
+    switch (GST_EVENT_TYPE (event)) {
+      case GST_EVENT_CUSTOM_DOWNSTREAM:
+	GST_LOG_OBJECT (mpeg2subt,
+	    "DVD event on subtitle pad with timestamp %llu",
+	    GST_EVENT_TIMESTAMP (event));
+	gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, TRUE);
+	break;
+      default:
+	break;
+    }
+
+    /* Discard the event. */
+    g_queue_pop_head (mpeg2subt->subt_queue);
+    gst_event_unref (event);
+    
+    data = GST_MINI_OBJECT (g_queue_peek_head ((mpeg2subt)->subt_queue));
+  }
+
+  if (data == NULL) {
+    return NULL;
+  } else {
+    return GST_BUFFER (data);
+  }
+}
+
 /* Advance the current command block pointer to the next command
    block, or to NULL when no next block is available, and update all
    related fields.
@@ -779,7 +818,7 @@ gst_mpeg2subt_next_block (GstMpeg2Subt * mpeg2subt)
 
   if (mpeg2subt->cur_cmds == NULL) {
     /* Check for a new packet. */
-    mpeg2subt->cur_cmds_buf = g_queue_peek_head ((mpeg2subt)->subt_queue);
+    mpeg2subt->cur_cmds_buf = gst_mpeg2subt_process_events (mpeg2subt);
     if (mpeg2subt->cur_cmds_buf == NULL) {
       /* No transition. */
       return FALSE;
@@ -811,7 +850,7 @@ gst_mpeg2subt_next_block (GstMpeg2Subt * mpeg2subt)
 				    (mpeg2subt->subt_queue)));
 
       /* and check for a new one. */
-      mpeg2subt->cur_cmds_buf = g_queue_peek_head ((mpeg2subt)->subt_queue);
+      mpeg2subt->cur_cmds_buf = gst_mpeg2subt_process_events (mpeg2subt);
       if (mpeg2subt->cur_cmds_buf == NULL) {
 	/* No more packets available for the time being. */
 	mpeg2subt->cur_cmds = NULL;
@@ -1212,24 +1251,30 @@ gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
 
   GST_MPEG2SUBT_LOCK (mpeg2subt);
 
+  /* This function doesn't forward any events to the source pad. The
+     video event function does that. */
+
   switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_FLUSH_START:
+    case GST_EVENT_FLUSH_STOP:
       gst_mpeg2subt_flush_subtitle (mpeg2subt);
+      gst_event_unref (event);
       break;
-    case GST_EVENT_CUSTOM_DOWNSTREAM:
     case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
       GST_LOG_OBJECT (mpeg2subt,
-	  "DVD event on subtitle pad with timestamp %llu",
+	  "out-of-band DVD event on subtitle pad with timestamp %llu",
 	  GST_EVENT_TIMESTAMP (event));
       res = gst_mpeg2subt_handle_dvd_event (mpeg2subt, event, TRUE);
+      gst_event_unref (event);
       break;
     default:
-      GST_LOG_OBJECT (mpeg2subt, "Got event of type %d on subtitle pad",
-	  GST_EVENT_TYPE (event));
+      if (GST_EVENT_IS_SERIALIZED (event)) {
+	/* Put the event in the queue, to make sure it is processed in
+	   the right sequence with respect to subtitle buffers. */
+	g_queue_push_tail (mpeg2subt->subt_queue, event);
+      }  
       break;
   }
 
-  gst_event_unref (event);
   gst_object_unref (GST_OBJECT (mpeg2subt));
   GST_MPEG2SUBT_UNLOCK (mpeg2subt);
   return res;
@@ -1246,7 +1291,8 @@ gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt)
   }
 
   while (!g_queue_is_empty (mpeg2subt->subt_queue)) {
-    gst_buffer_unref (GST_BUFFER (g_queue_pop_head (mpeg2subt->subt_queue)));
+    gst_mini_object_unref (GST_MINI_OBJECT (g_queue_pop_head
+			       (mpeg2subt->subt_queue)));
   }
 
   mpeg2subt->cur_cmds = NULL;
@@ -1277,6 +1323,11 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
   const gchar *event_type;
 
   structure = gst_event_get_structure (event);
+
+  if (!gst_structure_has_name (structure, "application/x-gst-dvd")) {
+    /* This isn't a DVD event. */
+    return gst_pad_push_event (mpeg2subt->srcpad, event);
+  }
 
   event_type = gst_structure_get_string (structure, "event");
   g_return_val_if_fail (event_type != NULL, FALSE);

@@ -1,5 +1,16 @@
 2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_dvd_event): Forward custom events that
+	aren't DVD events.
+	(gst_mpeg2subt_finalize, gst_mpeg2subt_process_events) 
+	(gst_mpeg2subt_next_block, gst_mpeg2subt_event_subtitle) 
+	(gst_mpeg2subt_flush_subtitle): Put synchronous events received on
+	the subtitle pad in the subtitle queue, and process them in
+	sequence with data buffers.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/pipeline.py (StateTracker, Pipeline.__slots__) 
 	(Pipeline.__init__, Pipeline.stateMsgHandler): Move __gsignals__
 	to the Pipeline class and get rid of the StateTracker

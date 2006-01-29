@@ -100,7 +100,7 @@ struct _GstMpeg2Subt {
                                    until we have a full control
                                    sequence. */
   GQueue *subt_queue;		/* Queue of subtitle control sequences
-                                   pending for display. */
+                                   and events pending for display. */
 
   GstBuffer *last_frame;	/* Last video frame seen. */
 
