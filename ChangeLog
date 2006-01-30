@@ -1,3 +1,17 @@
+2006-01-30  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_check_video_timestamp, gst_mpeg2subt_loop): 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt):
+	Keep track of timestamps sent down the pipeline, check for gaps
+	and drop frames with implausible timestamps. Apart from making
+	mpeg2subt generally more robust, this change functions as a
+	workaround for the fact that mpeg2dec is not generally able to
+	sequence NEWSEGMENT events with the actual decoded frames. This
+	was leading to situations where the video sink blocked because of
+	frames with to high timestamps, which actually hapenned to be
+	frames belonging to the previous segment.
+
 2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init)
