@@ -1,5 +1,14 @@
 2006-01-30  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/videowidget.py (VideoWidget.__init__, buttonPressCb): 
+	* src/mainwindow.py (MainWindow.__init__) 
+	(MainWindow.videoButtonPress): 
+	Don't force mouse-button-press navigation events since they cause
+	segfaults in the pipeline. Use an alternative method to activate
+	on mouse click.
+
+2006-01-30  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
 	(gst_mpeg2subt_check_video_timestamp, gst_mpeg2subt_loop): 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt):

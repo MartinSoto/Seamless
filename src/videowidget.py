@@ -64,10 +64,8 @@ class VideoWidget(gtk.EventBox):
         # A lock to protect accesses to the display window.
         self.xlock = threading.RLock()
 
-        self.set_events(gtk.gdk.POINTER_MOTION_MASK |
-                        gtk.gdk.BUTTON_PRESS_MASK)
+        self.set_events(gtk.gdk.POINTER_MOTION_MASK)
         self.connect('delete-event', self.deleteCb)
-        self.connect('button-press-event', self.buttonPressCb)
 
         self.modify_bg(gtk.STATE_NORMAL, gtk.gdk.color_parse('black'))
 
@@ -239,9 +237,3 @@ class VideoWidget(gtk.EventBox):
     def deleteCb(self, da):
         self.overlay.set_xwindow_id(0L)
         set.overlaySet = False
-
-    def buttonPressCb(self, widget, event):
-        # We send button press navigation events "by hand" here, since
-        # Gtk seems to prevent the GStreamer elements from doing so.
-        self.overlay.send_mouse_event ('mouse-button-press',
-                                       event.button, event.x, event.y)
