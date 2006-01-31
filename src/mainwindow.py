@@ -117,7 +117,6 @@ class MainWindow(gtk.Window):
         self.video.show()
         vbox.pack_start(self.video)
         self.video.set_property('can-focus', True)
-        self.video.connect('button-press-event', self.videoButtonPress)
         self.video.connect('key-press-event', self.videoKeyPress)
         self.video.connect('ready', self.videoReady)
         self.video.grab_focus()
@@ -202,10 +201,6 @@ class MainWindow(gtk.Window):
     def videoReady(self, widget):
         # Start the player.
         self.player.start()
-
-    def videoButtonPress(self, widget, event):
-        # FIXME: Use the event position to select.
-        self.mainUi.confirm.activate()
 
     def videoKeyPress(self, widget, event):
         keyName = gtk.gdk.keyval_name(event.keyval)
