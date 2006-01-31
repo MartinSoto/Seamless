@@ -39,6 +39,9 @@ GST_DEBUG_CATEGORY_STATIC (mpeg2subt_debug);
    comparing values: */
 #define COMPARE_GAP ((2 * GST_SECOND) / 90)
 
+/* Maximum number of frames to adjust before giving up. */
+#define MAX_ADJUST 5
+
 
 /* elementfactory information */
 static GstElementDetails mpeg2subt_details = {
@@ -265,8 +268,10 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt, GstMpeg2SubtClass * gclass)
   mpeg2subt->hide = FALSE;
   mpeg2subt->forced_display = FALSE;
 
-  mpeg2subt->last_video_ts = GST_CLOCK_TIME_NONE;
   mpeg2subt->still_ts = GST_CLOCK_TIME_NONE;
+
+  mpeg2subt->last_video_ts = GST_CLOCK_TIME_NONE;
+  mpeg2subt->adjusted_count = 0;
 
   memset (mpeg2subt->current_clut, 0, 16 * sizeof (guint32));
   memset (mpeg2subt->subtitle_index, 0, sizeof (mpeg2subt->subtitle_index));
@@ -527,10 +532,10 @@ gst_mpeg2subt_chain_video (GstPad * pad, GstBuffer * buffer)
   return res;
 }
 
-/* Check the current video frame timestamp for unexpected
-   changes. Returns TRUE if the frame should be displayed and FALSE if
-   it should be dropped. */
-static gboolean
+/* Check the current video frame timestamp for unexpected changes. If
+   a serious gap was found and still seems fixable, returns an
+   adjusted timestamp. Otherwise, returns the timestamp unmodified. */
+static GstClockTime
 gst_mpeg2subt_check_video_timestamp (GstMpeg2Subt * mpeg2subt,
     GstClockTime ts)
 {
@@ -538,8 +543,8 @@ gst_mpeg2subt_check_video_timestamp (GstMpeg2Subt * mpeg2subt,
     GST_WARNING_OBJECT (mpeg2subt,
 	"check video timestamp without previous newsegment");
 
-    /* Let the buffer play anyway. */
-    return TRUE;
+    /* Let the buffer play normally anyway. */
+    goto no_adjust;
   }
 
   if (ts > mpeg2subt->last_video_ts) {
@@ -550,18 +555,23 @@ gst_mpeg2subt_check_video_timestamp (GstMpeg2Subt * mpeg2subt,
 	  1.0 * (ts - mpeg2subt->last_video_ts) / GST_SECOND,
 	  1.0 * mpeg2subt->last_video_ts / GST_SECOND,
 	  1.0 * ts / GST_SECOND);
-      return FALSE;
+
+      if (mpeg2subt->adjusted_count <= MAX_ADJUST) {
+	mpeg2subt->last_video_ts += (GST_SECOND * mpeg2subt->frame_denominator)
+	  / mpeg2subt->frame_numerator;
+	mpeg2subt->adjusted_count++;
+	return mpeg2subt->last_video_ts;
+      } else {
+	/* Give up trying to adjust timestamps: */
+	goto no_adjust;
+      }
     }
-  } else if (ts + COMPARE_GAP < mpeg2subt->last_video_ts) {
-      GST_WARNING_OBJECT (mpeg2subt,
-	  "reverse timestamp gap: %0.3fs, prev: %0.3fs, actual: %0.3fs",
-	  1.0 * (mpeg2subt->last_video_ts - ts) / GST_SECOND,
-	  1.0 * mpeg2subt->last_video_ts / GST_SECOND,
-	  1.0 * ts / GST_SECOND);
-    return FALSE;
   }
 
-  return TRUE;
+ no_adjust:
+  mpeg2subt->last_video_ts = ts;
+  mpeg2subt->adjusted_count = 0;
+  return ts;
 }
 
 static void
@@ -615,8 +625,6 @@ gst_mpeg2subt_loop (GstMpeg2Subt * mpeg2subt)
     res = gst_pad_push (mpeg2subt->srcpad, out_buf);
     GST_MPEG2SUBT_LOCK (mpeg2subt);
 
-    mpeg2subt->last_video_ts = mpeg2subt->still_ts;
-
     goto done;
   }
 
@@ -649,18 +657,15 @@ gst_mpeg2subt_loop (GstMpeg2Subt * mpeg2subt)
     GST_LOG_OBJECT (mpeg2subt, "Pushing frame with timestamp %"
 	GST_TIME_FORMAT, GST_TIME_ARGS (GST_BUFFER_TIMESTAMP (out_buf)));
 
-    if (gst_mpeg2subt_check_video_timestamp (mpeg2subt,
-	    GST_BUFFER_TIMESTAMP (out_buf))) {
-      /* Push the buffer. */
-      GST_MPEG2SUBT_UNLOCK (mpeg2subt);
-      res = gst_pad_push (mpeg2subt->srcpad, out_buf);
-      GST_MPEG2SUBT_LOCK (mpeg2subt);
+    /* Adjust the frame's timestamp. */
+    GST_BUFFER_TIMESTAMP (out_buf) =
+      gst_mpeg2subt_check_video_timestamp (mpeg2subt,
+	  GST_BUFFER_TIMESTAMP (out_buf));
 
-      mpeg2subt->last_video_ts = GST_BUFFER_TIMESTAMP (out_buf);
-    } else {
-      /* Drop the buffer. */
-      gst_buffer_unref (out_buf);
-    }
+    /* Push the buffer. */
+    GST_MPEG2SUBT_UNLOCK (mpeg2subt);
+    res = gst_pad_push (mpeg2subt->srcpad, out_buf);
+    GST_MPEG2SUBT_LOCK (mpeg2subt);
   } else if (GST_IS_EVENT (mpeg2subt->data)) {
     GstEvent *event = GST_EVENT(mpeg2subt->data);
 

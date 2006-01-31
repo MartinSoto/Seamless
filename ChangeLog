@@ -1,20 +1,22 @@
 2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (MAX_ADJUST) 
+	(gst_mpeg2subt_init, gst_mpeg2subt_check_video_timestamp) 
+	(gst_mpeg2subt_loop): 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt):
+	Milder timestamp gap recovery. Don't drop frames but adjust their
+	timestamps to close the gaps, and adjust a maximum of five frames
+	in a row before giving up. This makes gap handling much more
+	reliable.
+
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_event_subtitle) 
 	(gst_mpeg2subt_reset_highlight, gst_mpeg2subt_handle_dvd_event):
 	reset_highlight renamed from flush_subtitle. Now, the subtitle
 	queue is only emptied when actually flushing and no when the
 	reset-highlight DVD event is received. This fixes a segfault when
 	flushing under certain circumstances.
-
-2006-01-30  Martin Soto  <martinsoto@users.sourceforge.net>
-
-	* src/videowidget.py (VideoWidget.__init__, buttonPressCb): 
-	* src/mainwindow.py (MainWindow.__init__) 
-	(MainWindow.videoButtonPress): 
-	Don't force mouse-button-press navigation events since they cause
-	segfaults in the pipeline. Use an alternative method to activate
-	on mouse click.
 
 2006-01-30  Martin Soto  <martinsoto@users.sourceforge.net>
 

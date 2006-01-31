@@ -125,11 +125,16 @@ struct _GstMpeg2Subt {
   gboolean forced_display;	/* TRUE if menu forced display was
 				   activated. */
 
-  GstClockTime last_video_ts;	/* Last video timestamp sent. */
   GstClockTime still_ts;	/* Last timestamp used for displaying
 				   the still frame. */
   GstClockTime still_stop;	/* Stop time for the current still
 				   frame. */
+
+  GstClockTime last_video_ts;	/* Last video timestamp sent down the
+				   pipeline. Used for playback gap
+				   checking. */
+  gint adjusted_count;		/* Count of adjusted frames in
+				   sequence. */
 
   /* 
    * Store 1 line width of U, V and A respectively.
