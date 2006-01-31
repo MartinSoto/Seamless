@@ -1,5 +1,14 @@
 2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.vobuRead, Manager.runInteractive, Manager.doSeek):
+	Guarantee that no material is sent down the pipeline in the period
+	between a flush is started and the pipeline is actually cleaned by
+	the seek operation. This fixes occasional playback glitches after
+	flushing.
+
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c (MAX_ADJUST) 
 	(gst_mpeg2subt_init, gst_mpeg2subt_check_video_timestamp) 
 	(gst_mpeg2subt_loop): 

@@ -152,6 +152,7 @@ class Manager(object):
                  'segmentStop',
 
                  'flushing',
+                 'cleaning',
 
                  'showingStill',
                  'stillCancelCond')
@@ -173,6 +174,7 @@ class Manager(object):
         # Connect our signals to the source object.
         self.src.connect('vobu-read', self.vobuRead)
         self.src.connect('vobu-header', self.vobuHeader)
+        self.src.connect('do-seek', self.doSeek)
 
         # The video state:
         self.aspectRatio = (0, 0)
@@ -203,6 +205,10 @@ class Manager(object):
         # True if we are in the middle of a flush operation.
         self.flushing = False
 
+        # True in the first part of a flush operation until the
+        # flushing seek is complete.
+        self.cleaning = False
+
         # True if we are currently showing a still frame.
         self.showingStill = False
 
@@ -224,6 +230,18 @@ class Manager(object):
         """Invoked by the source element after reading a complete
         VOBU."""
         gst.log("VOBU read")
+
+        if self.cleaning:
+            # A flush requiring operation was already executed on the
+            # machine and the source is trying to read material, but
+            # the pipeline is not yet flushed. We cannot execute any
+            # commands from the machine as yet, because their effect
+            # will potentially get lost when the actual flush
+            # happens. Returning here (where no VOBU is still
+            # programmed) instructs the source to send an EOS down the
+            # pipeline, which will be cleaned up later by the flushing
+            # seek.
+            return
 
         # Commands expecting this method to return set vobuReadReturn
         # to True.
@@ -397,6 +415,7 @@ class Manager(object):
             # Don't allow interactive operations until the flush
             # completes.
             self.flushing = True
+            self.cleaning = True
 
             # Reset the highlight state.
             self.area = None
@@ -455,6 +474,14 @@ class Manager(object):
             
         self.flushing = False
         gst.debug("flush completed")
+
+    @synchronized
+    def doSeek(self, src, event):
+        gst.debug("seek")
+
+        # Drop the cleaning flag thus letting the source play material
+        # from the machine again.
+        self.cleaning = False
 
 
     #
