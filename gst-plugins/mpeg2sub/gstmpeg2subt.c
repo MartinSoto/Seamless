@@ -1481,10 +1481,10 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-reset-highlight")) {
     /* Turn off forced highlight display */
     mpeg2subt->current_button = 0;
-    mpeg2subt->clip_left = mpeg2subt->left;
-    mpeg2subt->clip_top = mpeg2subt->top;
-    mpeg2subt->clip_right = mpeg2subt->right;
-    mpeg2subt->clip_bottom = mpeg2subt->bottom;
+    mpeg2subt->clip_left = 0;
+    mpeg2subt->clip_top = 0;
+    mpeg2subt->clip_right = 0;
+    mpeg2subt->clip_bottom = 0;
     gst_mpeg2subt_reset_highlight (mpeg2subt);
     GST_LOG_OBJECT (mpeg2subt, "Clearing button state");
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-hide")) {

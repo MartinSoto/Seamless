@@ -1,5 +1,12 @@
 2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_dvd_event): When resetting the highlight,
+	set it to an empty area. This prevents funny highlights sometimes
+	hapenning when entering menus.
+
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
 	(Manager.runInteractive, Manager.highlight): Send highlight events
 	as out-of-band only when they happen as a result of an interactive
