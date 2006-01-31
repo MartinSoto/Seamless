@@ -1,3 +1,12 @@
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_event_subtitle) 
+	(gst_mpeg2subt_reset_highlight, gst_mpeg2subt_handle_dvd_event):
+	reset_highlight renamed from flush_subtitle. Now, the subtitle
+	queue is only emptied when actually flushing and no when the
+	reset-highlight DVD event is received. This fixes a segfault when
+	flushing under certain circumstances.
+
 2006-01-30  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/videowidget.py (VideoWidget.__init__, buttonPressCb): 

@@ -154,7 +154,7 @@ static gboolean gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event);
 
 static void gst_mpeg2subt_merge_title (GstMpeg2Subt * mpeg2subt,
     GstBuffer * buf);
-static void gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt);
+static void gst_mpeg2subt_reset_highlight (GstMpeg2Subt * mpeg2subt);
 static gboolean gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt,
     GstEvent * event, gboolean from_sub_pad);
 static void gst_mpeg2subt_finalize (GObject * gobject);
@@ -1349,7 +1349,17 @@ gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_FLUSH_STOP:
-      gst_mpeg2subt_flush_subtitle (mpeg2subt);
+      if (mpeg2subt->partialbuf) {
+	gst_buffer_unref (mpeg2subt->partialbuf);
+	mpeg2subt->partialbuf = NULL;
+      }
+
+      while (!g_queue_is_empty (mpeg2subt->subt_queue)) {
+	gst_mini_object_unref (GST_MINI_OBJECT (g_queue_pop_head
+				   (mpeg2subt->subt_queue)));
+      }
+
+      gst_mpeg2subt_reset_highlight (mpeg2subt);
       gst_segment_init (&(mpeg2subt->subtitle_segment), GST_FORMAT_TIME);
       gst_event_unref (event);
       break;
@@ -1375,19 +1385,9 @@ gst_mpeg2subt_event_subtitle (GstPad *pad, GstEvent *event)
 }
 
 static void
-gst_mpeg2subt_flush_subtitle (GstMpeg2Subt * mpeg2subt)
+gst_mpeg2subt_reset_highlight (GstMpeg2Subt * mpeg2subt)
 {
-  GST_DEBUG_OBJECT (mpeg2subt, "Flushing subtitle");
-
-  if (mpeg2subt->partialbuf) {
-    gst_buffer_unref (mpeg2subt->partialbuf);
-    mpeg2subt->partialbuf = NULL;
-  }
-
-  while (!g_queue_is_empty (mpeg2subt->subt_queue)) {
-    gst_mini_object_unref (GST_MINI_OBJECT (g_queue_pop_head
-			       (mpeg2subt->subt_queue)));
-  }
+  GST_DEBUG_OBJECT (mpeg2subt, "Resetting highlight");
 
   mpeg2subt->cur_cmds = NULL;
   mpeg2subt->cur_cmds_buf = NULL;
@@ -1480,7 +1480,7 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     mpeg2subt->clip_top = mpeg2subt->top;
     mpeg2subt->clip_right = mpeg2subt->right;
     mpeg2subt->clip_bottom = mpeg2subt->bottom;
-    gst_mpeg2subt_flush_subtitle (mpeg2subt);
+    gst_mpeg2subt_reset_highlight (mpeg2subt);
     GST_LOG_OBJECT (mpeg2subt, "Clearing button state");
   } else if (from_sub_pad && !strcmp (event_type, "dvd-spu-hide")) {
     mpeg2subt->hide = TRUE;
