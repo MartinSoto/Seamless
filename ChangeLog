@@ -1,6 +1,17 @@
 2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.runInteractive, Manager.highlight): Send highlight events
+	as out-of-band only when they happen as a result of an interactive
+	operation. Fixes occasional glitches where no highlight is
+	displayed after entering a menu.
+
+	* src/player/events.py (highlight): Rename outOfBand parameter to
+	immediate to convey the actual meaning.
+
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
 	(Manager.vobuRead, Manager.runInteractive, Manager.doSeek):
 	Guarantee that no material is sent down the pipeline in the period
 	between a flush is started and the pipeline is actually cleaned by

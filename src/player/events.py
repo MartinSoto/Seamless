@@ -89,9 +89,11 @@ def audioFillGap(start, stop):
 # Subpicture DVD Events
 #
 
-def highlight(area, button, palette, outOfBand=True):
+def highlight(area, button, palette, immediate=True):
     """Create and return a new highlight event based on the specified
-    highlight area, button number, and color palette."""
+    highlight area, button number, and color palette. If `immediate`
+    is True, the event is created as an out-of-band event so that it
+    takes affect as soon as possible."""
     (sx, sy, ex, ey) = area
 
     st = gst.Structure('application/x-gst-dvd')
@@ -103,7 +105,7 @@ def highlight(area, button, palette, outOfBand=True):
     st.set_value('ex', ex)
     st.set_value('ey', ey)
 
-    return createCustom(st, outOfBand)
+    return createCustom(st, outOfBand=immediate)
 
 def highlightReset():
     """Create and return a new highlight reset event."""

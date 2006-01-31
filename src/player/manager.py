@@ -146,6 +146,8 @@ class Manager(object):
                  'audio',
 
                  'interactiveCount',
+                 'interactiveMode',
+
                  'vobuReadReturn',
 
                  'segmentStart',
@@ -195,6 +197,9 @@ class Manager(object):
         # operation is executed. It is used to deal with call/resume
         # operations and pipeline flushing.
         self.interactiveCount = 0
+
+        # True when executing commands interactively.
+        self.interactiveMode = False
 
         # Start and stop times of the current segment. The current
         # segment covers the current VOBU and all preceeding VOBUs
@@ -404,8 +409,11 @@ class Manager(object):
             # We saw the end of the interactive operation before
             # reaching any VOBU playback operation. Commands should be
             # executed right now without flushing.
+            self.interactiveMode = True
             for cmd in cmds:
+                gst.log("Running command %s interactively" % str(cmd))
                 cmd(self)
+            self.interactiveMode = False
         else:
             # Push back the collected commands so that they get
             # executed.
@@ -581,7 +589,8 @@ class Manager(object):
 
         self.sendEvent(events.highlight(self.area,
                                         self.button,
-                                        self.palette))
+                                        self.palette,
+                                        self.interactiveMode))
 
     def resetHighlight(self):
         """Clear (reset) the highlighted area."""
