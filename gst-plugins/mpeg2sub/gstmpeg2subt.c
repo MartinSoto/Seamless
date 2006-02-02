@@ -268,7 +268,9 @@ gst_mpeg2subt_init (GstMpeg2Subt * mpeg2subt, GstMpeg2SubtClass * gclass)
   mpeg2subt->hide = FALSE;
   mpeg2subt->forced_display = FALSE;
 
+  mpeg2subt->still = FALSE;
   mpeg2subt->still_ts = GST_CLOCK_TIME_NONE;
+  mpeg2subt->still_stop = GST_CLOCK_TIME_NONE;
 
   mpeg2subt->last_video_ts = GST_CLOCK_TIME_NONE;
   mpeg2subt->adjusted_count = 0;
@@ -454,6 +456,7 @@ gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event)
 	gst_mini_object_unref (mpeg2subt->data);
 	mpeg2subt->data = NULL;
       }
+      mpeg2subt->still = FALSE;
       mpeg2subt->still_ts = GST_CLOCK_TIME_NONE;
       mpeg2subt->still_stop = GST_CLOCK_TIME_NONE;
       g_cond_signal (mpeg2subt->data_processed);
@@ -588,14 +591,12 @@ gst_mpeg2subt_loop (GstMpeg2Subt * mpeg2subt)
     goto done;
   }
 
-  if (GST_CLOCK_TIME_IS_VALID (mpeg2subt->still_stop) &&
-      mpeg2subt->last_frame != NULL) {
+  if (mpeg2subt->still && mpeg2subt->last_frame != NULL) {
     /* We are playing a still frame. */
 
     if (!GST_CLOCK_TIME_IS_VALID (mpeg2subt->still_ts)) {
       /* Start repeating from last frame's timestamp, regardless of
-	 the event's start time. Sometimes there's a gap between them
-	 both. */
+	 the event's start time. Sometimes there's a gap between them. */
       mpeg2subt->still_ts = GST_BUFFER_TIMESTAMP (mpeg2subt->last_frame);
     }
 
@@ -607,6 +608,7 @@ gst_mpeg2subt_loop (GstMpeg2Subt * mpeg2subt)
 	(GST_CLOCK_TIME_IS_VALID (mpeg2subt->still_stop) &&
 	    mpeg2subt->still_ts >= mpeg2subt->still_stop)) {
       /* We reached the end of the still frame. */
+      mpeg2subt->still = FALSE;
       mpeg2subt->still_ts = GST_CLOCK_TIME_NONE;
       mpeg2subt->still_stop = GST_CLOCK_TIME_NONE;
       if (mpeg2subt->flushing) {
@@ -1517,9 +1519,9 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
 	GST_TIME_FORMAT ", stop: %" GST_TIME_FORMAT, GST_TIME_ARGS (start),
 	GST_TIME_ARGS (stop));
 
-    /* Assigning the stop time is enough. The loop function will do
-       the rest. */
+    mpeg2subt->still = TRUE;
     mpeg2subt->still_stop = stop;
+    /* The loop function initializes still_ts. */
   } else {
     /* Ignore all other unknown events */
     /*GST_LOG_OBJECT (mpeg2subt, "Ignoring DVD event %s from %s pad",
