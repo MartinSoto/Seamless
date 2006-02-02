@@ -1517,13 +1517,6 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
 	GST_TIME_FORMAT ", stop: %" GST_TIME_FORMAT, GST_TIME_ARGS (start),
 	GST_TIME_ARGS (stop));
 
-    if (!mpeg2subt->last_frame) {
-      /* We don't have a frame to repeat. */
-      GST_ERROR_OBJECT (mpeg2subt, "still event, but no frame available");
-      res = FALSE;
-      goto done;
-    }
-      
     /* Assigning the stop time is enough. The loop function will do
        the rest. */
     mpeg2subt->still_stop = stop;
