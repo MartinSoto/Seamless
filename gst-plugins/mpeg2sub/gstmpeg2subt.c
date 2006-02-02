@@ -455,6 +455,7 @@ gst_mpeg2subt_event_video (GstPad *pad, GstEvent *event)
 	mpeg2subt->data = NULL;
       }
       mpeg2subt->still_ts = GST_CLOCK_TIME_NONE;
+      mpeg2subt->still_stop = GST_CLOCK_TIME_NONE;
       g_cond_signal (mpeg2subt->data_processed);
 
       mpeg2subt->flushing = FALSE;
@@ -587,10 +588,16 @@ gst_mpeg2subt_loop (GstMpeg2Subt * mpeg2subt)
     goto done;
   }
 
-  if (GST_CLOCK_TIME_IS_VALID (mpeg2subt->still_ts)) {
+  if (GST_CLOCK_TIME_IS_VALID (mpeg2subt->still_stop) &&
+      mpeg2subt->last_frame != NULL) {
     /* We are playing a still frame. */
 
-    g_return_if_fail (mpeg2subt->last_frame != NULL);
+    if (!GST_CLOCK_TIME_IS_VALID (mpeg2subt->still_ts)) {
+      /* Start repeating from last frame's timestamp, regardless of
+	 the event's start time. Sometimes there's a gap between them
+	 both. */
+      mpeg2subt->still_ts = GST_BUFFER_TIMESTAMP (mpeg2subt->last_frame);
+    }
 
     /* Advance the timestamp. */
     mpeg2subt->still_ts += (GST_SECOND * mpeg2subt->frame_denominator) /
@@ -601,6 +608,7 @@ gst_mpeg2subt_loop (GstMpeg2Subt * mpeg2subt)
 	    mpeg2subt->still_ts >= mpeg2subt->still_stop)) {
       /* We reached the end of the still frame. */
       mpeg2subt->still_ts = GST_CLOCK_TIME_NONE;
+      mpeg2subt->still_stop = GST_CLOCK_TIME_NONE;
       if (mpeg2subt->flushing) {
 	gst_pad_pause_task (mpeg2subt->srcpad);
       }
@@ -1516,15 +1524,8 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
       goto done;
     }
       
-    if (GST_CLOCK_TIME_IS_VALID (
-	    GST_BUFFER_TIMESTAMP (mpeg2subt->last_frame))) {
-      /* The timestamp for the still frame often lies before the stop
-	 time for its containing VOBU. We display starting from the
-	 last frame anyway. */
-      mpeg2subt->still_ts = GST_BUFFER_TIMESTAMP (mpeg2subt->last_frame);
-    } else {
-      mpeg2subt->still_ts = start;
-    }
+    /* Assigning the stop time is enough. The loop function will do
+       the rest. */
     mpeg2subt->still_stop = stop;
   } else {
     /* Ignore all other unknown events */

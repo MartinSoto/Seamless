@@ -1,3 +1,11 @@
+2006-02-02  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_event_video) 
+	(gst_mpeg2subt_loop, gst_mpeg2subt_handle_dvd_event): Make
+	still frame display robust even if the still-frame event arrives
+	before the frame itself (which shouldn't happen but may happen if
+	the MPEG decoder doesn't serialize events properly).
+
 2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c
