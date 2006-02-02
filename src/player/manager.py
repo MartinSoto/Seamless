@@ -312,6 +312,14 @@ class Manager(object):
            nav.getFirstAudioOffset(self.audio + 1) == 0x3fff:
             # This VOBU has no audio. Fill with silence.
             self.sendEvent(events.audioFillGap(start, stop))
+
+        if nav.nextVobu != None and nav.nextVideoVobu == None:
+            # This VOBU may contain video only partially or contain no
+            # video at all. The still frame event will make the
+            # subtitle decoder fill the gap if there's one. This type
+            # of VOBUs can often be seen in menus with audio but no
+            # animated background.
+            self.sendEvent(events.stillFrame(start, stop))
             
         # FIXME: This should be done later in the game, namely, when
         # the packet actually reaches the subtitle element.

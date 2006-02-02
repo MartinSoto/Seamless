@@ -1,5 +1,14 @@
 2006-02-02  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/dvdread/_dvdread.pyx (getSimplePointer): Make comparison
+	stricter, so that it works also with the next/previous video
+	pointers.
+
+	* src/player/manager.py (Manager.vobuHeader): Fill video gaps in
+	VOBUs containing audio but not video.
+
+2006-02-02  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt): 
 	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
 	(gst_mpeg2subt_event_video, gst_mpeg2subt_loop) 
