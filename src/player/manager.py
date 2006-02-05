@@ -157,7 +157,10 @@ class Manager(object):
                  'cleaning',
 
                  'showingStill',
-                 'stillCancelCond')
+                 'stillCancelCond',
+
+                 'navSequence',
+                 'navList')
 
 
     def __init__(self, machine, pipeline):
@@ -173,10 +176,16 @@ class Manager(object):
         # The synchronized method lock.
         self.lock = threading.RLock()
 
-        # Connect our signals to the source object.
+        # Connect our signal handlers to the source object.
         self.src.connect('vobu-read', self.vobuRead)
         self.src.connect('vobu-header', self.vobuHeader)
         self.src.connect('do-seek', self.doSeek)
+
+        # Connect a handler to the pipeline's message bus, to tell
+        # when navigation packets actually arrive to the sink element
+        # (well, the subtitle decoder is not the video sink, but it's
+        # close enough.)
+        self.pipeline.get_bus().connect('message', self.buttonNavMsgHandler)
 
         # The video state:
         self.aspectRatio = (0, 0)
@@ -219,6 +228,19 @@ class Manager(object):
 
         # Condition object to notify the canceling of a still frame.
         self.stillCancelCond = threading.Condition(self.lock)
+
+        # Navigation packet sequence number. Each navigation packet is
+        # given a unique, consecutive number. This same number is put
+        # in a dvd-spu-nav-sequence events, that travels down the
+        # pileline and causes a signal to be emitted by the subtitle
+        # decoder, with the number as parameter. We use the number to
+        # identify retrieve the corresponding nav packet and use it
+        # for the buttons.
+        self.navSequence = 1
+
+        # A list (queue) of pairs containing a sequence number and the
+        # corresponding nav packet.
+        self.navList = []
 
     def sendEvent(self, event):
         """Send `event` down the pipeline."""
@@ -289,6 +311,12 @@ class Manager(object):
             # VOBU playback was cancelled.
             return
 
+        # Put the nav packet in the queue for eventual use as button
+        # NAV packet, and send the corresponding event.
+        self.navList.append((self.navSequence, nav))
+        self.sendEvent(events.navSequence(self.navSequence))
+        self.navSequence += 1
+
         # Update the current segment and send a corresponding
         # newsegment event.
         start = events.mpegTimeToGstTime(nav.startTime)
@@ -320,10 +348,6 @@ class Manager(object):
             # of VOBUs can often be seen in menus with audio but no
             # animated background.
             self.sendEvent(events.stillFrame(start, stop))
-            
-        # FIXME: This should be done later in the game, namely, when
-        # the packet actually reaches the subtitle element.
-        self.machine.callIterator(self.machine.setButtonNav(nav))
 
 
     #
@@ -498,6 +522,49 @@ class Manager(object):
         # Drop the cleaning flag thus letting the source play material
         # from the machine again.
         self.cleaning = False
+
+
+    #
+    # Button Navigation Packet Handling
+    #
+
+    def buttonNavMsgHandler(self, bus, msg):
+        if msg.type & gst.MESSAGE_ELEMENT and \
+               msg.src == self.pipeline.getSubtitleDecoder() and \
+               msg.structure.has_name('mpeg2subt.nav_sequence'):
+                self.setButtonNav(msg.structure['number'])
+
+    @synchronized
+    def setButtonNav(self, number):
+        try:
+            # Discard previous packets.
+            (navNumber, nav) = self.navList.pop(0)
+            while navNumber < number:
+                (navNumber, nav) = self.navList.pop(0)
+
+            if navNumber != number:
+                gst.error('NAV packet %d not found' % number)
+                return
+        except IndexError:
+            gst.error('NAV packet %d not found' % number)
+            return
+
+        self.runInteractive(self.machine.setButtonNav(nav))
+
+        def interactiveWrapper():
+            """Call the iterator and send an `EndInteractive`
+            operation at the end."""
+            yield itersched.Call(self.machine.setButtonNav(nav))
+
+            end = self.EndInteractive()
+            yield end
+
+        self.machine.callIterator(interactiveWrapper())
+        for cmd in self.machine:
+            gst.log("Running command %s for button nav" % str(cmd))
+            cmd(self)
+            if isinstance(cmd, self.EndInteractive):
+                break
 
 
     #

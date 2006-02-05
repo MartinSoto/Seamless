@@ -431,7 +431,7 @@ class Pipeline(gst.Pipeline):
 
 
     #
-    # Component Retrieval
+    # Element Retrieval
     #
 
     def getBlockSource(self):
@@ -439,6 +439,9 @@ class Pipeline(gst.Pipeline):
 
     def getVideoSink(self):
         return self.videoBin.get_by_name('videosink')
+
+    def getSubtitleDecoder(self):
+        return self.videoBin.get_by_name('mpeg2subt')
 
 
     #

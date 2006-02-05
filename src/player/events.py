@@ -157,3 +157,11 @@ def subpictureShow():
 
     return createCustom(st)
 
+def navSequence(number):
+    """Create and return a new navigation sequence event with sequence
+    number `number`."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-spu-nav-sequence')
+    st.set_value('number', number)
+
+    return createCustom(st)

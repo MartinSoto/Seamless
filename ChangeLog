@@ -1,3 +1,37 @@
+2006-02-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (Pipeline.getSubtitleDecoder): New method
+	to retrieve the subtitle decoder.
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__)
+	(Manager.vobuHeader, Manager.buttonNavMsgHandler)
+	(Manager.setButtonNav): Work together with the subtitle decoder to
+	tell when NAV packets are actually "played". The trick is to store
+	every NAV packet in a queue-like data structure, together with an
+	arbitrary sequence number, and, at the same time, send a
+	serialized event (dvd-spu-nav-sequence) down the pipeline,
+	containing the sequence number. When the event arrives to the
+	subtitle decoder (which is close enough in time to the video sink)
+	the decoder sends a bus message (mpeg2subt.nav_sequence) with the
+	number. The manager catches the message, searches for the right
+	packet in the queue, and sets it in the machine as button NAV
+	packet.
+
+	The effect of all of this is that the button NAV packet actually
+	corresponds to the material being played (there may be a slight
+	delay caused by the message bus, but that's normally small enough
+	for practical purposes.) This fixes potential highlight-related
+	display glitches with menus, and make it possible to play a number
+	of DVD games that expect the button NAV packet to closely match
+	the displayed material.
+
+	* src/player/events.py (navSequence): New procedure to create
+	dvd-spu-nav-sequence events.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_dvd_event): Send a mpeg2subt.nav_sequence
+	bus message when receiving a dvd-spu-nav-sequence event.
+
 2006-02-02  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/dvdread/_dvdread.pyx (getSimplePointer): Make comparison

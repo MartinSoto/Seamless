@@ -1522,6 +1522,22 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
     mpeg2subt->still = TRUE;
     mpeg2subt->still_stop = stop;
     /* The loop function initializes still_ts. */
+  } else if (!from_sub_pad && !strcmp (event_type, "dvd-spu-nav-sequence")) {
+    gint number;
+    GstStructure *msg_str;
+
+    if (!gst_structure_get_int (structure, "number", &number)) {
+      GST_ERROR_OBJECT (mpeg2subt,
+	  "dvd-spu-nav-sequence event did not contain field 'number'");
+      res = FALSE;
+      goto done;
+    }
+
+    msg_str = gst_structure_new ("mpeg2subt.nav_sequence",
+	"number", G_TYPE_INT, number, NULL);
+    gst_element_post_message (GST_ELEMENT (mpeg2subt),
+	gst_message_new_custom (GST_MESSAGE_ELEMENT,
+	    GST_OBJECT (mpeg2subt), msg_str));
   } else {
     /* Ignore all other unknown events */
     /*GST_LOG_OBJECT (mpeg2subt, "Ignoring DVD event %s from %s pad",
