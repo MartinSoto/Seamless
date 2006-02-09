@@ -123,8 +123,8 @@ class DVDPlayer(gobject.GObject):
 
         self.stopMachine()
 
-        # Wait for the EOS message to reach the sinks.
-        yield tasklet.WaitForSignal(self.pipeline, 'eos')
+        # Wait for the pipeline to be paused.
+        yield tasklet.WaitForSignal(self.pipeline, 'state-paused')
         tasklet.get_event()
 
         # Shutdown the pipeline and wait for the NULL state to be reached.
