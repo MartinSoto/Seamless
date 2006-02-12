@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -24,6 +24,10 @@ import gst
 import loadplugins
 
 
+class PipelineParseError(Exception):
+    pass
+
+
 class Bin(gst.Bin):
     """An enhanced GStreamer bin."""
 
@@ -41,7 +45,13 @@ class Bin(gst.Bin):
         if name == None:
             name = type
 
-        subelem = gst.parse_launch(descr)
+        try:
+            subelem = gst.parse_launch(descr)
+        except gobject.GError, e:
+            raise PipelineParseError(
+                _("Error parsing GStreamer pipeline '%s': %s") %
+                (descr, str(e)))
+
         subelem.set_property('name', name)
 
         self.addSubelem(subelem, **keywords)
@@ -106,7 +116,9 @@ class SoftwareAudio(Bin):
         
         self.makeSubelem('capsaggreg')
 
-        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=0,
+        # Time limiting doesn't seem to be working properly. Limit by
+        # size as well.
+        self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=192000,
                          max_size_time=gst.SECOND)
         self.makeParsedSubelem(options['audioSink'], 'audiosink')
 
@@ -166,9 +178,8 @@ class SpdifAudio(Bin):
         
         self.makeSubelem('capsaggreg')
 
-        # Apparently, this queue can get confused and accept too much
-        # material if limited only by time. Fortunately, we can also
-        # limit it to 1s material by size.
+        # Time limiting doesn't seem to be working properly. Limit by
+        # size as well.
         self.makeSubelem('queue', max_size_buffers=0, max_size_bytes=192000,
                          max_size_time=gst.SECOND)
         self.makeSubelem(options['audioSink'], 'audiosink',
@@ -273,14 +284,16 @@ class BackPlayer(Bin):
     def __init__(self, options, name='backplayer'):
         super(BackPlayer, self).__init__(name)
 
-        src = self.makeSubelem('dvdblocksrc', location=options['location'])
-        demux = self.makeSubelem('dvddemux')
+        self.makeSubelem('dvdblocksrc', location=options['location'])
+        self.makeSubelem('dvddemux')
+        self.makeSubelem('audiofiller')
 
         self.link('dvdblocksrc', 'dvddemux')
+        self.linkPads('dvddemux', 'current_audio', 'audiofiller', 'sink')
 
         self.ghostify('dvddemux', 'current_video', 'video')
         self.ghostify('dvddemux', 'current_subpicture', 'subtitle')
-        self.ghostify('dvddemux', 'current_audio', 'audio')
+        self.ghostify('audiofiller', 'src', 'audio')
 
     def getBlockSource(self):
         return self.get_by_name('dvdblocksrc')
@@ -289,15 +302,44 @@ class BackPlayer(Bin):
 class Pipeline(gst.Pipeline):
     """The GStreamer pipeline used to play DVDs."""
 
-    __slots__ = ('backPlayer',
+    __slots__ = ('currentState',
+                 'pendingState',
+
+                 'backPlayer',
                  'audioBin',
                  'videoBin',
                  'syncHandlers')
 
-    def __init__(self, options, name="dvdplayer"):
-        super(Pipeline, self).__init__(name)
+    __gsignals__ = {
+        'state-paused' : (gobject.SIGNAL_RUN_LAST,
+                          gobject.TYPE_NONE,
+                          ()),
+        'state-playing' : (gobject.SIGNAL_RUN_LAST,
+                           gobject.TYPE_NONE,
+                           ()),
+        'eos' : (gobject.SIGNAL_RUN_LAST,
+                 gobject.TYPE_NONE,
+                 ())        
+        }
 
-        # Build the pipeline.
+
+    def __init__(self, options, name="dvdplayer"):
+        # Necessary for __gsignals__ to work.
+        self.__gobject_init__()
+
+        # A message handler to track pipeline state changes.
+        self.get_bus().add_signal_watch()
+        self.get_bus().connect('message', self.stateMsgHandler)
+
+        # The current pipeline state.
+        self.currentState = gst.STATE_NULL
+
+        # The state we are currently changing to, or `None` if no
+        # change is pending.
+        self.statePending = None
+
+
+        # Build the pipeline:
 
         # The back player.
         self.backPlayer = BackPlayer(options)
@@ -350,7 +392,46 @@ class Pipeline(gst.Pipeline):
 
 
     #
-    # Component Retrieval
+    # State Handling
+    #
+
+    def stateMsgHandler(self, bus, msg):
+        """Keep track of pipeline state changes."""
+
+        if msg.type & gst.MESSAGE_STATE_CHANGED and \
+               msg.src == self:
+            (old, new, pending) =  msg.parse_state_changed()
+
+            if pending == gst.STATE_VOID_PENDING:
+                self.currentState = new
+                self.statePending = None
+
+                if new == gst.STATE_PAUSED:
+                    self.emit('state-paused')
+                elif new == gst.STATE_PLAYING:
+                    self.emit('state-playing')
+        elif msg.type & gst.MESSAGE_EOS:
+            self.emit('eos')
+
+    def setState(self, state):
+        """Set the state of the playback pipeline to `state`."""
+        self.statePending = state
+        self.set_state(state)
+        if state in (gst.STATE_NULL, gst.STATE_READY):
+            # Wait for the state change to complete.
+            self.get_state(gst.CLOCK_TIME_NONE)
+
+    def getState(self):
+        """Return the current pipeline state, or `None` if state is
+        being changed right now."""
+        if self.statePending != None:
+            return None
+        else:
+            return self.currentState
+
+
+    #
+    # Element Retrieval
     #
 
     def getBlockSource(self):
@@ -359,9 +440,12 @@ class Pipeline(gst.Pipeline):
     def getVideoSink(self):
         return self.videoBin.get_by_name('videosink')
 
+    def getSubtitleDecoder(self):
+        return self.videoBin.get_by_name('mpeg2subt')
+
 
     #
-    # Flush handling
+    # Flush
     #
 
     def prepareFlush(self):

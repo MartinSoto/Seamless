@@ -1254,7 +1254,7 @@ cdef wrapButton(NavPacket nav, btni_t *btn):
 
 
 cdef getSimplePointer(unsigned long value):
-    if value == 0x3fffffff:
+    if value & 0x3fffffff == 0x3fffffff:
         return None
 
     return value & 0x3fffffff

@@ -16,23 +16,22 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-# This package is used only to configure Seamless to work locally
-# without requiring an installation. Installed versions of Seamless
-# use a generated config.py file.
+import gtk
 
-import os
-import sys
+def errorDialog(mainMsg, secMsg=None, parent=None):
+    flags = gtk.DIALOG_MODAL
+    if parent:
+        flags = flags | gtk.DIALOG_DESTROY_WITH_PARENT
+        
+    dialog = gtk.MessageDialog(parent=parent,
+                               flags=flags,
+                               type=gtk.MESSAGE_ERROR,
+                               buttons=gtk.BUTTONS_CLOSE,
+                               message_format=mainMsg)
+    dialog.set_title(_("Seamless DVD Player: Error"))
 
-# Suffix for plugin files.
-pluginSuffix = '.so'
+    if secMsg:
+        dialog.format_secondary_markup(secMsg)
 
-# Base source directory.
-base = os.path.split(os.path.split(__path__[0])[0])[0]
+    return dialog.run()
 
-# Directory containing the GStreamer plugins.
-gstPlugins = os.path.join(base, 'gst-plugins')
-
-# Directory contaning all glade files.
-gladeDir = os.path.join(base, 'glade')
-
-__all__ = (pluginSuffix, gstPlugins, gladeDir)

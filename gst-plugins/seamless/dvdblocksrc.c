@@ -48,6 +48,7 @@ static GstElementDetails dvdblocksrc_details = GST_ELEMENT_DETAILS (
 enum {
   VOBU_READ_SIGNAL,
   VOBU_HEADER_SIGNAL,
+  EVENT_SIGNAL,
   DO_SEEK_SIGNAL,
   LAST_SIGNAL,
 };
@@ -102,6 +103,9 @@ dvdblocksrc_get_property (GObject *object,
     guint prop_id, 
     GValue *value,
     GParamSpec *pspec);
+
+static gboolean
+dvdblocksrc_event (GstBaseSrc * src, GstEvent * event);
 
 static GstFlowReturn
 dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf);
@@ -168,13 +172,22 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
         gst_marshal_VOID__BOXED,
         G_TYPE_NONE,
         1, GST_TYPE_BUFFER);
+  dvdblocksrc_signals[EVENT_SIGNAL] =
+    g_signal_new ("event",
+        G_TYPE_FROM_CLASS (klass),
+        G_SIGNAL_RUN_LAST,
+        G_STRUCT_OFFSET (DVDBlockSrcClass, event_signal),
+        NULL, NULL,
+        gst_marshal_VOID__BOXED,
+        G_TYPE_NONE,
+        1, GST_TYPE_EVENT);
   dvdblocksrc_signals[DO_SEEK_SIGNAL] =
     g_signal_new ("do-seek",
         G_TYPE_FROM_CLASS (klass),
         G_SIGNAL_RUN_LAST,
         G_STRUCT_OFFSET (DVDBlockSrcClass, do_seek),
         NULL, NULL,
-        g_cclosure_marshal_VOID__BOXED,
+        gst_marshal_VOID__BOXED,
         G_TYPE_NONE,
         1, GST_TYPE_SEGMENT);
 
@@ -206,6 +219,7 @@ dvdblocksrc_class_init (DVDBlockSrcClass *klass)
           FALSE, G_PARAM_READWRITE));
 
   gstbasesrc_class->stop = dvdblocksrc_stop;
+  gstbasesrc_class->event = dvdblocksrc_event;
   gstbasesrc_class->is_seekable = dvdblocksrc_is_seekable;
   gstbasesrc_class->do_seek = dvdblocksrc_do_seek;
 
@@ -342,6 +356,19 @@ dvdblocksrc_get_property (GObject *object, guint prop_id,
 }
 
 
+static gboolean
+dvdblocksrc_event (GstBaseSrc * src, GstEvent * event)
+{
+  if (GST_BASE_SRC_CLASS (parent_class)->event) {
+    g_signal_emit (G_OBJECT (src),
+        dvdblocksrc_signals[EVENT_SIGNAL], 0, event);
+    return GST_BASE_SRC_CLASS (parent_class)->event (src, event);
+  } else {
+    return FALSE;
+  }
+}
+
+
 /* Try to read block_count blocks from the current file, in a newly
    allocated buffer. It could potentally read less blocks than
    requested. The size of the resulting buffer will always be set
@@ -448,7 +475,8 @@ dvdblocksrc_create (GstPushSrc * psrc, GstBuffer ** outbuf)
 
   *outbuf = buf;
 
-  GST_LOG_OBJECT (src, "leaving create normally");
+  GST_LOG_OBJECT (src, "leaving create normally, buf: %p, size: %d, data: %p",
+      buf, GST_BUFFER_SIZE (buf), GST_BUFFER_DATA (buf));
 
  done:
   g_mutex_unlock (src->cancel_lock);
@@ -550,12 +578,20 @@ dvdblocksrc_is_seekable (GstBaseSrc *src)
 
 
 static gboolean
-dvdblocksrc_do_seek (GstBaseSrc *src, GstSegment *segment)
+dvdblocksrc_do_seek (GstBaseSrc *bsrc, GstSegment *segment)
 {
+  DVDBlockSrc *src = DVDBLOCKSRC (bsrc);
+
   GST_DEBUG_OBJECT (src, "doing seek");
 
+  /* Cancel playback of the current VOBU. */
+  g_mutex_lock (src->cancel_lock);
+  src->vobu_start = -1;
+  src->block_count = 0;
+  g_mutex_unlock (src->cancel_lock);
+
   g_signal_emit (G_OBJECT (src),
-        dvdblocksrc_signals[DO_SEEK_SIGNAL], 0);
+        dvdblocksrc_signals[DO_SEEK_SIGNAL], 0, segment);
 
   return TRUE;
 }

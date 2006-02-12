@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Seamless DVD Player
-# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -18,7 +18,6 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-
 import os
 import string
 import sys
@@ -27,11 +26,15 @@ from optparse import OptionParser
 # Work around a bug in Python 2.3 that breaks gst-python.
 os.environ['PYGTK_USE_GIL_STATE_API'] = '1'
 
+# Activate the _() function.
+import gettext
+gettext.install('seamless')
+
 import gobject
 try:
     gobject.threads_init()
 except:
-    print "WARNING: gobject doesn't have threads_init, no threadsafety"
+    print _("WARNING: gobject doesn't have threads_init, no threadsafety")
 
 import pygtk
 pygtk.require('2.0')
@@ -51,6 +54,7 @@ sys.argv.extend(helpOpts)
 
 import player
 import mainui
+import message
 
 
 class DictOptions(object):
@@ -83,21 +87,21 @@ def main():
 
     # Parse the commandline.
     optParser = OptionParser()
-    optParser.set_usage('Usage: %prog [options]')
-    optParser.set_description("Seamless: A DVD player based on GStreamer")
+    optParser.set_usage(_('Usage: %prog [options]'))
+    optParser.set_description(_("Seamless: A DVD player based on GStreamer"))
     optParser.add_option("--fullscreen", dest="fullScreen",
                          action="store_true",
-                         help="start in full screen mode")
+                         help=_("start in full screen mode"))
     optParser.add_option("--device", dest="location",
                          metavar="PATH",
-                         help="set path to DVD device to PATH",
+                         help=_("set path to DVD device to PATH"),
                          default="/dev/dvd")
     optParser.add_option("--lirc", dest="lirc",
                          action="store_true",
-                         help="enable lirc remote control support")
+                         help=_("enable lirc remote control support"))
     optParser.add_option("--region", dest="region",
                          metavar="REGION",
-                         help="Set player's region to REGION. Possible "
+                         help=_("Set player's region to REGION. Possible "
                          "regions are: "
                          "0: Region free (not accepted by some DVDs); "
                          "1: U.S., Canada, U.S. Territories; "
@@ -114,41 +118,71 @@ def main():
                          "6: China; "
                          "7: Reserved; "
                          "8: Special international venues (airplanes, "
-                         "cruise ships, etc.)",
+                         "cruise ships, etc.)"),
                          default=0)
     optParser.add_option("--audio-sink", dest="audioSink",
                          metavar="SINK",
-                         help="audio sink is SINK",
+                         help=_("audio sink is SINK"),
                          default="alsasink")
     optParser.add_option("--spdif-card", dest="spdifCard",
                          metavar="CARD",
-                         help="Instead of decoding audio in software, "
+                         help=_("Instead of decoding audio in software, "
                          "output raw AC3 and DTS to the SP/DIF "
                          "output in card CARD. CARD must be an audio "
                          "card name as defined by the ALSA driver (look "
                          "at the contents of your /proc/asound/cards "
                          "file). This option won't work if you don't "
                          "have the ALSA audio drivers installed and "
-                         "configured in your machine")
+                         "configured in your machine"))
     optParser.add_option("--video-sink", dest="videoSink",
                          metavar="SINK",
-                         help="video sink is SINK",
+                         help=_("video sink is SINK"),
                          default="xvimagesink")
     optParser.add_option("--pixel-aspect", dest="pixelAspect",
                          metavar="ASPECT",
-                         help="set pixel aspect ratio to ASPECT (default 1/1)",
+                         help=_("set pixel aspect ratio to ASPECT "
+                                "(default 1/1)"),
                          default="1/1")    
     (options, args) = optParser.parse_args()
     options = DictOptions(options)
 
     if args != []:
-        optParser.error("invalid argument(s): %s" % string.join(args, ' '))
+        optParser.error(_("invalid argument(s): %s") % string.join(args, ' '))
 
     # Create the main objects.
-    playerObj = player.DVDPlayer(options)
+    try:
+        playerObj = player.DVDPlayer(options)
+    except IOError, e:
+        mainMsg = _("Cannot open DVD in path '%s'") % options.location
+        secMsg = _("Your DVD drive could not be found. You may try to "
+                   "use the --device command line option to specify the "
+                   "correct device path to your drive. If you are sure"
+                   " that you specified a valid path, verify that you "
+                   "have read access to the device.")
+        message.errorDialog(mainMsg, secMsg)
+        return 1
+    except gst.PluginNotFoundError, e:
+        mainMsg = _("Cannot find GStreamer plugin '%s'") % str(e)
+        secMsg = _("GStreamer is the multimedia system used by this "
+                   "program to play video and audio, and it seems to "
+                   "be installed incompletely or configured incorrectly"
+                   " in your machine. Check your software installation"
+                   " and try starting this program again.")
+        message.errorDialog(mainMsg, secMsg)
+        return 1
+    except player.PipelineParseError, e:
+        secMsg = _("A Gstreamer pipeline specified through the command"
+                   " line options could not be parsed, or tried to use"
+                   " unavailable GStreamer elements. Check your command"
+                   " line and try again.")
+        message.errorDialog(str(e), secMsg)
+        return 1
+
     appInstance = mainui.MainUserInterface(playerObj, options)
 
+    # Get into the main loop.
     gtk.main()
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

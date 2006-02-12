@@ -16,9 +16,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-import time
+import sys
 
+import gobject
 import gst
+
+import tasklet
 
 import dvdread
 import machine
@@ -27,19 +30,28 @@ from manager import interactiveOp
 import pipeline
 
 from itersched import NoOp, Call
-from sig import SignalHolder, signal
 
 
-class DVDPlayer(SignalHolder):
+class DVDPlayer(gobject.GObject):
     """Main interface to interactively control the DVD playback system
     and query its state."""
 
     __slots__ = ('info',
                  'machine',
                  'pipeline',
-                 'manager')
+                 'manager',
+                 'src')
+
+    __gsignals__ = {
+        'stopped' : (gobject.SIGNAL_RUN_LAST,
+                     gobject.TYPE_NONE,
+                     ())
+        }
+
 
     def __init__(self, options):
+        super(DVDPlayer, self).__init__()
+
         # Create an info object for the DVD.
         self.info = dvdread.DVDInfo(options.location)
 
@@ -49,6 +61,14 @@ class DVDPlayer(SignalHolder):
         self.machine = machine.VirtualMachine(self.info)
         self.pipeline = pipeline.Pipeline(options)
         self.manager = manager.Manager(self.machine, self.pipeline)
+
+        # Listen to navigation (upstream) events arriving to the
+        # source element.
+        self.src = self.pipeline.getBlockSource()
+        self.src.connect('event', self.sourceEvent)
+
+        # Set the region.
+        self.setRegion(int(options.region))
 
     def getDVDInfo(self):
         return self.info
@@ -75,34 +95,43 @@ class DVDPlayer(SignalHolder):
     #
 
     def start(self):
-        self.pipeline.set_state(gst.STATE_PLAYING)
+        self.pipeline.setState(gst.STATE_PLAYING)
 
-    def pause(self):
-        """Toggle between paused and playing."""
-        (status, state, pending) = self.pipeline.get_state()
-
-        if state == gst.STATE_PLAYING:
-            self.pipeline.set_state(gst.STATE_PAUSED)
-        elif state == gst.STATE_PAUSED:
-            self.pipeline.set_state(gst.STATE_PLAYING)
+    def pause(self, activate):
+        """Toggle between paused and playing. When `activate` is TRUE
+        pause playback, else continue playback."""
+        if activate:
+            self.pipeline.setState(gst.STATE_PAUSED)
+        else:
+            self.pipeline.setState(gst.STATE_PLAYING)
 
     @interactiveOp
     def stopMachine(self):
         yield Call(self.machine.exit())
 
+    @tasklet.task
     def stop(self):
+        """Stop the player. This operation is asynchronous. The
+        'stopped' signal will be emitted when the player is actually
+        stopped."""
+        if self.pipeline.getState() != gst.STATE_PLAYING:
+            # Restart the pipeline to guarantee that the EOS event can
+            # actually reach the sinks.
+            self.pipeline.setState(gst.STATE_PLAYING)
+            yield tasklet.WaitForSignal(self.pipeline, 'state-playing')
+            tasklet.get_event()
+
         self.stopMachine()
 
-        # Wait for the pipeline to actually reach the paused state.
-        maxIter = 40
-        while maxIter > 0 and \
-                  self.pipeline.get_state() == gst.STATE_PLAYING:
-            time.sleep(0.1)
-            maxIter -= 1
+        # Wait for the pipeline to be paused.
+        yield tasklet.WaitForSignal(self.pipeline, 'state-paused')
+        tasklet.get_event()
 
-        # Shutdown the pipeline and confirm the state.
-        self.pipeline.set_state(gst.STATE_NULL)
-        self.pipeline.get_state()
+        # Shutdown the pipeline and wait for the NULL state to be reached.
+        self.pipeline.setState(gst.STATE_NULL)
+
+        # The player is stopped now.
+        self.emit('stopped')
 
 
     #
@@ -270,3 +299,41 @@ class DVDPlayer(SignalHolder):
             return
 
         yield Call(self.machine.callMenu(dvdread.MENU_TYPE_ROOT, 0))
+
+
+    #
+    # Navigation Events
+    #
+
+    def sourceEvent(self, src, event):
+        if event.type == gst.EVENT_NAVIGATION:
+            structure = event.get_structure()
+            if structure.has_name('application/x-gst-navigation'):
+                if structure['event'] == 'mouse-move':
+                    self.selectByPos(int(structure['pointer_x']),
+                                     int(structure['pointer_y']))
+                elif structure['event'] == 'mouse-button-press':
+                    self.confirmByPos(int(structure['pointer_x']),
+                                      int(structure['pointer_y']))
+
+    @interactiveOp
+    def selectByPos(self, x, y):
+        buttonNr = self.machine.getButtonByPos(x, y)
+        if buttonNr == None:
+            return
+
+        yield Call(self.selectButtonInteractive(buttonNr))
+
+    @interactiveOp
+    def confirmByPos(self, x, y):
+        buttonNr = self.machine.getButtonByPos(x, y)
+        if buttonNr == None:
+            return
+
+        yield Call(self.machine.selectButton(buttonNr))
+
+        btnObj = self.machine.getButtonObj()
+        if btnObj == None:
+            return
+
+        yield Call(self.machine.buttonCommand(btnObj.command))

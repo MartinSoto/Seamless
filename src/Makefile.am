@@ -1,4 +1,4 @@
-SUBDIRS = dvdread machine player
+SUBDIRS = baseui dvdread gazpacho machine player tasklet
 
 pypkgdir = $(pkglibdir)/python
 

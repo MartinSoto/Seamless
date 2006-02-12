@@ -16,23 +16,4 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-# This package is used only to configure Seamless to work locally
-# without requiring an installation. Installed versions of Seamless
-# use a generated config.py file.
-
-import os
-import sys
-
-# Suffix for plugin files.
-pluginSuffix = '.so'
-
-# Base source directory.
-base = os.path.split(os.path.split(__path__[0])[0])[0]
-
-# Directory containing the GStreamer plugins.
-gstPlugins = os.path.join(base, 'gst-plugins')
-
-# Directory contaning all glade files.
-gladeDir = os.path.join(base, 'glade')
-
-__all__ = (pluginSuffix, gstPlugins, gladeDir)
+from uimanager import *

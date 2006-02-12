@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004-2005 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
+
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
@@ -20,74 +21,47 @@ import os
 import sys
 import traceback
 
-import gobject
-try:
-    gobject.threads_init()
-except:
-    print "WARNING: gobject doesn't have threads_init, no threadsafety"
-
 import gst
 
-import pygtk
-pygtk.require('2.0')
 import gtk
 
 import debug
+import tasklet
 import player
-import videowidget
+from baseui import UIManager, ActionGroup, action, toggleAction
+import mainwindow
 
 # "Plugins"
 import lirc
 import xscreensaver
 
 
-class MainUserInterface(object):
+class MainUserInterface(UIManager):
+    """The class responsible for creating all widgets and implementing
+    the main actions associated to the Seamless user interface."""
+
+    __slots__ = ('player',
+                 'options',
+                 
+                 'window',
+
+                 'lirc',
+                 'xscreensaver')
+
     def __init__(self, player, options):
+        super(MainUserInterface, self).__init__()
+
         self.player = player
         self.options = options
 
         # Create the main window.
-        self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        self.window.set_title('DVD Player')
-        self.window.set_border_width(0)
-        self.window.set_property('can-focus', True)
-
-        self.window.connect('key-press-event', self.mainKeyPress)
-        self.window.connect('delete_event', self.mainDeleteEvent)
-        self.window.connect('destroy', self.mainDestroy)
-
-        self.video = videowidget.VideoWidget()
-        self.window.add(self.video)
-        
-        self.video.add_events(gtk.gdk.BUTTON_PRESS_MASK)
-        self.video.connect('ready', self.videoReady)
-        self.video.connect('button-press-event', self.videoButtonPress)
-
-        # FIXME: If the video sink doesn't support XOverlay, we have a
-        # problem.
-        self.video.setOverlay(self.player.getVideoSink())
-
-        # Give the window a decent minimum size.
-        self.window.set_size_request(480, 360)
-
-        # Set the initial dimensions of the window to 75% of the screen.
-        (rootWidth, rootHeight) = \
-                    self.window.get_root_window().get_geometry()[2:4]
-        self.window.set_default_size(int(rootWidth * 0.75),
-                                     int(rootHeight * 0.75))
-
-        # Set the full screen mode.
-        self.fullScreen = self.options.fullScreen
-        self.performFullScreen()
-
-        # Set the region.
-        self.player.setRegion(int(self.options.region))
-
-        # Show the actual windows.
-        self.video.show()
+        self.window = mainwindow.MainWindow(self)
+        self.window.connect('delete-event', self.mainWindowDeleteEvent)
+        self.window.fullScreen(options.fullScreen)
         self.window.show()
 
         # Initialize all 'plugins'.
+        # FIXME: A decent framework for extensions is necessary here.
         if self.options.lirc:
             self.lirc = lirc.LIRC(self)
         self.xscreensaver = xscreensaver.XScreensaver(self)
@@ -95,82 +69,112 @@ class MainUserInterface(object):
     def getPlayer(self):
         return self.player
 
-    def shutDown(self):
+    def getOptions(self):
+        return self.options
+
+    @tasklet.task
+    def shutdown(self):
         self.window.hide()
 
+        # Stop the player, and wait for actual termination.
         self.player.stop()
+        yield tasklet.WaitForSignal(self.player, 'stopped')
+        tasklet.get_event()
 
         # Stop control plugins.
+        # FIXME: A decent framework for extensions is necessary here.
         if self.options.lirc:
             self.lirc.close()
         self.xscreensaver.close()
 
         gtk.main_quit()
 
-    def isFullScreen(self):
-        return self.fullScreen
+    def mainWindowDeleteEvent(self, widget, event):
+        self.shutdown()
 
-    def performFullScreen(self):
-        if self.fullScreen:
-            self.window.fullscreen()
-            self.window.set_keep_above(1)
-            self.video.grab_focus()
-        else:
-            self.window.unfullscreen()
-            self.window.set_keep_above(0)
-
-    def toggleFullScreen(self):
-        self.fullScreen = not self.fullScreen
-        self.performFullScreen()
+        # Prevent the window from being closed here. The shutdown()
+        # tasklet will call gtk.main_quit() when ready.
+        return True
 
 
-    #
-    # Callbacks
-    #
+    class alwaysAvailable(ActionGroup):
+        """Always available operations."""
 
-    def mainKeyPress(self, widget, event):
-        keyName = gtk.gdk.keyval_name(event.keyval)
+        @action(stockId=gtk.STOCK_GO_UP)
+        def up(ui, action):
+            ui.player.up()
 
-        if keyName == 'P' or keyName == 'p':
-            self.player.pause()
-        elif keyName == 'Up':
-            self.player.up()
-        elif keyName == 'Down':
-            self.player.down()
-        elif event.state == 0 and keyName == 'Left':
-            self.player.left()
-        elif event.state == 0 and keyName == 'Right':
-            self.player.right()
-        elif keyName == 'Return':
-            self.player.confirm()
-        elif keyName == 'Page_Up':
-            self.player.prevProgram()
-        elif keyName == 'Page_Down':
-            self.player.nextProgram()
-        elif event.state == gtk.gdk.SHIFT_MASK and keyName == 'Left':
-            self.player.backward10()
-        elif event.state == gtk.gdk.SHIFT_MASK and keyName == 'Right':
-            self.player.forward10()
-        elif keyName == 'Escape':
-            self.player.menu()
-        elif keyName == 'F2':
-            self.player.nextAudioStream()
-        elif keyName == 'F3':
-            self.player.nextAngle()
-        elif event.state == gtk.gdk.SHIFT_MASK and keyName == 'F12':
-            debug.debugConsoleAsync(self.player)
+        @action(stockId=gtk.STOCK_GO_DOWN)
+        def down(ui, action):
+            ui.player.down()
 
-        return False
+        @action(stockId=gtk.STOCK_GO_BACK)
+        def left(ui, action):
+            ui.player.left()
 
-    def mainDeleteEvent(self, widget, event):
-        return False
+        @action(stockId=gtk.STOCK_GO_FORWARD)
+        def right(ui, action):
+            ui.player.right()
 
-    def mainDestroy(self, widget):
-        self.shutDown()
+        @action(stockId=gtk.STOCK_OK)
+        def confirm(ui, action):
+            ui.player.confirm()
 
-    def videoReady(self, widget):
-        # Start the player.
-        self.player.start()
+        @action(stockId=gtk.STOCK_HOME, label=_('Menu'), accel='m',
+                tooltip=_('Go to the DVD menu'))
+        def menu(ui, action):
+            ui.player.menu()
 
-    def videoButtonPress(self, widget, event):
-        self.toggleFullScreen()
+
+        @toggleAction(stockId=gtk.STOCK_MEDIA_PAUSE, accel='p',
+                tooltip=_('Pause playback'))
+        def pause(ui, action):
+            ui.player.pause(action.get_active())
+
+        @action(stockId=gtk.STOCK_MEDIA_PREVIOUS, accel='Page_Up',
+                tooltip=_('Jump to previous chapter'))
+        def prevProgram(ui, action):
+            ui.player.prevProgram()
+
+        @action(stockId=gtk.STOCK_MEDIA_NEXT, accel='Page_Down',
+                tooltip=_('Jump to next chapter'))
+        def nextProgram(ui, action):
+            ui.player.nextProgram()
+
+        @action(stockId=gtk.STOCK_MEDIA_REWIND, accel='<Shift>Left',
+                tooltip=_('Jump 10 seconds backward'))
+        def backward10(ui, action):
+            ui.player.backward10()
+
+        @action(stockId=gtk.STOCK_MEDIA_FORWARD, accel='<Shift>Right',
+                tooltip=_('Jump 10 seconds forward'))
+        def forward10(ui, action):
+            ui.player.forward10()
+
+
+        @toggleAction(stockId=gtk.STOCK_FULLSCREEN)
+        def fullScreen(ui, action):
+            ui.window.fullScreen(action.get_active())
+
+
+        @action(label=_("Next Audio"), accel='F2',
+                tooltip=_('Select next audio track'))
+        def nextAudioStream(ui, action):
+            ui.player.nextAudioStream()
+
+        @action(label=_("Next Angle"), accel='F3',
+                tooltip=_('Select next angle'))
+        def nextAngle(ui, action):
+            ui.player.nextAngle()
+
+
+        @action(stockId=gtk.STOCK_QUIT, accel='<Ctrl>Q',
+                tooltip=_(''))
+        def quit(ui, action):
+            ui.shutdown()
+
+
+        @action(label=_("Debug Console"), accel='<Ctrl>F12')
+        def debugConsoleAsync(ui, action):
+            debug.debugConsoleAsync(ui.player)
+

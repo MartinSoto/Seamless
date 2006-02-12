@@ -43,14 +43,6 @@ def filler():
     """Create and return a filler event."""
     return gst.event_new_filler()
 
-def flush_start():
-    """Create and return a flush start event."""
-    return gst.event_new_flush_start()
-
-def flush_stop():
-    """Create and return a flush stop event."""
-    return gst.event_new_flush_stop()
-
 def newsegment(update, startTime, endTime):
     """Create and return a newsegment event for the specified start
     and end times. Times are specified in nanoseconds."""
@@ -83,16 +75,13 @@ def audio(physical):
     st.set_value('physical', physical, 'int')
     return createCustom(st)
 
-def audioShutdown():
-    """Create and return an audio shutdown event."""
+def audioFillGap(start, stop):
+    """Create and return a new audio fill gap event for the specified
+    start and stop times."""
     st = gst.Structure('application/x-gst-dvd')
-    st.set_value('event', 'dvd-audio-shutdown')
-    return createCustom(st)
-
-def audioRestart():
-    """Create and return an audio restart event."""
-    st = gst.Structure('application/x-gst-dvd')
-    st.set_value('event', 'dvd-audio-restart')
+    st.set_value('event', 'dvd-audio-fill-gap')
+    st.set_value('start', start, 'uint64')
+    st.set_value('stop', stop, 'uint64')
     return createCustom(st)
 
 
@@ -100,9 +89,11 @@ def audioRestart():
 # Subpicture DVD Events
 #
 
-def highlight(area, button, palette, outOfBand=True):
+def highlight(area, button, palette, immediate=True):
     """Create and return a new highlight event based on the specified
-    highlight area, button number, and color palette."""
+    highlight area, button number, and color palette. If `immediate`
+    is True, the event is created as an out-of-band event so that it
+    takes affect as soon as possible."""
     (sx, sy, ex, ey) = area
 
     st = gst.Structure('application/x-gst-dvd')
@@ -114,7 +105,7 @@ def highlight(area, button, palette, outOfBand=True):
     st.set_value('ex', ex)
     st.set_value('ey', ey)
 
-    return createCustom(st, outOfBand)
+    return createCustom(st, outOfBand=immediate)
 
 def highlightReset():
     """Create and return a new highlight reset event."""
@@ -123,10 +114,13 @@ def highlightReset():
 
     return createCustom(st)
 
-def stillFrame():
-    """Create and return a still frame event."""
+def stillFrame(start, stop):
+    """Create and return a still frame event with the specified start
+    and stop times."""
     st = gst.Structure('application/x-gst-dvd')
     st.set_value('event', 'dvd-spu-still-frame')
+    st.set_value('start', start, 'uint64')
+    st.set_value('stop', stop, 'uint64')
     return createCustom(st)
 
 def subpictureClut(clut):
@@ -163,3 +157,11 @@ def subpictureShow():
 
     return createCustom(st)
 
+def navSequence(number):
+    """Create and return a new navigation sequence event with sequence
+    number `number`."""
+    st = gst.Structure('application/x-gst-dvd')
+    st.set_value('event', 'dvd-spu-nav-sequence')
+    st.set_value('number', number)
+
+    return createCustom(st)

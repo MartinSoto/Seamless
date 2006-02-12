@@ -121,15 +121,20 @@ AC_SUBST([AM_CFLAGS])
 AC_OUTPUT([
   Makefile
   config/Makefile
+  glade/Makefile
   gst-plugins/Makefile
   gst-plugins/alsaspdif/Makefile
   gst-plugins/capspipe/Makefile
   gst-plugins/seamless/Makefile
   gst-plugins/mpeg2sub/Makefile
   src/Makefile
+  src/baseui/Makefile
   src/dvdread/Makefile
+  src/gazpacho/Makefile
+  src/gazpacho/loader/Makefile
   src/machine/Makefile
   src/player/Makefile
+  src/tasklet/Makefile
 ])
 
 echo

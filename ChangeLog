@@ -1,12 +1,589 @@
+2006-02-10  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/player.py (DVDPlayer.stop): Wait only for paused
+	state when shutting down. EOS takes ages to arrive and don't seem
+	to be necessary anyway.
+
+2006-02-05  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (Pipeline.getSubtitleDecoder): New method
+	to retrieve the subtitle decoder.
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__)
+	(Manager.vobuHeader, Manager.buttonNavMsgHandler)
+	(Manager.setButtonNav): Work together with the subtitle decoder to
+	tell when NAV packets are actually "played". The trick is to store
+	every NAV packet in a queue-like data structure, together with an
+	arbitrary sequence number, and, at the same time, send a
+	serialized event (dvd-spu-nav-sequence) down the pipeline,
+	containing the sequence number. When the event arrives to the
+	subtitle decoder (which is close enough in time to the video sink)
+	the decoder sends a bus message (mpeg2subt.nav_sequence) with the
+	number. The manager catches the message, searches for the right
+	packet in the queue, and sets it in the machine as button NAV
+	packet.
+
+	The effect of all of this is that the button NAV packet actually
+	corresponds to the material being played (there may be a slight
+	delay caused by the message bus, but that's normally small enough
+	for practical purposes.) This fixes potential highlight-related
+	display glitches with menus, and make it possible to play a number
+	of DVD games that expect the button NAV packet to closely match
+	the displayed material.
+
+	* src/player/events.py (navSequence): New procedure to create
+	dvd-spu-nav-sequence events.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_dvd_event): Send a mpeg2subt.nav_sequence
+	bus message when receiving a dvd-spu-nav-sequence event.
+
+2006-02-02  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/dvdread/_dvdread.pyx (getSimplePointer): Make comparison
+	stricter, so that it works also with the next/previous video
+	pointers.
+
+	* src/player/manager.py (Manager.vobuHeader): Fill video gaps in
+	VOBUs containing audio but not video.
+
+2006-02-02  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt): 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_event_video, gst_mpeg2subt_loop) 
+	(gst_mpeg2subt_handle_dvd_event): Unbrake unlimited still frames,
+	broken by previous patches.
+
+2006-02-02  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_event_video) 
+	(gst_mpeg2subt_loop, gst_mpeg2subt_handle_dvd_event): Make
+	still frame display robust even if the still-frame event arrives
+	before the frame itself (which shouldn't happen but may happen if
+	the MPEG decoder doesn't serialize events properly).
+
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_dvd_event): When resetting the highlight,
+	set it to an empty area. This prevents funny highlights sometimes
+	hapenning when entering menus.
+
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.runInteractive, Manager.highlight): Send highlight events
+	as out-of-band only when they happen as a result of an interactive
+	operation. Fixes occasional glitches where no highlight is
+	displayed after entering a menu.
+
+	* src/player/events.py (highlight): Rename outOfBand parameter to
+	immediate to convey the actual meaning.
+
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(Manager.vobuRead, Manager.runInteractive, Manager.doSeek):
+	Guarantee that no material is sent down the pipeline in the period
+	between a flush is started and the pipeline is actually cleaned by
+	the seek operation. This fixes occasional playback glitches after
+	flushing.
+
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (MAX_ADJUST) 
+	(gst_mpeg2subt_init, gst_mpeg2subt_check_video_timestamp) 
+	(gst_mpeg2subt_loop): 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt):
+	Milder timestamp gap recovery. Don't drop frames but adjust their
+	timestamps to close the gaps, and adjust a maximum of five frames
+	in a row before giving up. This makes gap handling much more
+	reliable.
+
+2006-01-31  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_event_subtitle) 
+	(gst_mpeg2subt_reset_highlight, gst_mpeg2subt_handle_dvd_event):
+	reset_highlight renamed from flush_subtitle. Now, the subtitle
+	queue is only emptied when actually flushing and no when the
+	reset-highlight DVD event is received. This fixes a segfault when
+	flushing under certain circumstances.
+
+2006-01-30  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_check_video_timestamp, gst_mpeg2subt_loop): 
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt):
+	Keep track of timestamps sent down the pipeline, check for gaps
+	and drop frames with implausible timestamps. Apart from making
+	mpeg2subt generally more robust, this change functions as a
+	workaround for the fact that mpeg2dec is not generally able to
+	sequence NEWSEGMENT events with the actual decoded frames. This
+	was leading to situations where the video sink blocked because of
+	frames with to high timestamps, which actually hapenned to be
+	frames belonging to the previous segment.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init)
+	(gst_mpeg2subt_event_video, gst_mpeg2subt_loop)
+	(gst_mpeg2subt_process_events, gst_mpeg2subt_next_block)
+	(gst_mpeg2subt_event_subtitle): *
+	gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt): Keep track of
+	NEWSEGMENT events in both the video and audio streams, and use
+	them together with the timestamps to decide when to display the
+	subtitles/highlights. This fixes occasional glitches with
+	highlight display.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c
+	(gst_mpeg2subt_handle_dvd_event): Forward custom events that
+	aren't DVD events.
+	(gst_mpeg2subt_finalize, gst_mpeg2subt_process_events) 
+	(gst_mpeg2subt_next_block, gst_mpeg2subt_event_subtitle) 
+	(gst_mpeg2subt_flush_subtitle): Put synchronous events received on
+	the subtitle pad in the subtitle queue, and process them in
+	sequence with data buffers.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (StateTracker, Pipeline.__slots__) 
+	(Pipeline.__init__, Pipeline.stateMsgHandler): Move __gsignals__
+	to the Pipeline class and get rid of the StateTracker
+	workaround. Thanks to Johan Dahlin for the suggested fix (or, at
+	least, much less radical workaround.)
+
+	* src/player/player.py (DVDPlayer.stop): 
+	* src/player/manager.py (Manager.flush): 
+	Don't reference pipeline.tracker attribute.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainwindow.py (MainWindow.__init__, mainDeleteEvent): 
+	* src/mainui.py (MainUserInterface.__init__) 
+	(MainUserInterface.mainWindowDeleteEvent): 
+	Move handling of the delete event completely to
+	MainUserInterface. Trap only the delete event.
+
+	* src/lirc.py (LIRC.readData): shutDown -> shutdown.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainwindow.py (MainWindow.mainDeleteEvent): Cancel closing
+	of the window here, and just wait for shutdown() to do its work.
+
+	* src/mainui.py (MainUserInterface.shutdown): Rename from
+	'shutDown'. Make asynchronous, based on the player's 'stopped'
+	signal.
+
+	* src/player/player.py (DVDPlayer.__gsignals__): Add 'stopped'
+	signal.
+	(DVDPlayer.stop): Stop asynchronously and send the 'stopped'
+	signal when ready.
+
+	* src/player/pipeline.py (StateTracker.__gsignals__) 
+	(Pipeline.stateMsgHandler, Pipeline.setState): Add eos
+	signal. Don't emit signals for the NULL and READY states but wait
+	for them synchronously instead.
+
+2006-01-29  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.runInteractive, flush): Implement
+	the flush operation as a single tasklet.
+
+	* src/player/pipeline.py (StateTracker): New class containing
+	signals for pipeline state change tracking.
+	(Pipeline.__slots__, Pipeline.__init__, Pipeline.stateMsgHandler) 
+	(Pipeline.setState, Pipeline.getState): Keep track of state using
+	attributes and a bus message handler. Offer simpler semantics for
+	setting and getting the current state.
+
+2006-01-28  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (_GstMpeg2Subt):
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_setcaps) 
+	(gst_mpeg2subt_loop): Use the actual frame rate for still frames.
+
+2006-01-28  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.stillFrame): Send still frame
+	events with proper start and stop times.
+
+	* src/player/events.py (flush_start, flush_stop): Erased. 
+	(stillFrame): Add start and stop parameters.
+
+	* gst-plugins/mpeg2sub/gstmpeg2subt.h (GST_MPEG2SUBT_LOCK) 
+	(GST_MPEG2SUBT_UNLOCK, GST_MPEG2SUBT_COND_WAIT)
+	(_GstMpeg2Subt):
+	* gst-plugins/mpeg2sub/gstmpeg2subt.c (gst_mpeg2subt_init) 
+	(gst_mpeg2subt_finalize, gst_mpeg2subt_src_activate_push) 
+	(gst_mpeg2subt_event_video, gst_mpeg2subt_chain_video) 
+	(gst_mpeg2subt_loop, gst_mpeg2subt_update_still_frame) 
+	(gst_mpeg2subt_chain_subtitle, gst_mpeg2subt_flush_video) 
+	(gst_mpeg2subt_handle_dvd_event): 
+	First round of changes directed to make mpeg2subt able to handle
+	still frames by sending copies of the same frame, possibly with
+	overlayed subtitles/highlights. mpeg2subt is now a chain/loop
+	based element, a bit like gstqueue.
+
+2006-01-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/seamless/audiofiller.c (audiofiller_event): Return
+	FALSE if an incorrect dvd-audio-fill-gap arrives.
+
+2006-01-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.flush): Don't restart the
+	pipeline if it was originally paused. This allows for seeking in
+	paused mode.
+
+2006-01-23  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__)
+	(Manager.flush, Manager.stillFrame): Reimplement unlimited still
+	frames.
+
+2006-01-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (synchronized.wrapper): Actually return
+	the return value of the wrapped method.
+	(Manager.__init__, Manager.runInteractive, Manager.flush) 
+	(Manager.flushMsgHandler): Yet another flush revamp. Now the flush
+	operation is executed synchronously from runInteractive.
+	(Manager.cancelVobu): Reactivate use of the cancel-vobu property.
+
+	* gst-plugins/seamless/dvdblocksrc.c (dvdblocksrc_create): Better
+	debugging info.
+	(dvdblocksrc_do_seek): Cancel playback of the current VOBU. Not
+	doing that is an effective way of making mpeg2dec crash.
+
+2006-01-22  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/pipeline.py (SoftwareAudio.__init__): Limit the queue
+	by size as well.
+
+	* src/player/manager.py (Manager.__slots__, Manager.sendEvent)
+	(Manager.collectCmds, Manager.playVobu)
+	(Manager.SILENCE_BLOCKS_PER_SECOND, Manager.stillFrame)
+	(Manager.flush): Implement timed still frames using audio gap
+	filling and NEWSEGMENT events. This eliminates the need to flush
+	after a still, and guarantees that the pipeline keeps running
+	smootly after the still ends. Also, for the first time in
+	seamless' history, timed stills are displayed for the exact
+	specified time.
+	(pause): Erased.
+	(Manager.sendEvent): Check for errors when sending events.
+
+	* src/machine/machine.py (CellPlayer.playFromVobu): Instead of
+	activily waiting here, just send a StillFrame command with the
+	appropriate wait time value.
+
+	* src/machine/cmds.py (StillFrame): StillFrame now takes the
+	number of seconds as parameters.
+	(Pause): Erased.
+
+	* gst-plugins/seamless/audiofiller.c (audiofiller_push_silence) 
+	(audiofiller_transform_ip): Additional debug messages.
+
+2006-01-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.__slots__, Manager.__init__) 
+	(shutdownAudio, restartAudio, Manager.flush): 
+	* src/player/events.py (audioShutdown, audioRestart): Get rid of
+	all code related to audio shutdown/restart operations.
+
+2006-01-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.vobuHeader): Partially adapt
+	audio shutdown code to send fill gap events instead. Still work in
+	progress.
+
+	* src/player/events.py (audioFillGap): New function to create
+	audio fill gap events.
+
+	* src/player/pipeline.py (BackPlayer.__init__): Insert an
+	audiofiller element between the demux and the audio pipeline.
+
+	* gst-plugins/seamless/Makefile.am (libseamless_la_SOURCES) 
+	(noinst_HEADERS): 
+	* gst-plugins/seamless/seamlessinit.c (plugin_init): 
+	* gst-plugins/seamless/audiofiller.c: New element intended to fill
+	audio gaps. When receiving a dvd-audio-fill-gap event, it sends as
+	much PCM silence down the pipeline as the event specifies. This is
+	though as an interim solution until GStreamer has working sparse
+	stream support.
+
 2006-01-17  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* README: Point to SourceForge instead of GNA.
+
+2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/videowidget.py (VideoWidget.__init__, VideoWidget.deleteCb):
+	Manually send button press navigation events up the pipeline,
+	since Gtk seems to be preventing the GStreamer components from
+	doing so automatically.
+
+	* src/player/player.py (DVDPlayer.__init__) 
+	(DVDPlayer.sourceEvent, DVDPlayer.selectByPos) 
+	(DVDPlayer.confirmByPos): Select the button under the mouse cursor
+	according to navigation events, and confirm on button press.
+
+	* src/machine/machine.py (VirtualMachine.getButtonByPos): New
+	method to find the button corresponding to a screen position.
+
+	* gst-plugins/seamless/dvdblocksrc.h: 
+	* gst-plugins/seamless/dvdblocksrc.c
+	(dvdblocksrc_class_init, dvdblocksrc_event): New 'event' signal
+	that gets fired every time an upstream event arrives to the sink.
+
+2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/seamless.py (main): Trap and report errors caused by
+	incorrect pipelines specified in the command line.
+
+	* src/player/pipeline.py (PipelineParseError) 
+	(Bin.makeParsedSubelem): 
+	* src/player/__init__.py: 
+	Raise a custom exception when a pipeline cannot be parsed.
+
+2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/seamless.py (main): Trap and report errors caused by not
+	found plugins. Use message.errorDialog for all errors.
+
+	* src/message.py: New module for message dialogs.
+
+2006-01-16  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/seamless.py (main): Use a dialog box to report problems when
+	the DVD cannot be open.
+
+2006-01-15  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/manager.py (Manager.runInteractive, Manager.flush):
+	Change the point where the 'flushing' attribute is set to True, to
+	ensure that it isn't possible to enter runInteractive while a
+	flush operation is in progress. This fixes a race condition that
+	was causing the player to block when many flushes happened close
+	to each other (i.e., when skipping chapters).
+
+2006-01-15  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/seamless/dvdblocksrc.c (dvdblocksrc_class_init) 
+	(dvdblocksrc_do_seek): Actually pass the segment as parameter to the
+	do-seek signal.
+
+2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainui.py (MainUserInterface.__init__)
+	(MainUserInterface.alwaysAvailable.fullScreen):
+	* src/mainwindow.py (MainWindow.__slots_, MainWindow.__init__)
+	(MainWindow.fullScreen, MainWindow._videoCursorHidden)
+	(MainWindow._videoCursorShown, videoButtonPress)
+	(MainWindow.videoKeyPress, MainWindow._leaveFullScreenClicked):
+	Rewrite the implementation of the full screen mode. Full screen
+	is now activated from the toolbar and has a leave button that is
+	hidden together with the cursor.
+
+	* src/videowidget.py (VideoWidget): Inherit from EventBox, to make
+	it possible to put widgets on top of the video display.
+
+2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainui.py (MainUserInterface.alwaysAvailable)
+	(MainUserInterface.alwaysAvailable): Fix misspellings in tooltip
+	strings.
+
+2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__gsignals__, VideoWidget.__init__) 
+	(VideoWidget._showCursor, VideoWidget._hideCursor) 
+	(VideoWidget._updateCursor, mapCb): Further VideoWidget
+	rework. The __init__ method is now a tasklet that waits until a
+	map event arrives to initialize the window. This ensures that
+	initialization happens only once. There are also new signals
+	cursor-hidden and cursor-shown.
+
+2006-01-14  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/tasklet/__init__.py (initTask): Add a generator to convert
+	the __init__ method of class into a generator.
+
+2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/videowidget.py (VideoWidget.__init__, realizeCb)
+	(VideoWidget.mapCb): Emit the "ready" signal when map-event
+	arrives, instead of at realize time. This (hopefully) fixes a race
+	condition that was causing Seamless to abort with an XError
+	because the player could try to display video when the window
+	wasn't still there.
+
+2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainwindow.py (MainWindow.__init__) 
+	(MainWindow.mainConfigureEvent): React to the configure event in
+	the main window, to refresh the video overlay when
+	the window is moved. Previously, still frames and paused video got
+	badly displayed when moving the window.
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__init__, VideoWidget.forceVideoUpdate) 
+	(VideoWidget.prepareWindowCb, VideoWidget.deleteCb): Add a
+	public operation to refresh the video overlay.
+
+2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainui.py (MainUserInterface.alwaysAvailable.pause): Convert
+	the pause action into a toggle action. This make it a toggle on
+	the toolbar as well.
+
+	* src/player/player.py (DVDPlayer.pause): Pass an activate
+	parameter to the pause operation to activate or deactivate the
+	pause.
+
+2006-01-12  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainwindow.py (MainWindow.__init__) 
+	(MainWindow.performFullScreen): Activate cursor hiding only when
+	the window is maximized.
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__init__, getInvisibleCursor) 
+	(VideoWidget.updateCursor, hidePointer) 
+	(VideoWidget.setCursorTimeout, motionCb, VideoWidget.realizeCb):
+	Reimplement cursor hiding as a tasklet, allow for a settable
+	timeout, and make the cursor blink before it gets hidden, so that
+	the user notices it.
+
+2006-01-11  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/tasklet/__init__.py: 
+	* src/tasklet/tasklet.py: Added a copy of Gustavo Carneiro's
+	tasklet framework.
+
+	* src/Makefile.am: 
+	* src/tasklet/Makefile.am: 
+	* configure.ac: 
+	Arrange for tasklet files to be distributed.
+
+2006-01-10  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/videowidget.py (VideoWidget.__slots__) 
+	(VideoWidget.__init__, VideoWidget.do_expose_event) 
+	(VideoWidget.prepareWindowCb, sizeAllocateCb) 
+	(backgroundRealizeCb, VideoWidget.realizeCb, videoEventFilterCb):
+	Revamp the video widget to use a single DrawingArea.
+
+2006-01-10  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainui.py	(MainUserInterface.alwaysAvailable): Add
+	keyboard accelerators and tooltips to many of the actions.
+
+	* src/mainwindow.py (MainWindow.__init__): Install accelerator
+	group and add most existing actions as accelerators to the XML
+	description. Clean up window construction.
+	(MainWindow.videoKeyPress): Arrow keys and return must be handled
+	with an event handler instead of using key accelerators.
+
+2006-01-09  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/baseui/uimanager.py (ActionGroup.__init__): Add action
+	instances as attributes to the UIManager instead of the action
+	groups.
 
 2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/manager.py (Manager.vobuHeader): Also shutdown the
 	sound pipeline when no physical audio channel is reported by the
 	machine.
+
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainwindow.py (MainWindow.__slots_, MainWindow.__init__) 
+	(MainWindow.performFullScreen, mainKeyPress): Add a toolbar and
+	connect some of the actions to it. Remove direct keyboard
+	handling.
+
+	* src/mainui.py (MainUserInterface, MainUserInterface.__init__) 
+	(MainUserInterface.alwaysAvailable): Convert MainUserInterface
+	into an baseui.UIManager and define the main operations as
+	actions.
+
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/baseui/uimanager.py (ActionGroup.__init__): Create the
+	action callbacks as method bound to UIManager. This way, they have
+	direct access to the UIManager instance and not to the ActionGroup
+	containing the action.
+	(UIManager.__init__): Pass self as parameter when creating the
+	action groups, so that the callbacks can access the ui manager.
+
+	* src/baseui/actiongroup.py 
+	* src/baseui/uimanager.py:
+	Consolidate in a single file.
+
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/mainwindow.py: 
+	* src/mainui.py (MainUserInterface.__slots__) 
+	(MainUserInterface.__init__): 
+	In preparation for creating an UI manager, create a new class to
+	represent the main player window and move all relevant code from
+	mainui to it.
+
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/seamless.py: 
+	(main): Install the _() gettext translation function and mark the
+	commandline options' help text for translations.
+
+2006-01-08  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/baseui/uimanager.py: 
+	* src/baseui/actiongroup.py: 
+	* src/baseui/__init__.py: 
+	New package baseui for generic user interface code. For the moment
+	it offers a wrapper system for gtk.UIManager and gtk.ActionGroup.
+
+	* src/baseui/Makefile.am: 
+	* src/Makefile.am (SUBDIRS): 
+	* configure.ac: 
+	Install the python files in baseui.
+
+2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/player.py (DVDPlayer.__init__): 
+	* src/mainui.py (MainUserInterface.__init__): 
+	Move region setting to the player itself, which receives the
+	options object anyway.
+
+2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/config/__init__.py (__all__): Fix the export line.
+
+2006-01-07  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* configure.ac: 
+	* src/Makefile.am (SUBDIRS): 
+	* src/gazpacho:
+	Copy the loader package from Gazpacho, so that we can load
+	Gazpacho created .glade files.
+
+	* configure.ac: 
+	* glade/seamless.glade
+	* src/config/__init__.py: 
+	* config/config.py.tmpl: 
+	* config/Makefile.am (config.py): 
+	* Makefile.am (SUBDIRS): 
+	Create a new glade file directory and define a configuration
+	variable to find its location. Also add a new seamless.glade file
+	and setup the compilation system to install it properly.
+
+	* autogen.sh: Pass parameters to configure script.
 
 2006-01-05  Martin Soto  <martinsoto@users.sourceforge.net>
 

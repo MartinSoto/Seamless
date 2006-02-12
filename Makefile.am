@@ -1,1 +1,1 @@
-SUBDIRS=config gst-plugins src
+SUBDIRS=config glade gst-plugins src

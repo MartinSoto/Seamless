@@ -86,6 +86,7 @@ struct _DVDBlockSrcClass {
   /* Signals */
   void (*vobu_read)		(DVDBlockSrc * src);
   void (*vobu_header)		(DVDBlockSrc * src, GstBuffer * header);
+  gboolean (*event_signal)	(GstBaseSrc *src, GstEvent *event);
   gboolean (*do_seek)		(GstBaseSrc *src, GstSegment *segment);
 };
 

@@ -16,23 +16,28 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-# This package is used only to configure Seamless to work locally
-# without requiring an installation. Installed versions of Seamless
-# use a generated config.py file.
+from tasklet import *
 
-import os
-import sys
+def task(generator):
+    """A decorator to convert a function into a tasklet."""
 
-# Suffix for plugin files.
-pluginSuffix = '.so'
+    def wrapper(*args, **keywords):
+        return tasklet.run(generator(*args, **keywords))
 
-# Base source directory.
-base = os.path.split(os.path.split(__path__[0])[0])[0]
+    return wrapper
 
-# Directory containing the GStreamer plugins.
-gstPlugins = os.path.join(base, 'gst-plugins')
+def initTask(generator):
+    """A decorator to convert an __init__ method into a tasklet.
 
-# Directory contaning all glade files.
-gladeDir = os.path.join(base, 'glade')
+    Creating an object with such an __init__ method will automatically
+    start the task. If the object has a writable `_mainTask'
+    attribute, it will be set to task object."""
 
-__all__ = (pluginSuffix, gstPlugins, gladeDir)
+    def wrapper(self, *args, **keywords):
+        taskObj = tasklet.run(generator(self, *args, **keywords))
+        try:
+            self._mainTask = taskObj
+        except:
+            pass
+
+    return wrapper

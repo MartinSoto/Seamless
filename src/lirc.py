@@ -41,7 +41,7 @@ class LIRC(object):
                 
             return True
         else:
-            self.mainUi.shutDown()
+            self.mainUi.shutdown()
             return False
 
     def close(self):

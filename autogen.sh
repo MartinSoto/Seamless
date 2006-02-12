@@ -26,4 +26,5 @@ libtoolize --force && \
 $AUTOHEADER
 $AUTOMAKE -a && \
 $AUTOCONF && \
-./configure --enable-maintainer-mode
+./configure --enable-maintainer-mode $*
+
