@@ -105,6 +105,15 @@ class DVDPlayer(gobject.GObject):
         else:
             self.pipeline.setState(gst.STATE_PLAYING)
 
+    def togglePause(self):
+        """Toggle between paused and playing. Available for use with a
+        remote control or similar interface."""
+        state = self.pipeline.getState()
+        if state == gst.STATE_PAUSED:
+            self.pipeline.setState(gst.STATE_PLAYING)
+        elif state == gst.STATE_PLAYING:
+            self.pipeline.setState(gst.STATE_PAUSED)
+
     @interactiveOp
     def stopMachine(self):
         yield Call(self.machine.exit())

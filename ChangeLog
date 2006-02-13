@@ -1,3 +1,9 @@
+2006-02-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/player/player.py (DVDPlayer.togglePause): New function to
+	toggle between pause and play, for use with lirc or similar
+	interfaces.
+
 2006-02-10  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/player.py (DVDPlayer.stop): Wait only for paused
