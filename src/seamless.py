@@ -96,9 +96,6 @@ def main():
                          metavar="PATH",
                          help=_("set path to DVD device to PATH"),
                          default="/dev/dvd")
-    optParser.add_option("--lirc", dest="lirc",
-                         action="store_true",
-                         help=_("enable lirc remote control support"))
     optParser.add_option("--region", dest="region",
                          metavar="REGION",
                          help=_("Set player's region to REGION. Possible "
@@ -143,6 +140,11 @@ def main():
                          help=_("set pixel aspect ratio to ASPECT "
                                 "(default 1/1)"),
                          default="1/1")    
+    optParser.add_option("--plugins", dest="plugins",
+                         metavar="PLUGINS",
+                         help=_("Enable Seamless plugins listed in "
+                                "PLUGINS (a comma separated list)"),
+                         default="xscreensaver")
     (options, args) = optParser.parse_args()
     options = DictOptions(options)
 

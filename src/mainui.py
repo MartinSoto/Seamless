@@ -20,6 +20,7 @@
 import os
 import sys
 import traceback
+import re
 
 import gst
 
@@ -30,10 +31,8 @@ import tasklet
 import player
 from baseui import UIManager, ActionGroup, action, toggleAction
 import mainwindow
-
-# "Plugins"
-import lirc
-import xscreensaver
+import pluginmgr
+import message
 
 
 class MainUserInterface(UIManager):
@@ -45,8 +44,7 @@ class MainUserInterface(UIManager):
                  
                  'window',
 
-                 'lirc',
-                 'xscreensaver')
+                 'pluginManager')
 
     def __init__(self, player, options):
         super(MainUserInterface, self).__init__()
@@ -60,11 +58,19 @@ class MainUserInterface(UIManager):
         self.window.fullScreen(options.fullScreen)
         self.window.show()
 
-        # Initialize all 'plugins'.
-        # FIXME: A decent framework for extensions is necessary here.
-        if self.options.lirc:
-            self.lirc = lirc.LIRC(self)
-        self.xscreensaver = xscreensaver.XScreensaver(self)
+        # Activate the plugins.
+        self.pluginManager = pluginmgr.PluginManager()
+        for pluginName in re.split(' *, *', options.plugins):
+            e = self.pluginManager.loadPlugin('plugins.' + pluginName, self)
+            if e:
+                mainMsg = _("Could not activate plugin '%s'") % pluginName
+                secMsg = _("The named plugin couldn't be activated. "
+                           "If you specified a plugin list in the command"
+                           " line, verify it. Otherwise, "
+                           "your Seamless installation could be broken. "
+                           "The internal error message produced while "
+                           "activating the plugin was: \"%s\"" % e)
+                message.errorDialog(mainMsg, secMsg)
 
     def getPlayer(self):
         return self.player
@@ -81,11 +87,18 @@ class MainUserInterface(UIManager):
         yield tasklet.WaitForSignal(self.player, 'stopped')
         tasklet.get_event()
 
-        # Stop control plugins.
-        # FIXME: A decent framework for extensions is necessary here.
-        if self.options.lirc:
-            self.lirc.close()
-        self.xscreensaver.close()
+        # Stop the plugins.
+        for modName, e in self.pluginManager.closePlugins():
+            if modName.startswith('plugins.'):
+                pluginName = modName[8:]
+            else:
+                pluginName = modName
+
+            mainMsg = _("Error closing plugin '%s'") % pluginName
+            secMsg = _("The named plugin couldn't be closed. "
+                       "The internal error message produced while "
+                       "closing the plugin was: \"%s\"" % e)
+            message.errorDialog(mainMsg, secMsg)
 
         gtk.main_quit()
 

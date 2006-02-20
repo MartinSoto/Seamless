@@ -1,5 +1,30 @@
 2006-02-20  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/seamless.py (main): Erase --lirc option and add --plugins
+	option for specifying a plugin list.
+
+	* src/mainui.py (MainUserInterface.__slots__) 
+	(MainUserInterface.__init__, MainUserInterface.shutdown): Use the
+	new plugin manager.
+
+	* src/message.py (errorDialog): Hide messages after receiving a
+	response.
+
+	* src/plugins/xscreensaver.py: 
+	(Plugin): 
+	* src/plugins/lirc.py: 
+	(Plugin): Use Plugin as main class name, since that's required by
+	the manager.
+
+	* src/plugins/Makefile.am: 
+	* src/plugins/__init__.py: Move previous plugins to the plugins
+	subdirectory.
+
+	* src/pluginmgr.py: New plugin manager module for general
+	extensions to Seamless.
+
+2006-02-20  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/xscreensaver.py (XScreensaver.timeout): Prevent funny
 	messages when xscreensaver-command is installed but no
 	xscreensaver is running.

@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -13,28 +13,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
+
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-import gtk
 
-def errorDialog(mainMsg, secMsg=None, parent=None):
-    flags = gtk.DIALOG_MODAL
-    if parent:
-        flags = flags | gtk.DIALOG_DESTROY_WITH_PARENT
-        
-    dialog = gtk.MessageDialog(parent=parent,
-                               flags=flags,
-                               type=gtk.MESSAGE_ERROR,
-                               buttons=gtk.BUTTONS_CLOSE,
-                               message_format=mainMsg)
-    dialog.set_title(_("Seamless DVD Player: Error"))
-
-    if secMsg:
-        dialog.format_secondary_markup(secMsg)
-
-    result = dialog.run()
-
-    if result != gtk.RESPONSE_DELETE_EVENT:
-        dialog.hide()
-
+# Empty

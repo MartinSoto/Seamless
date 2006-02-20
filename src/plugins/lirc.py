@@ -21,7 +21,7 @@ import traceback
 
 import gobject
 
-class LIRC(object):
+class Plugin(object):
     def __init__(self, mainUi):
         self.mainUi = mainUi
 

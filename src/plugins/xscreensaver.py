@@ -21,8 +21,8 @@ import sys
 
 import gobject
 
-class XScreensaver(object):
-    """Prevent xscreensaver from activating."""
+class Plugin(object):
+    """Prevent xscreensaver from activating while a movie is playing."""
 
     def __init__(self, mainUi):
         self.mainUi = mainUi
