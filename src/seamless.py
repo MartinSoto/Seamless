@@ -144,7 +144,7 @@ def main():
                          metavar="PLUGINS",
                          help=_("Enable Seamless plugins listed in "
                                 "PLUGINS (a comma separated list)"),
-                         default="xscreensaver")
+                         default="dpms,xscreensaver")
     (options, args) = optParser.parse_args()
     options = DictOptions(options)
 

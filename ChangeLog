@@ -1,5 +1,15 @@
 2006-02-20  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/seamless.py (main): Add DPMS plugin to the default list.
+
+	* src/plugins/xscreensaver.py (__init__, close): Remove DPMS
+	related bits.
+
+	* src/plugins/dpms.py: New plugin to stop DPMS while a movie is
+	being played.
+
+2006-02-20  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* src/seamless.py (main): Erase --lirc option and add --plugins
 	option for specifying a plugin list.
 
