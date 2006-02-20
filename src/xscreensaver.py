@@ -1,5 +1,5 @@
 # Seamless DVD Player
-# Copyright (C) 2004 Martin Soto <martinsoto@users.sourceforge.net>
+# Copyright (C) 2004-2006 Martin Soto <martinsoto@users.sourceforge.net>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -35,12 +35,15 @@ class XScreensaver(object):
         self.sourceId = gobject.timeout_add(30000, self.timeout)
 
     def timeout(self):
-        # Do any significant work in other process.
-        if os.fork() == 0:
-            # Redirect standard output to /dev/null to prevent
-            # xscreensaver-command from cluterring the output.
+        # Do the work in another process.
+        pid = os.fork()
+        if pid == 0:
+            # Redirect standard output and error to /dev/null to prevent
+            # xscreensaver-command from cluttering the output.
             descr = os.open('/dev/null', os.O_WRONLY)
             os.dup2(descr, 1)
+            descr = os.open('/dev/null', os.O_WRONLY)
+            os.dup2(descr, 2)
     
             try:
                 os.execlp('xscreensaver-command', 'xscreensaver-command',
@@ -48,7 +51,16 @@ class XScreensaver(object):
             except OSError:
                 # xscreensaver-command not found. Deactivate the timeout.
                 gobject.source_remove(self.sourceId)
+                return False
         else:
+            pid, status = os.waitpid(pid, 0)
+
+            if status & 0xff != 0 or status >> 8 != 0:
+                # Something went wrong while calling
+                # xscreensaver-command. Deactivate the timeout.
+                gobject.source_remove(self.sourceId)
+                return False
+
             return True
 
     def close(self):

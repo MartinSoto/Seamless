@@ -1,3 +1,9 @@
+2006-02-20  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* src/xscreensaver.py (XScreensaver.timeout): Prevent funny
+	messages when xscreensaver-command is installed but no
+	xscreensaver is running.
+
 2006-02-13  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/player.py (DVDPlayer.togglePause): New function to
