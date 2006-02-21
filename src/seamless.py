@@ -36,6 +36,10 @@ try:
 except:
     print _("WARNING: gobject doesn't have threads_init, no threadsafety")
 
+import dbus
+if getattr(dbus, 'version', (0,0,0)) >= (0,41,0):
+    import dbus.glib
+
 import pygtk
 pygtk.require('2.0')
 import gtk
@@ -143,8 +147,9 @@ def main():
     optParser.add_option("--plugins", dest="plugins",
                          metavar="PLUGINS",
                          help=_("Enable Seamless plugins listed in "
-                                "PLUGINS (a comma separated list)"),
-                         default="dpms,xscreensaver")
+                                "PLUGINS. PLUGINS is a comma separated "
+                                "list"),
+                         default="dpms,xscreensaver,gnomescreensaver")
     (options, args) = optParser.parse_args()
     options = DictOptions(options)
 

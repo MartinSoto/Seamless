@@ -1,5 +1,13 @@
 2006-02-21  Martin Soto  <martinsoto@users.sourceforge.net>
 
+	* src/seamless.py (main): Make the gnomescreensaver plugin active
+	by default.
+
+	* src/plugins/gnomescreensaver.py: New plugin to stop Gnome
+	Screensaver from activating during a movie.
+
+2006-02-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
 	* m4/pkg.m4: New version.
 
 	* configure.ac: Fix reference to src/plugins/Makefile.
