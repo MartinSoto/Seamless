@@ -134,7 +134,7 @@ AC_OUTPUT([
   src/gazpacho/loader/Makefile
   src/machine/Makefile
   src/player/Makefile
-  src/plugin/Makefile
+  src/plugins/Makefile
   src/tasklet/Makefile
 ])
 

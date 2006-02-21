@@ -1,3 +1,9 @@
+2006-02-21  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* m4/pkg.m4: New version.
+
+	* configure.ac: Fix reference to src/plugins/Makefile.
+
 2006-02-20  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/seamless.py (main): Add DPMS plugin to the default list.
