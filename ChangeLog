@@ -1,3 +1,12 @@
+2006-03-13  Martin Soto  <martinsoto@users.sourceforge.net>
+
+	* gst-plugins/Makefile.am: 
+	* configure.ac: 
+	* gst-plugins/alsaspdif/Makefile.am:
+	* gst-plugins/alsaspdif/alsaspdifsink.c:
+	* gst-plugins/alsaspdif/alsaspdifsink.h:
+	Old alsaspdif plugin removed.
+
 2006-02-10  Martin Soto  <martinsoto@users.sourceforge.net>
 
 	* src/player/player.py (DVDPlayer.stop): Wait only for paused

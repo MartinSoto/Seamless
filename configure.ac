@@ -100,13 +100,6 @@ dnl
 dnl Optional Dependencies
 dnl
 
-dnl Check for ALSA
-AM_PATH_ALSA(0.9.1, HAVE_ALSA="yes", HAVE_ALSA="no")
-AC_SUBST(HAVE_ALSA)
-AC_SUBST(ALSA_CFLAGS)
-AC_SUBST(ALSA_LIBS)
-AM_CONDITIONAL(HAVE_ALSA, test "x$HAVE_ALSA" = "xyes")
-
 dnl Check for Pyrex
 AC_PATH_PROG(PYREXC, pyrexc, NOT_FOUND)
 AC_SUBST(PYREXC)
@@ -123,7 +116,6 @@ AC_OUTPUT([
   config/Makefile
   glade/Makefile
   gst-plugins/Makefile
-  gst-plugins/alsaspdif/Makefile
   gst-plugins/capspipe/Makefile
   gst-plugins/seamless/Makefile
   gst-plugins/mpeg2sub/Makefile
