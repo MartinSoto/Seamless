@@ -98,8 +98,6 @@ class MainWindow(gtk.Window):
         self.set_border_width(0)
         self.set_property('can-focus', True)
 
-        self.connect('configure-event', self.mainConfigureEvent)
-
         vbox = gtk.VBox()
         vbox.show()
         self.add(vbox)
@@ -194,9 +192,6 @@ class MainWindow(gtk.Window):
     #
     # Callbacks
     #
-
-    def mainConfigureEvent(self, widget, event):
-        self.video.forceVideoUpdate()
 
     def videoReady(self, widget):
         # Start the player.

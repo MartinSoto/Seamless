@@ -121,27 +121,6 @@ class VideoWidget(gtk.EventBox):
 
 
     #
-    # Expose
-    #
-
-    def do_expose_event(self, event):
-        self.xlock.acquire()
-        self.overlay.expose()
-        self.xlock.release()
-
-        return True
-
-    def forceVideoUpdate(self):
-        """Force an update of the video display. This is used to keep
-        the video properly repainted when the main window is moved
-        without exposing any new area."""
-        if self.overlaySet:
-            self.xlock.acquire()
-            self.overlay.expose()
-            self.xlock.release()
-
-
-    #
     # Cursor
     #
 
@@ -239,12 +218,6 @@ class VideoWidget(gtk.EventBox):
     def deleteCb(self, da):
         self.overlay.set_xwindow_id(0L)
         set.overlaySet = False
-
-    def buttonPressCb(self, widget, event):
-        # We send button press navigation events "by hand" here, since
-        # Gtk seems to prevent the GStreamer elements from doing so.
-        self.overlay.send_mouse_event ('mouse-button-press',
-                                       event.button, event.x, event.y)
 
     def buttonPressCb(self, widget, event):
         # We send button press navigation events "by hand" here, since
