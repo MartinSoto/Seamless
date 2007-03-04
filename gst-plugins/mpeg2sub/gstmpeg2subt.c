@@ -1443,12 +1443,13 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
 
   if (from_sub_pad && !strcmp (event_type, "dvd-spu-highlight")) {
     gint button;
-    gint palette, sx, sy, ex, ey;
+    guint palette;
+    gint sx, sy, ex, ey;
     gint i;
 
     /* Details for the highlight region to display */
     if (!gst_structure_get_int (structure, "button", &button) ||
-        !gst_structure_get_int (structure, "palette", &palette) ||
+        !gst_structure_has_field_typed (structure, "palette", G_TYPE_UINT) ||
         !gst_structure_get_int (structure, "sx", &sx) ||
         !gst_structure_get_int (structure, "sy", &sy) ||
         !gst_structure_get_int (structure, "ex", &ex) ||
@@ -1457,6 +1458,10 @@ gst_mpeg2subt_handle_dvd_event (GstMpeg2Subt * mpeg2subt, GstEvent * event,
       res = FALSE;
       goto done;
     }
+
+    palette = g_value_get_uint (gst_structure_get_value (structure,
+				                         "palette"));
+
     mpeg2subt->current_button = button;
     mpeg2subt->clip_left = sx;
     mpeg2subt->clip_top = sy;

@@ -51,7 +51,7 @@ def newsegment(update, startTime, endTime):
 
 
 #
-# Audio DVD Events
+# Aspect Ratio DVD Events
 #
 
 def aspectRatioSet(ratio_n, ratio_d):
@@ -98,12 +98,12 @@ def highlight(area, button, palette, immediate=True):
 
     st = gst.Structure('application/x-gst-dvd')
     st.set_value('event', 'dvd-spu-highlight')
-    st.set_value('button', button)
-    st.set_value('palette', palette)
-    st.set_value('sx', sx)
-    st.set_value('sy', sy)
-    st.set_value('ex', ex)
-    st.set_value('ey', ey)
+    st.set_value('button', button, 'int')
+    st.set_value('palette', palette, 'uint')
+    st.set_value('sx', sx, 'int')
+    st.set_value('sy', sy, 'int')
+    st.set_value('ex', ex, 'int')
+    st.set_value('ey', ey, 'int')
 
     return createCustom(st, outOfBand=immediate)
 
@@ -125,13 +125,13 @@ def stillFrame(start, stop):
 
 def subpictureClut(clut):
     """Create and return a new subpicture CLUT event based on the
-    specified color lookup table (an 16 position array)."""
+    specified color lookup table (a 16 position array)."""
     st = gst.Structure('application/x-gst-dvd')
     st.set_value('event', 'dvd-spu-clut-change')
 
     # Each value is stored in a separate field.
     for i in range(16):
-        st.set_value('clut%02d' % i, clut[i])
+        st.set_value('clut%02d' % i, clut[i], 'int')
 
     return createCustom(st)
 
