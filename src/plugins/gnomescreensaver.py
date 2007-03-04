@@ -29,7 +29,7 @@ class Plugin(object):
         self.saver = self.bus.get_object('org.gnome.ScreenSaver', 
                                          '/org/gnome/ScreenSaver')
         self.saver = dbus.Interface(self.saver, 'org.gnome.ScreenSaver')
-        self.saver.InhibitActivation(_('Seamless: Playing video'))
+        self.saver.Inhibit('Seamless', _('playing video'))
 
     def close(self):
         self.saver.AllowActivation()
